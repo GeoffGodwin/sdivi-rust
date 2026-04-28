@@ -62,7 +62,7 @@ A Python-side rework would not have yielded those properties; a Rust port does, 
 
 ### Distribution Model
 
-Open source. License is an open question (see Open Design Questions); the GitHub repo was initialized with MIT, and the recommendation is **Apache 2.0** for the patent grant given corporate adopters in the gardener-LLM use case.
+Open source under **Apache 2.0** (ratified 2026-04-28; replaces the GitHub auto-init MIT). Apache 2.0 was picked over AGPL/copyleft alternatives because the goal is broad adoption — including paid and enterprise use — with attribution preserved. The patent grant covers the gardener-LLM corporate adopter use case explicitly. `LICENSE` and `NOTICE` are at the repo root; every published crate sets `license = "Apache-2.0"`.
 
 Distribution shapes:
 
@@ -879,8 +879,8 @@ The questions named in `sdi-rust-scope.md` plus a couple of additions surfaced w
 2. **Graph library.** `petgraph` is the default. If Leiden's hot path needs a more cache-friendly representation (CSR), we may roll our own minimal graph type for the detection stage. **Decide after the Leiden port spike.**
 3. **Tree-sitter grammar distribution.** Compile-time linking (each grammar a build dependency) vs. runtime dynamic loading. Compile-time is simpler and matches Rust ecosystem norms; runtime gives smaller binaries when not all grammars are needed. **Recommend compile-time for MVP with feature flags per language.**
 4. **MSRV.** Rust minimum supported version. **Recommend "stable latest minus 2"** — generous enough for distros, conservative enough to use modern features. Decide before m01.
-5. **Crate name on crates.io.** Verify `sdi`, `sdi-core`, `sdi-cli` are available before committing. **Reserve early** — pre-work item before m01.
-6. **License.** sdi-py says MIT or Apache 2.0. The GitHub-side initial commit used MIT. **Recommend Apache 2.0** for the patent grant; the gardener-LLM use case has corporate adopters in mind. Decide and update LICENSE before the first crates.io publish.
+5. **Crate name on crates.io** — *partially resolved 2026-04-28.* `sdi` is taken (an unrelated dependency-injection library, ~2.9K downloads, last published 2023). `sdi-core`, `sdi-cli`, `sdi-config`, `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, all six `sdi-lang-*`, plus `sdi-rust`, `sdi-py`, `sdi-node` are available. Resolution: publish the install-discovery meta-crate as `sdi-rust` with `[[bin]] name = "sdi"` in `sdi-cli`'s `Cargo.toml` so users still type `sdi` after `cargo install sdi-rust`. m01 publishes `0.0.0` placeholders for all of the above to lock the names.
+6. **License** — *resolved 2026-04-28: Apache 2.0.* See KDD-8 in CLAUDE.md. Replaces the GitHub auto-init MIT. Picked over AGPL/copyleft alternatives because the explicit goal is broad adoption including paid/enterprise use, and the explicit patent grant matters for corporate compliance. `LICENSE` and `NOTICE` at repo root; every crate's `Cargo.toml` sets `license = "Apache-2.0"`.
 7. **Bindings publish cadence.** PyO3 and napi-rs bindings are post-MVP. Open: do they live in this repo (`bindings/` directory in the workspace) or in their own repos? Recommendation is in-repo until they have non-trivial consumer-side surface area; split out only if cross-repo CI complexity outweighs the workspace benefit.
 8. **Snapshot file naming.** sdi-py uses `snapshot_<timestamp>_<sha>.json`. Carry forward unchanged unless we hit a real-world filename-length issue on one of the supported platforms.
 9. **`BTreeMap` vs `IndexMap` for catalogs.** `BTreeMap` orders by key (deterministic); `IndexMap` preserves insertion order (also deterministic given deterministic insertion). `BTreeMap` is the safer default. Revisit only if profiling shows the comparison cost on a hot path.

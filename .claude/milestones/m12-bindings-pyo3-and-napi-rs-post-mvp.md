@@ -1,5 +1,16 @@
 #### Milestone 12: Bindings — PyO3 and napi-rs (Post-MVP)
 
+> **⚠ STOP — POST-MVP / NOT IN v0 MANIFEST**
+>
+> This file is planning content only. m12 is intentionally **not** listed in
+> `MANIFEST.cfg` because v0 closes at m11 (sdi-rust 0.1.0 release). Bindings
+> are post-MVP per the scope doc and may belong in a v1 era with its own
+> `DESIGN_v1.md` and a fresh manifest.
+>
+> Do **not** run `tekhton "Implement Milestone 12: …"` until you've
+> explicitly decided bindings work belongs to v0 (and re-added m12 to the
+> manifest) or opened a v1 era for it.
+
 **Scope:** Re-expose `sdi-core` through PyO3 (`bindings/sdi-py`) and napi-rs (`bindings/sdi-node`). Both ship in this workspace per KDD-11. Python wheel to PyPI; Node prebuilt to npm. Bindings mirror the Rust surface idiomatically: `sdi.Pipeline(cfg).snapshot(path)` in both languages.
 
 **Deliverables:**

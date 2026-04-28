@@ -1,21 +1,21 @@
 #### Milestone 1: Workspace Scaffold and `sdi-core` Skeleton
 
-**Scope:** Create the Cargo workspace with all crates as empty shells, wire up CI, settle license and MSRV. Stand up the `Config` struct and `ExitCode` enum — the two types every other crate depends on. Reserve crate names on crates.io. No real analysis logic yet.
+**Scope:** Create the Cargo workspace with all crates as empty shells, wire up CI, finalize MSRV, reserve crate names on crates.io with `0.0.0` placeholders, and stand up the `Config` struct and `ExitCode` enum — the two types every other crate depends on. License (Apache 2.0) and `sdi`-name workaround are already ratified during planning; this milestone just executes them. No real analysis logic yet.
 
 **Deliverables:**
 - Cargo workspace with `crates/sdi-core`, `crates/sdi-cli`, `crates/sdi-parsing`, `crates/sdi-graph`, `crates/sdi-detection`, `crates/sdi-patterns`, `crates/sdi-snapshot`, `crates/sdi-config`, and the six `sdi-lang-*` adapter crates as compile-but-empty libraries
 - `Config` struct in `sdi-config` with `Default`, full schema mirroring DESIGN, and 5-level precedence loader stub returning defaults
 - `ExitCode` closed enum in `sdi-core::exit_code` with explicit `i32` discriminants (`Success=0, RuntimeError=1, ConfigError=2, AnalysisError=3, ThresholdExceeded=10`)
 - `sdi-cli` builds a `sdi --version` binary
-- `LICENSE` set to Apache 2.0 (replacing initial MIT commit)
+- `LICENSE` (Apache 2.0) and `NOTICE` already in place from planning; verify contents match upstream; every crate's `Cargo.toml` sets `license = "Apache-2.0"`
 - `rust-toolchain.toml` pinning MSRV to "stable latest minus 2"
 - GitHub Actions: `ci.yml` (clippy, fmt, test on Linux/macOS/Windows × stable/MSRV); `release.yml` skeleton (no publish yet); `audit.yml` weekly
-- Crate names reserved on crates.io with empty 0.0.0 placeholders if needed
+- Crate names reserved on crates.io with empty `0.0.0` placeholders. Names to publish: `sdi-rust` (the install-discovery meta-crate; users `cargo install sdi-rust`), `sdi-core`, `sdi-cli`, `sdi-config`, `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-lang-rust`, `sdi-lang-python`, `sdi-lang-typescript`, `sdi-lang-javascript`, `sdi-lang-go`, `sdi-lang-java`, `sdi-py`, `sdi-node`. **The bare `sdi` is unavailable** (taken by an unrelated DI library); the binary stays `sdi` via `[[bin]] name = "sdi"` in `sdi-cli`'s `Cargo.toml`
 
 **Files to create or modify:**
 - `Cargo.toml` (workspace, pinned dep versions with `.workspace = true`)
 - `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`
-- `LICENSE`, `README.md`, `CHANGELOG.md`
+- `LICENSE`, `NOTICE`, `README.md`, `CHANGELOG.md` (all already exist; `Cargo.toml` workspace metadata wires them in)
 - `crates/sdi-core/{Cargo.toml,src/lib.rs,src/exit_code.rs,src/error.rs}`
 - `crates/sdi-cli/{Cargo.toml,src/main.rs}`
 - `crates/sdi-config/{Cargo.toml,src/lib.rs,src/config.rs,src/load.rs,src/error.rs}`
@@ -39,9 +39,11 @@
 - `crates/sdi-cli/tests/version.rs`: `assert_cmd::Command::cargo_bin("sdi").arg("--version")` succeeds
 
 **Watch For:**
-- Crate name conflicts on crates.io — check `sdi`, `sdi-core`, `sdi-cli` immediately; fall back to `sdi-rs-*` prefix and document if any taken
+- Crate name re-check before publishing — availabilities were verified 2026-04-28 but crates.io is first-come; re-run `cargo search` against each name immediately before `cargo publish`
+- Publish order matters: leaf crates first (`sdi-config`, `sdi-lang-*`), then `sdi-parsing`/`sdi-graph`/`sdi-detection`/`sdi-patterns`/`sdi-snapshot`, then `sdi-core`, then `sdi-cli`, then `sdi-rust` (meta). For empty `0.0.0` placeholders this ordering is cosmetic but for real publishes in m11 it's load-bearing
+- crates.io is **append-only** — once `0.0.0` is published it stays; do not panic about needing version bumps later
 - MSRV drift: pin a concrete version in `rust-toolchain.toml` and add an MSRV row to the CI matrix
-- LICENSE replacement must update the SPDX header in every published crate's `Cargo.toml` (`license = "Apache-2.0"`)
+- Every published crate's `Cargo.toml` needs `license = "Apache-2.0"` and a `description` (crates.io rejects publishes without one)
 - Workspace `[workspace.dependencies]` block must list every external dep with a pinned version; member crates use `dep.workspace = true`
 
 **Seeds Forward:**

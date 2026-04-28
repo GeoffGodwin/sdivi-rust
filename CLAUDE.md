@@ -16,7 +16,7 @@ sdi-rust is the Rust reimplementation of the Structural Divergence Indexer (SDI)
 - Distribution: crates.io (`sdi-core`, `sdi-cli`, language adapters), GitHub Releases (prebuilt `sdi` binaries Linux/macOS/Windows), PyPI (PyO3 wheel, post-MVP), npm (napi-rs prebuilt, post-MVP). WASM is post-MVP and only when a real consumer exists.
 - Invocation: typically once per merge to the primary branch (CI gate) plus ad-hoc human invocations; bindings introduce continuous in-process invocation from long-running agent runtimes. No daemon, no server, no interactive TUI.
 
-**License:** Recommended **Apache 2.0** (corporate adopter patent grant). The GitHub repo was initialized MIT — must be updated before first crates.io publish. Open source.
+**License:** **Apache 2.0** (ratified 2026-04-28). Permissive open source with explicit attribution preservation, contributor patent grant, and broad enterprise acceptance. `LICENSE` and `NOTICE` are at the repo root; every published crate sets `license = "Apache-2.0"` in its `Cargo.toml`.
 
 ## Architecture Philosophy
 
@@ -107,7 +107,8 @@ sdi-rust/
 ├── CHANGELOG.md                         # hand-maintained, conventional sections
 ├── MIGRATION_NOTES.md                   # entries for breaking 0.x → 0.(x+1) bumps
 ├── DRIFT_LOG.md                         # vendoring / patch decisions, design drift notes
-├── LICENSE                              # Apache 2.0 (decision in KDD)
+├── LICENSE                              # Apache 2.0 (KDD-8)
+├── NOTICE                               # Apache 2.0 attribution notice
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                       # lint+build+test matrix on push/PR
@@ -301,9 +302,9 @@ sdi-rust/
 
 ### KDD-8: License is Apache 2.0
 
-**Decision:** Replace MIT (used in initial GitHub commit) with Apache 2.0 before first crates.io publish.
+**Decision:** Apache 2.0 across the workspace. Replaced the initial MIT `LICENSE` (GitHub auto-init) on 2026-04-28; `NOTICE` file added per Apache 2.0 conventions.
 
-**Rationale (Open Q #6):** Patent grant matters for the gardener-LLM corporate adopter use case. Update LICENSE in Milestone 1.
+**Rationale (Open Q #6 → ratified):** Goal is broad adoption including paid/enterprise use, with attribution preserved. Apache 2.0 is permissive enough for corporate compliance teams to accept by default, includes an explicit contributor patent grant (which MIT lacks), and requires preservation of copyright and the `NOTICE` file. Every published crate's `Cargo.toml` sets `license = "Apache-2.0"`.
 
 ### KDD-9: Deltas are `null` on first snapshot, not zero
 

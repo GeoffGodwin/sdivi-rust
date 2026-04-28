@@ -13,11 +13,12 @@
 - `crates/sdi-snapshot/src/boundary_inference.rs`
 - `crates/sdi-config/src/boundary.rs` (extend with write path)
 - `crates/sdi-cli/src/commands/boundaries.rs` (full subcommand impl)
+- `docs/migrating-from-sdi-py.md` — **create** this file with at minimum the YAML comment-loss section (full migration guide is finished in Milestone 10)
 
 **Acceptance criteria:**
 - `sdi boundaries infer` on a multi-snapshot history proposes groupings only for clusters present in `stability_threshold` consecutive snapshots
 - `sdi boundaries ratify` writes a valid YAML file; reading it back produces an equivalent `BoundarySpec`
-- A user-written boundaries.yaml with comments loses comments on the next ratify; behavior documented in `docs/migrating-from-sdi-py.md`
+- A user-written boundaries.yaml with comments loses comments on the next ratify; behavior documented in `docs/migrating-from-sdi-py.md` (file is created here as a stub with the comment-loss section; Milestone 10 fills out the rest of the migration guide)
 - `sdi boundaries show` prints the spec in either YAML or JSON format
 
 **Tests:**

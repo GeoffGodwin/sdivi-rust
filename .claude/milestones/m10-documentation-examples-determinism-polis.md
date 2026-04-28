@@ -1,6 +1,6 @@
-#### Milestone 10: Documentation, Examples, Determinism Polish
+#### Milestone 10: Documentation, Examples, Determinism Polish, bifl-tracker Validation
 
-**Scope:** Stand up the documentation surfaces (`README.md`, `docs/*.md`, rustdoc with `#![deny(missing_docs)]`). Doc tests in CI. Runnable examples. Tighten determinism with `proptest` regression suite and FMA documentation.
+**Scope:** Stand up the documentation surfaces (`README.md`, `docs/*.md`, rustdoc with `#![deny(missing_docs)]`). Doc tests in CI. Runnable examples. Tighten determinism with `proptest` regression suite and FMA documentation. **Run sdi-rust end-to-end against bifl-tracker as the v0 validation gate** — this is the same harness sdi-py used for its v0 freeze and is the user-facing acceptance for "the rewrite produces the same answers." Failures here block 0.1.0 release.
 
 **Deliverables:**
 - `README.md` quick start, install paths (cargo, brew, binary), one-paragraph SDI overview, links — under 200 lines
@@ -12,13 +12,15 @@
 - `#![deny(missing_docs)]` enabled on `sdi-core` with docs for every public item
 - `cargo test --doc` runs in CI; no broken doc tests
 - `proptest` regression directory checked in; `prop_test_pipeline_deterministic`, `prop_test_delta_pure`, `prop_test_leiden_seeded` all permanent
+- **bifl-tracker validation harness** at `tools/validate-against-bifl-tracker.sh` — clones (or uses local checkout of) `~/workspace/geoffgodwin/bifl-tracker`, runs `sdi snapshot` at a fixed set of commits across its history (the same commits sdi-py validated against), and compares snapshot output to sdi-py's stored snapshots. Acceptable variance per KD11: modularity within 1%, community count ±10%, pattern entropy within 5%. The compared sdi-py snapshots are pinned in `tests/fixtures/bifl-tracker-baselines/`
 
 **Files to create or modify:**
-- `README.md`, `docs/{cli-integration,library-embedding,migrating-from-sdi-py,determinism}.md`
+- `README.md`, `docs/{cli-integration,library-embedding,migrating-from-sdi-py,determinism}.md` — `migrating-from-sdi-py.md` already exists from Milestone 9 with the comment-loss section; expand with the full carry/change matrix
 - `examples/{embed_pipeline,custom_config}.rs`
 - Doc comments throughout `crates/sdi-core/src/**/*.rs`
 - `crates/sdi-core/src/lib.rs` enables `#![deny(missing_docs)]`
 - `proptest-regressions/` directories per crate (committed)
+- `tools/validate-against-bifl-tracker.sh`, `tests/fixtures/bifl-tracker-baselines/` (pinned sdi-py snapshots from the bifl-tracker validation history)
 
 **Acceptance criteria:**
 - `cargo doc --workspace --no-deps` produces no warnings
@@ -27,6 +29,7 @@
 - README under 200 lines
 - All four `docs/*.md` files exist with non-trivial content
 - `proptest` regression files exist and are loaded by tests
+- `tools/validate-against-bifl-tracker.sh` runs end-to-end against the local bifl-tracker checkout and passes within the documented tolerances (modularity within 1%, community count ±10%, pattern entropy within 5%, boundary spread direction matches). A failing comparison blocks the milestone
 
 **Tests:**
 - Doc tests on every public function with an `# Examples` block

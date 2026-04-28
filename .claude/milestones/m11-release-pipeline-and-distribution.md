@@ -8,7 +8,7 @@
 - `CHANGELOG.md` with `0.1.0` entry covering all milestones
 - `cargo audit` weekly cron in `.github/workflows/audit.yml`
 - Binary size tracked in `CHANGELOG.md` per release
-- crates.io publish of `sdi-core`, `sdi-cli`, and the six adapter crates
+- crates.io publish (in dependency order): `sdi-config`, six `sdi-lang-*`, `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-core`, `sdi-cli`, `sdi-rust` (the install-discovery meta-crate). Each with version `0.1.0`. Bindings (`sdi-py`, `sdi-node`) are not published in this milestone — they ship in Milestone 12 (post-MVP)
 
 **Files to create or modify:**
 - `.github/workflows/release.yml` (full)
@@ -18,14 +18,14 @@
 
 **Acceptance criteria:**
 - Tagging `v0.1.0` triggers the release workflow; crates.io push waits on manual approval
-- After approval, `cargo install sdi` from crates.io succeeds and produces a working binary
+- After approval, `cargo install sdi-rust` from crates.io succeeds and produces a working `sdi` binary on PATH (binary name comes from `[[bin]] name = "sdi"` in `sdi-cli`)
 - GitHub Release page has binaries for all five Tier-1 + Tier-2 platforms
 - Binary size noted in CHANGELOG
 - `cargo audit` cron green
 
 **Tests:**
 - Dry-run the release workflow on a `vX.Y.Z-rc.N` pre-tag
-- Smoke test: `cargo install --version 0.1.0 sdi` on each platform; `sdi --version` reports `0.1.0`
+- Smoke test: `cargo install --version 0.1.0 sdi-rust` on each platform; `sdi --version` reports `0.1.0`
 - `cargo audit` clean
 
 **Watch For:**
