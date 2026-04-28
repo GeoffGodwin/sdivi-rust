@@ -19,3 +19,32 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Sensitive files
+.env
+*.pem
+*.key
+id_rsa
+.DS_Store
+
+# Tekhton runtime artifacts
+.claude/PIPELINE.lock
+.claude/PIPELINE_STATE.md
+.claude/MILESTONE_STATE.md
+.claude/CHECKPOINT_META.json
+.claude/LAST_FAILURE_CONTEXT.json
+.claude/TEST_BASELINE.json
+.claude/TEST_BASELINE_OUTPUT.txt
+.claude/test_acceptance_output.tmp
+.claude/dashboard/data/
+.claude/logs/
+.claude/indexer-venv/
+.claude/index/
+.claude/serena/
+.claude/dry_run_cache/
+.claude/migration-backups/
+.claude/watchtower_inbox/
+.claude/tui_sidecar.pid
+.claude/worktrees/
+.tekhton/BUILD_FIX_REPORT.md
+.claude/preflight_bak/
