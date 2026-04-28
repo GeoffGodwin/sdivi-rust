@@ -1,0 +1,1183 @@
+# Tekhton Planning Answers
+# Project: sdi-rust
+# Template: library
+# Generated: 2026-04-28T00:00:00Z
+# Tekhton: 3.71.0
+#
+# Seeded from:
+#   - structural-divergence-indexer/.claude/sdi-rust-scope.md  (the canonical
+#     pre-implementation scope document)
+#   - structural-divergence-indexer/CLAUDE.md                  (sdi-py rules
+#     that carry over unchanged per the scope doc's "What carries over" list)
+#
+# This file is intended for `tekhton --plan --answers <this-file>`. It picks the
+# `library` template because KD12 in the scope doc is explicit: sdi-rust is
+# library-first; the CLI is a deployment shape, not the canonical interface.
+
+sections:
+  developer_philosophy_constraints:
+    title: "Developer Philosophy & Constraints"
+    phase: 1
+    required: true
+    guidance: "Non-negotiable architectural rules. What patterns must every contributor follow from day one? What anti-patterns are banned?"
+    answer: |
+      sdi-rust inherits sdi-py's core principles unchanged. They are language-agnostic and
+      ratified — the rewrite is a tech-stack pivot, not a redesign.
+
+      Non-negotiable principles:
+
+      1. Measurement over opinion. Every claim sdi-rust makes about a codebase is backed by
+         a concrete, reproducible measurement derived from AST analysis or dependency graph
+         structure. No heuristics that cannot be explained. No scores without traceable
+         inputs. If a metric cannot be decomposed into its constituent measurements, it
+         does not ship.
+
+      2. Fever chart, not thermometer. Every metric must be trackable over time. The
+         primary output is always the trend — the rate of change of structural coherence,
+         not the absolute state. Alerts fire on rate-of-change thresholds, not absolute
+         values.
+
+      3. Automated inference, human ratification. sdi-rust infers structural boundaries
+         via Leiden community detection, proposes them, and waits for a human to ratify.
+         The tool measures divergence from declared intent, not from its own opinions.
+         Pattern categories detect structural shapes and count them but never classify
+         code as "good" or "bad."
+
+      4. Safe defaults, zero mandatory config. Running `sdi snapshot` on an un-initialized
+         repository produces useful output using purely inferred boundaries. Configuration
+         refines and ratifies — it is never required for first use.
+
+      5. Composable Unix tooling. Reads from filesystem and git history, writes JSON/text
+         to stdout/files, exits with meaningful codes. No daemon, no server, no interactive
+         TUI. Composes with `jq`, `diff`, CI pipelines, and git hooks.
+
+      6. Language-agnostic core, language-specific adapters. Dependency graph, community
+         detection, pattern fingerprinting, and snapshot diffing live in the language-
+         agnostic core (`sdi-core` crate). Per-language specifics live in adapter crates
+         (`sdi-lang-python`, `sdi-lang-typescript`, etc.). Tree-sitter provides consistent
+         AST representation across all supported languages.
+
+      7. Deterministic and reproducible — stronger than sdi-py. Same commit + same config +
+         same boundaries = same snapshot, bit-identical JSON output across runs on the same
+         platform, byte-stable across platforms modulo documented float edge cases. Rust
+         ownership and explicit RNG seeding upgrade sdi-py's discipline-level determinism
+         to a near-guarantee. `BTreeMap` over `HashMap` wherever output ordering matters.
+         RNG is explicit (`rand` with a chosen algorithm + seed). Floating-point is
+         controllable via `f64` ordering rules; deterministic across platforms with care
+         on FMA.
+
+      8. Memory safety enforcement is structural, not aspirational. sdi-py rule 15
+         ("tree-sitter CSTs not held in memory simultaneously") was enforced by convention
+         in Python. In Rust it is enforced by ownership: the parsing crate's API consumes
+         file content and yields a `FeatureRecord`; the CST is dropped before the function
+         returns. Memory usage is proportional to the largest single file, not the total
+         codebase size.
+
+      Banned anti-patterns (carry over from sdi-py unchanged):
+      - No ML/LLM calls in the analysis pipeline. sdi-rust is a measurement instrument;
+        determinism and reproducibility are non-negotiable.
+      - No network calls during analysis. No telemetry, no update checks, no remote
+        lookups. A snapshot must be producible on an airgapped machine.
+      - No opinions about code quality. sdi-rust never classifies code as "good" or
+        "bad." Pattern entropy is a measurement, not a judgment. Threshold breaches are
+        reported as "exceeded," not as "violations" or "problems."
+      - No automatic alert suppression. Elevated metrics are never silently accepted.
+        Teams must declare migration intent via per-category threshold overrides with
+        explicit expiry dates. After expiry, default thresholds resume without manual
+        intervention.
+      - No interactive TUI or daemon mode. CLI invocation only. Run, produce output, exit.
+
+      Rust-specific contributor rules:
+      - `unsafe` is forbidden in `sdi-core` and the language adapter crates. If a
+        future hot path requires `unsafe`, it lives in a dedicated crate behind a feature
+        flag with a SAFETY comment per block. Bindings crates (PyO3, napi-rs) may use
+        `unsafe` only as required by the binding macro.
+      - Public API of `sdi-core` is reviewed through a stability lens (see KD12). Adding
+        a `pub` symbol is a deliberate decision; removing one is a breaking change.
+      - All public items have `#[doc]`. `#![deny(missing_docs)]` on `sdi-core`.
+      - `cargo clippy -- -D warnings` is part of CI. No allow-listing without justification.
+      - `cargo fmt --check` is part of CI; default rustfmt config.
+  project_overview:
+    title: "Project Overview"
+    phase: 1
+    required: true
+    guidance: "What does this library do? Who uses it? What it replaces. License. From-scratch or port?"
+    answer: |
+      sdi-rust is the Rust reimplementation of the Structural Divergence Indexer (SDI),
+      delivered as a Cargo workspace whose primary product is the `sdi-core` library
+      crate. A thin CLI shell crate (`sdi-cli`) re-exposes the library through the
+      familiar `sdi` command surface (`init`, `snapshot`, `diff`, `trend`, `check`,
+      `show`, `boundaries`, `catalog`). Bindings crates (`sdi-py` via PyO3, `sdi-node`
+      via napi-rs) ship incrementally so non-Rust agent runtimes can embed the analysis
+      pipeline without shelling out.
+
+      What sdi-rust measures (carries over from sdi-py): the Structural Divergence Index,
+      a composite metric tracking the rate of structural drift in a codebase across four
+      dimensions — pattern entropy, convention drift rate, coupling topology delta, and
+      boundary violation velocity. Periodic snapshots are captured via tree-sitter AST
+      parsing and Leiden community detection, diffed over time, and surfaced as trend
+      data and CI gate checks.
+
+      Who uses it: software engineers, tech leads, and engineering managers responsible
+      for the structural health of codebases — particularly teams using AI-assisted
+      development at scale where multiple contributors generate code concurrently
+      without shared structural awareness. New audience added in sdi-rust era: tooling
+      authors and gardener-LLM developers who want to embed the pipeline directly via
+      Rust, Python, or Node bindings rather than shelling out to a binary.
+
+      Relationship to sdi-py: sdi-py (the existing `structural-divergence-indexer` repo)
+      is reframed as the POC. It freezes at the v0.x milestone that completes
+      bifl-tracker validation. Bug-fix-only afterward. No v1 work on the Python side.
+      sdi-rust starts at `0.1.0` with its own MAJOR.MILESTONE.PATCH counter — does not
+      inherit sdi-py's v0/v1 era system.
+
+      Why a rewrite, not a refactor: the rewrite is justified by deliverables that are
+      structurally awkward in Python — a stable embeddable library API, single-binary
+      distribution, near-deterministic output across platforms, and ownership-enforced
+      memory discipline for tree-sitter CSTs. A Python-side rework would not have
+      yielded those properties; a Rust port does, by construction. The five-stage
+      pipeline shape (parsing → graph → detection → patterns → snapshot/delta) and the
+      banned anti-patterns transfer unchanged.
+
+      Distribution model: open source. License is an open question (#6 in scope doc) —
+      the GitHub repo was initialized with MIT; the recommendation is Apache 2.0 for
+      the patent grant given corporate adopters in the gardener-LLM use case.
+      Distribution shapes: crates.io for `sdi-core`/`sdi-cli`, single-binary releases
+      via GitHub Releases for Linux/macOS/Windows (the "no Python install"
+      requirement), and bindings crates published to PyPI (PyO3 wheel) and npm
+      (napi-rs prebuilt) post-MVP.
+
+      Invocation frequency: typically once per merge to the primary branch (CI gate),
+      plus ad-hoc human invocations for exploration. Library bindings introduce a new
+      mode: continuous in-process invocation from a long-running agent runtime.
+
+      This is a **port** with deltas, not a from-scratch design. The scope document
+      `sdi-rust-scope.md` enumerates exactly what carries over (principles, pipeline,
+      module dependency rules, exit codes, config schema, boundary spec schema) and
+      what changes (tech stack, distribution shape, determinism guarantees, native
+      Leiden, snapshot schema clean break).
+  tech_stack:
+    title: "Tech Stack"
+    phase: 1
+    required: true
+    guidance: "Language, build tool, package registry, test framework, linter, docs, CI, MSRV."
+    answer: |
+      Language: Rust. MSRV (open question #4 in scope doc): "stable latest minus 2" —
+      generous enough for distros, conservative enough to use modern features. Decided
+      before m01 work begins.
+
+      Workspace layout: Cargo workspace with crates organized by responsibility.
+
+      ```
+      sdi-rust/
+      ├── Cargo.toml                   # workspace manifest
+      ├── crates/
+      │   ├── sdi-core/                # pipeline library — public, stable
+      │   ├── sdi-cli/                 # binary crate, thin shell over sdi-core
+      │   ├── sdi-parsing/             # tree-sitter integration, FeatureRecord
+      │   ├── sdi-graph/               # dependency graph (petgraph or custom CSR)
+      │   ├── sdi-detection/           # Leiden + boundary inference
+      │   ├── sdi-patterns/            # PatternFingerprint + catalog
+      │   ├── sdi-snapshot/            # snapshot model, delta, trend
+      │   ├── sdi-config/              # config TOML, boundary YAML loaders
+      │   ├── sdi-lang-python/         # Python tree-sitter adapter
+      │   ├── sdi-lang-typescript/     # TypeScript adapter
+      │   ├── sdi-lang-javascript/     # JavaScript adapter
+      │   ├── sdi-lang-go/             # Go adapter
+      │   ├── sdi-lang-java/           # Java adapter
+      │   └── sdi-lang-rust/           # Rust adapter
+      └── bindings/
+          ├── sdi-py/                  # PyO3 — post-MVP
+          └── sdi-node/                # napi-rs — post-MVP
+      ```
+
+      Module dependency rules (carry over from sdi-py KD-style):
+      - `sdi-cli` is the composition root; depends on everything.
+      - `sdi-parsing` depends only on tree-sitter and `sdi-config`.
+      - `sdi-graph` depends on `sdi-parsing` output and `petgraph`.
+      - `sdi-detection` depends on `sdi-graph` output.
+      - `sdi-patterns` depends on `sdi-parsing` output — NOT on graph or detection.
+      - `sdi-snapshot` is the assembly point: depends on graph, detection, patterns.
+      - `sdi-config` is leaf; depended on by all.
+      - `sdi-core` re-exports the public pipeline API; no module imports from `sdi-cli`.
+      - No cycles between crates.
+
+      Key dependencies (deltas vs sdi-py per scope doc table):
+
+      | Concern              | Crate / approach                                          |
+      |----------------------|-----------------------------------------------------------|
+      | AST parsing          | `tree-sitter` (Rust crate, native — no Python bindings)   |
+      | Graph                | `petgraph` (default); custom CSR if Leiden hot path needs |
+      | Community detection  | **Native Rust port of Leiden** (KD11) — no FFI to C++     |
+      | CLI framework        | `clap` v4, derive macros                                  |
+      | Terminal output      | `ratatui` for tables/progress, `owo-colors` / `anstream`  |
+      | TOML                 | `toml` crate (read+write)                                 |
+      | YAML (boundaries)    | `serde_yaml` for read; comment-preserving write deferred  |
+      | JSON (snapshots)     | `serde_json`                                              |
+      | RNG                  | `rand` with `StdRng` + explicit seed                      |
+      | Hashing              | `blake3` (fingerprints), `xxh3` (cache keys)              |
+      | Error handling       | `thiserror` for library, `anyhow` only at CLI boundary    |
+      | Serialization        | `serde` everywhere                                        |
+      | Workspace deps       | Pinned in workspace `Cargo.toml`, inherited via `.workspace = true` |
+
+      Tree-sitter grammar distribution (open question #3 in scope doc): compile-time
+      linking with feature flags per language. Each grammar is a build dependency
+      gated by a Cargo feature (`lang-python`, `lang-typescript`, ...). Default
+      feature set enables the same languages sdi-py supports.
+
+      Build tool: `cargo build --release` for binary; `cargo build -p sdi-core` for
+      library-only. Single-binary releases via `cargo build --release --bin sdi`.
+
+      Test framework: `cargo test` (built-in). `proptest` for property tests around
+      determinism and partition stability. `criterion` for benchmarks (run on tags,
+      not in normal CI). Integration tests in each crate's `tests/` directory plus a
+      top-level `tests/` directory for cross-crate scenarios.
+
+      Linter / formatter: `cargo clippy -- -D warnings`, `cargo fmt --check`. Default
+      rustfmt config; no project-specific overrides.
+
+      Documentation: `rustdoc`. Published to docs.rs for crates.io releases. README
+      points to docs.rs for `sdi-core` API; ships a separate `docs/cli-integration.md`
+      for the CLI surface.
+
+      CI: GitHub Actions, matrix on (Linux, macOS, Windows) × (stable, MSRV). Lint +
+      build + test on push/PR. Release workflow on tags pushes to crates.io and
+      attaches binaries to GitHub Releases.
+
+      Distribution:
+      - crates.io: `sdi-core`, `sdi-cli` (and language adapter crates as needed).
+        Crate name reservation is open question #5 in scope doc.
+      - GitHub Releases: prebuilt `sdi` binaries for Linux/macOS/Windows.
+      - PyPI / npm: bindings wheels via PyO3 / napi-rs (post-MVP).
+      - WASM: post-MVP (KD14 — only when a real consumer exists).
+  public_api_surface:
+    title: "Public API Surface"
+    phase: 1
+    required: true
+    guidance: "Every public function, class, type, or module. Signatures, behavior, examples. How is the API organized? What is the 80% use case?"
+    answer: |
+      sdi-rust has two public surfaces that must both stay stable: the `sdi-core`
+      library API (the canonical interface, per KD12) and the `sdi` CLI command
+      surface. The exit-code contract (0/1/2/3/10) is the hardest contract — see
+      Error Handling.
+
+      ### Library API — `sdi-core` crate
+
+      The library is a five-stage pipeline. The 80% use case is one call:
+
+      ```rust
+      use sdi_core::{Pipeline, Config};
+
+      let cfg = Config::load_or_default(repo_root)?;
+      let snapshot = Pipeline::new(&cfg).snapshot(repo_root)?;
+      println!("{}", serde_json::to_string_pretty(&snapshot)?);
+      ```
+
+      Top-level types and functions exposed from `sdi_core`:
+
+      - `Config` — Loaded configuration. `Config::load_or_default(path)` walks the
+        precedence order (CLI > env > project > global > defaults) and returns a
+        fully-resolved `Config`. `Config::default()` returns the built-in defaults.
+        All keys are `Copy`/`Clone` where cheap; complex sub-configs (boundaries,
+        threshold overrides) are owned. Error type: `ConfigError`.
+
+      - `Pipeline::new(&Config) -> Pipeline` — Cheap constructor. Holds references
+        to config; does not parse anything yet. `Pipeline::snapshot(&self, path: &Path)
+        -> Result<Snapshot, AnalysisError>` runs the full five-stage pipeline against
+        a repository tree. `Pipeline::delta(&self, prev: &Snapshot, curr: &Snapshot)
+        -> DivergenceSummary` is a pure function over two snapshots.
+
+      - `Snapshot` — `serde::Serialize + Deserialize`. Carries `snapshot_version`
+        ("1.0" for the sdi-rust schema, KD13 clean break from sdi-py). Always read
+        and write through this type; do not hand-edit JSON.
+
+      - `BoundarySpec` — `serde::Deserialize`. Read from `.sdi/boundaries.yaml` with
+        the same schema sdi-py uses (read-compatible). Write path may regress comment
+        preservation (open question #1 in scope doc — recommend "accept comment loss
+        on programmatic write" for MVP).
+
+      - `PatternCatalog`, `PatternFingerprint`, `FeatureRecord`, `DependencyGraph`,
+        `LeidenPartition`, `DivergenceSummary` — pipeline-stage outputs, all
+        Serialize-able and inspectable for embedders that want to drive their own
+        downstream analysis.
+
+      - `ExitCode` enum (`Success = 0`, `RuntimeError = 1`, `ConfigError = 2`,
+        `AnalysisError = 3`, `ThresholdExceeded = 10`) — published from `sdi-core`
+        so library consumers can return the same shell semantics if they choose.
+
+      Lower-level entry points (used by `sdi-cli`, also part of the stable surface):
+
+      - `sdi_core::parsing::parse_repository(&Config, &Path) -> impl Iterator<Item = FeatureRecord>`
+      - `sdi_core::graph::build_dependency_graph(impl Iterator<Item = FeatureRecord>) -> DependencyGraph`
+      - `sdi_core::detection::detect_communities(&DependencyGraph, seed: u64, gamma: f64) -> LeidenPartition`
+      - `sdi_core::patterns::build_pattern_catalog(impl Iterator<Item = FeatureRecord>, &Config) -> PatternCatalog`
+      - `sdi_core::snapshot::assemble(&DependencyGraph, &LeidenPartition, &PatternCatalog, &BoundarySpec, &Config) -> Snapshot`
+      - `sdi_core::snapshot::compute_delta(prev: &Snapshot, curr: &Snapshot) -> DivergenceSummary`
+
+      Stability commitment: every `pub` item in `sdi-core` is part of the SemVer
+      contract from `0.1.0` onward. Adding `pub` is deliberate; removing or renaming
+      `pub` is a breaking change. Internal-only items live in `pub(crate)` modules.
+
+      ### CLI command surface — `sdi-cli` crate
+
+      Same commands as sdi-py (read-compatible config and boundaries — see KD13):
+
+      - `sdi init` — write default `.sdi/config.toml` and detect languages
+      - `sdi snapshot [--commit REF] [--format json|text]` — capture and store
+      - `sdi diff <prev> <curr>` — compute delta between two stored snapshots
+      - `sdi trend [--last N]` — trend across stored snapshots
+      - `sdi check` — exit 10 if any threshold exceeded; 0 otherwise
+      - `sdi show [<id>] [--format json|text]` — inspect a snapshot
+      - `sdi boundaries {infer,ratify,show}` — manage boundary spec
+      - `sdi catalog [--format json|text]` — pattern catalog inspection
+
+      CLI flags map 1:1 onto config keys with CLI > env > config precedence (see
+      Config Architecture). Exit codes are stable across versions, including pre-1.0.
+
+      ### Bindings (post-MVP)
+
+      Bindings crates re-expose `sdi-core` through PyO3 (`sdi-py`) and napi-rs
+      (`sdi-node`). The Python and Node API mirror the Rust surface as closely as
+      idiomatic in each language: `sdi.Pipeline(cfg).snapshot(path)`. Bindings ship
+      after `sdi-core` is feature-stable (typically m04 or later).
+  core_algorithms_data_structures:
+    title: "Core Algorithms & Data Structures"
+    phase: 2
+    required: true
+    guidance: "What does the library do internally? Algorithms, data structures, complexity, edge cases."
+    answer: |
+      The pipeline is five sequential stages (carries over from sdi-py unchanged in
+      shape; implementation details are Rust-idiomatic).
+
+      ### Stage 1 — Parsing (`sdi-parsing`)
+
+      Input: repository root path + Config (which controls language detection and
+      exclude globs).
+
+      Algorithm:
+      1. Walk filesystem from repo root, applying `.gitignore` plus configured
+         exclude globs. File discovery is breadth-first, stable-sorted by path so
+         output is deterministic.
+      2. For each file, detect language by extension. Skip if no grammar registered.
+      3. Parse with the language adapter's tree-sitter grammar. Walk the CST,
+         extract a `FeatureRecord` (path, imports, exports, function/class/method
+         signatures, pattern instance handles).
+      4. **Drop the CST before the function returns.** Memory invariant enforced by
+         ownership: the parsing API consumes file content + grammar, returns
+         `FeatureRecord`, no CST escapes. Memory usage proportional to the largest
+         single file.
+
+      Parallelism: `rayon` parallel iterator over discovered files. Each worker has
+      its own grammar instance; thread-safe by construction.
+
+      Output: `Iterator<Item = FeatureRecord>` (or `Vec<FeatureRecord>` materialized
+      for downstream stages).
+
+      Complexity: O(N · F) where N is file count and F is average file size in
+      tokens. Benchmarked target: 50K-LOC repo in under 5 seconds on commodity
+      hardware (informational, not a hard contract — see Performance).
+
+      ### Stage 2 — Graph construction (`sdi-graph`)
+
+      Input: `Vec<FeatureRecord>`.
+
+      Algorithm:
+      1. Build a node per source file (or per top-level module — adapter decides).
+      2. For each `FeatureRecord`, resolve imports against known files; emit a
+         directed edge for each resolved import.
+      3. Edges are unweighted by default (KD4 from sdi-py carries over). Optional
+         weighting by import frequency / symbol count via `weighted_edges = true`.
+      4. Graph metrics computed once per snapshot: density, cycle count via DFS,
+         hubs (top-degree centrality), connected component count.
+
+      Data structure: `petgraph::Graph<NodeId, EdgeWeight>` for the default path; a
+      custom CSR (compressed sparse row) representation may be added for the Leiden
+      hot path if profiling shows the petgraph indirection dominates (open
+      question #2 in scope doc — decide after Leiden port spike).
+
+      Edge cases:
+      - Unresolved imports: dropped silently (logged at DEBUG).
+      - Self-loops: kept but excluded from cycle count.
+      - Disconnected components: each is partitioned independently in stage 3.
+
+      ### Stage 3 — Community detection (`sdi-detection`) — **KD11 hot zone**
+
+      Input: `DependencyGraph`, seed (u64), gamma (f64), optional warm-start
+      partition from prior snapshot.
+
+      Algorithm: native Rust port of Leiden (Traag et al. 2019), implementing
+      Modularity and CPM quality functions. Targets ~1500–2500 LOC. **No FFI to
+      the C++ implementation.**
+
+      Verification approach (this is the spec, not a footnote):
+      - Fixture suite: graphs of varying sizes (50, 500, 5000 nodes) parsed from
+        real codebases including bifl-tracker.
+      - For each fixture, run both `leidenalg` (via sdi-py or a one-off Python
+        harness) and the Rust port with a fixed seed.
+      - Pass criteria are *partition quality*, not bit-identity: modularity score
+        within 1% of leidenalg's, community count within ±10%, no community larger
+        than 50% of node count for graphs that leidenalg partitions sensibly, and
+        stable output across re-runs with the same seed.
+      - This regression suite ships in the `sdi-rust` repo and runs in CI (gated
+        behind a feature flag because it requires a Python+leidenalg installation).
+
+      Warm start: seed from `.sdi/cache/partition.json` (sdi-rust schema, distinct
+      from sdi-py's cache — see KD13).
+
+      Cold start: deterministic seed from `Config::random_seed` (default 42, sdi-py
+      compatibility).
+
+      Output: `LeidenPartition` (cluster assignments per node + per-cluster
+      stability score for boundary inference downstream).
+
+      ### Stage 4 — Pattern fingerprinting (`sdi-patterns`)
+
+      Input: `Vec<FeatureRecord>`, Config (categories, min_pattern_nodes,
+      scope_exclude).
+
+      Algorithm:
+      1. For each `FeatureRecord`, run the per-category tree-sitter queries against
+         the cached pattern instance handles to extract subtree shapes.
+      2. Hash each shape with `blake3` to a `PatternFingerprint`.
+      3. Group fingerprints into a `PatternCatalog`, tagging instance counts and
+         file locations per fingerprint per category.
+      4. Compute pattern entropy per category (distinct-shape count adjusted for
+         instance distribution).
+
+      `scope_exclude` excludes files from the catalog only — the same files remain
+      in the dependency graph and partition. Carry-over from sdi-py.
+
+      Determinism: BTreeMap-keyed catalog so iteration order is deterministic;
+      `blake3` hash seeded from a fixed key.
+
+      ### Stage 5 — Snapshot assembly + delta (`sdi-snapshot`)
+
+      Input: outputs of stages 2–4 plus `BoundarySpec` (if present).
+
+      Snapshot composition:
+      - `snapshot_version: "1.0"` (always — KD13)
+      - Pipeline stage outputs serialized via serde
+      - Per-dimension scalars: pattern entropy, convention drift (vs prior), coupling
+        delta, boundary violation count
+      - Intent divergence metrics, only present if `BoundarySpec` is loaded
+      - Velocity vectors (delta-from-prior). On first snapshot, all delta fields
+        are `null` (rule 14 in sdi-py — carries over).
+
+      Delta computation: pure function `compute_delta(prev: &Snapshot, curr:
+      &Snapshot) -> DivergenceSummary`. Returns `null` per-dimension when there is
+      no `prev`, NOT zero.
+
+      Storage: JSON files in `.sdi/snapshots/`. Atomic writes (tempfile + rename in
+      the target directory). Retention enforced synchronously after each write.
+
+      Edge cases (carry over from sdi-py):
+      - Missing boundary spec → all metrics computed except intent divergence; no
+        warning, this is normal operation.
+      - Snapshot with incompatible `snapshot_version` → warning + baseline
+        treatment (no delta), never a crash.
+      - Identical consecutive snapshots → DivergenceSummary fields all zero (not
+        null — null means "no prior").
+  configuration_options:
+    title: "Configuration & Options"
+    phase: 2
+    required: true
+    guidance: "What can consumers configure? Defaults, valid ranges, invalid values, mutability."
+    answer: |
+      Library consumers configure sdi-rust via the `Config` struct. CLI consumers
+      configure via flags + `.sdi/config.toml`. Both surfaces share the same
+      precedence order and the same default values. The `.sdi/config.toml` schema
+      is read-compatible with sdi-py (no migration required for users coming from
+      the Python POC — see KD13 compatibility matrix).
+
+      Precedence (highest to lowest):
+      1. Function arguments / CLI flags (`--format json`, etc.)
+      2. Environment variables (`SDI_LOG_LEVEL`, `SDI_WORKERS`, `SDI_CONFIG_PATH`,
+         `SDI_SNAPSHOT_DIR`, `NO_COLOR`)
+      3. Project-local config (`.sdi/config.toml`)
+      4. Global user config (`$XDG_CONFIG_HOME/sdi/config.toml` or
+         `~/.config/sdi/config.toml`)
+      5. Built-in defaults (compiled into `sdi-core`)
+
+      All keys are optional. Missing keys fall through to defaults. Malformed TOML
+      returns a `ConfigError` (CLI maps to exit code 2).
+
+      Config sections (TOML schema, identical to sdi-py):
+
+      - `[core]` — `languages` ("auto"), `exclude` (gitignore-style globs),
+        `random_seed` (default 42).
+      - `[snapshots]` — `dir` (default `.sdi/snapshots`), `retention` (default 100;
+        0 = unlimited).
+      - `[boundaries]` — `spec_file` (default `.sdi/boundaries.yaml`), `leiden_gamma`
+        (default 1.0 — KD5 manual override only, no auto-tuning), `stability_threshold`
+        (default 3), `weighted_edges` (default false — KD4).
+      - `[patterns]` — `categories` ("auto"), `min_pattern_nodes` (default 5),
+        `scope_exclude` (gitignore-style globs).
+      - `[thresholds]` — `pattern_entropy_rate` (default 2.0),
+        `convention_drift_rate` (default 3.0), `coupling_delta_rate` (default 0.15),
+        `boundary_violation_rate` (default 2.0).
+      - `[change_coupling]` — `min_frequency` (default 0.6), `history_depth`
+        (default 500).
+      - `[output]` — `format` (default "text"), `color` (default "auto").
+      - `[thresholds.overrides.<category>]` — per-category override sections.
+        `expires` field is **mandatory**; missing it is a config error (rule 6
+        from sdi-py, carries over). After expiry, override is silently ignored
+        and defaults resume.
+
+      Library mutability: `Config` is consumed at `Pipeline::new`. The pipeline
+      does not mutate config during a snapshot run. Consumers wanting per-call
+      overrides build a new Config instance — no global mutable state in
+      `sdi-core`.
+
+      Invalid values:
+      - Out-of-range numerics (negative seed, negative retention) return
+        `ConfigError::InvalidValue { key, message }`. CLI maps to exit 2.
+      - Unknown keys produce a deprecation warning but do not error (rule 12 from
+        sdi-py: config keys are never repurposed; removed keys are reserved
+        forever).
+
+      New `sdi-rust`-only keys (additive — sdi-py config files still load):
+      - `[determinism]` — `enforce_btree_order` (default true), reserved for
+        future toggles around float ordering / FMA control.
+      - `[bindings]` — placeholder section for binding-specific knobs (e.g.
+        `[bindings.python] convert_paths_to_str = true`). Unused at MVP; reserved.
+  error_handling_strategy:
+    title: "Error Handling Strategy"
+    phase: 2
+    required: false
+    guidance: "How does the library report errors? Error types, hierarchy, recoverable vs unrecoverable."
+    answer: |
+      sdi-rust uses `Result<T, E>` everywhere in the library. `panic!` is reserved
+      for "this should be impossible" invariant violations; recoverable errors
+      always return.
+
+      Error type taxonomy in `sdi-core`:
+
+      - `ConfigError` — TOML parse, invalid value, missing required field
+        (e.g. threshold override without `expires`). Maps to exit code 2.
+      - `AnalysisError` — parsing failure, graph construction failure, Leiden
+        diverged, snapshot serialization failure. Maps to exit code 3.
+      - `IoError` — file system, network-prohibited operations would fall here
+        (none expected). Maps to exit code 1.
+      - `ThresholdError` — used only by `sdi check` to signal exceedance. Maps
+        to exit code 10 (the only command that uses this code).
+
+      Crate strategy:
+      - `sdi-core` and supporting library crates use `thiserror` to derive named
+        error variants with structured fields. Errors carry context (file path,
+        line number, key name) so callers can decide how to surface them.
+      - `sdi-cli` is allowed to use `anyhow` at the binary boundary for
+        ergonomic error chaining in `main`. Library crates do not.
+
+      Exit-code contract (rule 8 from sdi-py — carries over unchanged, public API):
+
+      | Code | Meaning                                       |
+      |------|-----------------------------------------------|
+      | 0    | Success                                       |
+      | 1    | Runtime error (I/O, unexpected)               |
+      | 2    | Config / environment error                    |
+      | 3    | Analysis error (parse, graph, detection)      |
+      | 10   | Threshold exceeded — exclusively `sdi check`  |
+
+      Non-error cases:
+      - Missing tree-sitter grammar for one detected language: warning to stderr,
+        skip those files, continue. Only when ALL detected languages lack grammars
+        does `sdi snapshot` exit with code 3 (rule 10 from sdi-py).
+      - Missing boundary spec: normal operation, all metrics except intent
+        divergence are computed, no warning (rule 11 / 12-cli from sdi-py).
+      - First snapshot has `null` deltas, not zero (rule 14 / 7-system from
+        sdi-py).
+
+      Stderr / stdout discipline (rule 9 from sdi-py): logs, progress bars,
+      warnings → stderr. Snapshot JSON, summaries, table output → stdout.
+      `sdi show --format json | jq '.'` must always work without contamination.
+  type_system_generics:
+    title: "Type System & Generics"
+    phase: 2
+    required: false
+    guidance: "Generic types, type exports, utility types, narrowing."
+    answer: |
+      sdi-rust leans on Rust's type system for invariants that sdi-py enforced by
+      convention.
+
+      - `FeatureRecord`, `Snapshot`, `BoundarySpec`, `PatternCatalog`,
+        `DependencyGraph`, `LeidenPartition`, `DivergenceSummary` are concrete
+        types, not traits. Public, `serde::Serialize + Deserialize`. Embedders
+        get exact-shape data, not opaque handles.
+      - Pipeline stage functions are free functions or methods on `Pipeline`;
+        no inheritance hierarchy. Generics are kept narrow — most are bounded by
+        `Iterator<Item = FeatureRecord>` or `AsRef<Path>`.
+      - `Config` is a concrete struct with `Default`. No generics.
+      - Language adapters implement a `LanguageAdapter` trait
+        (in `sdi-parsing`) that the parsing stage dispatches over. Adapter trait
+        is the one stable extension point — third-party languages can be
+        implemented out-of-tree in MVP+1, though plugin loading is deferred (KD6
+        from sdi-py: no custom pattern categories at MVP).
+      - `BoundaryViolation`, `PatternInstance`, etc. are non-exhaustive enums
+        (`#[non_exhaustive]`) so adding variants is non-breaking.
+      - `ExitCode` is a closed enum with explicit `i32` discriminants matching
+        the contract.
+
+      Strict mode: the workspace passes `cargo clippy -- -D warnings` and
+      `cargo fmt --check`. `#![deny(missing_docs)]` on `sdi-core`. No
+      `#[allow(...)]` attributes on public items without an inline justification.
+  dependencies_peer_dependencies:
+    title: "Dependencies & Peer Dependencies"
+    phase: 2
+    required: false
+    guidance: "Runtime deps, peer deps, dev deps. Philosophy: zero-dep, minimal, batteries-included? Update strategy?"
+    answer: |
+      Philosophy: minimal but pragmatic. We use mature ecosystem crates for
+      parsing (tree-sitter), graphs (petgraph), serialization (serde), and CLI
+      (clap). We do not vendor or re-implement these. We DO implement Leiden
+      ourselves (KD11) because the community has no mature pure-Rust Leiden
+      crate and the FFI alternative loses our determinism story.
+
+      Runtime dependencies (workspace-pinned):
+      - `tree-sitter` + per-language grammar crates (gated by features)
+      - `petgraph`
+      - `serde`, `serde_json`, `serde_yaml`, `toml`
+      - `clap` (sdi-cli only)
+      - `ratatui`, `owo-colors`, `anstream` (sdi-cli only)
+      - `rayon` (parsing parallelism)
+      - `rand` (`StdRng`)
+      - `blake3`, `xxh3`
+      - `thiserror` (libraries), `anyhow` (sdi-cli only)
+      - `walkdir`, `globset`, `ignore` (file discovery)
+      - `tracing`, `tracing-subscriber` (structured logs to stderr)
+
+      Dev dependencies:
+      - `proptest` (property tests for determinism)
+      - `criterion` (benchmarks, gated)
+      - `assert_cmd`, `predicates` (CLI integration tests)
+      - `tempfile` (test fixtures)
+      - Python interop fixtures for KD11 verification — gated behind a feature
+        flag and `--ignored` test attribute so cargo test default doesn't try to
+        run them.
+
+      Peer dependencies (binding crates only):
+      - `pyo3` for `sdi-py` binding (post-MVP)
+      - `napi`, `napi-derive` for `sdi-node` binding (post-MVP)
+
+      Vulnerability strategy: `cargo audit` runs in CI on a weekly schedule and
+      on every release. Yanked crates trigger an issue. We update aggressively
+      within MSRV constraints; the workspace `Cargo.toml` is the single source
+      of truth for versions.
+
+      Vendoring: none at MVP. If a critical bug needs a fork patch, we vendor
+      via `[patch.crates-io]` and document the reason in `DRIFT_LOG.md`.
+  compatibility_platform_support:
+    title: "Compatibility & Platform Support"
+    phase: 2
+    required: false
+    guidance: "Supported runtime versions, browser support, environment, module formats, native bindings."
+    answer: |
+      Supported platforms (binary releases): Linux x86_64 + aarch64, macOS x86_64
+      + aarch64 (Apple Silicon), Windows x86_64. Tier-1 in CI: ubuntu-latest,
+      macos-latest. Tier-2 (release-only build verification): windows-latest.
+
+      MSRV: open question #4 — recommendation is "stable latest minus 2." Pinned
+      in `rust-toolchain.toml` and verified in CI.
+
+      Embedding environments:
+      - Native Rust consumers via crates.io (`sdi-core` library)
+      - Python via PyO3 wheel (sdi-py binding, post-MVP)
+      - Node via napi-rs prebuilt (sdi-node binding, post-MVP)
+      - Browser / WASM: not MVP (KD14). Lands when a real consumer exists.
+
+      Compatibility with sdi-py artifacts (KD13 — clean break vs read-compatible):
+
+      | Artifact                | Compat            | Notes |
+      |-------------------------|-------------------|-------|
+      | `.sdi/config.toml`      | Read-compatible   | sdi-rust accepts sdi-py config files; new keys are additive. |
+      | `.sdi/boundaries.yaml`  | Read-compatible   | Schema unchanged. Comment preservation on programmatic write may regress (open question #1). |
+      | `.sdi/snapshots/*.json` | **Clean break**   | sdi-rust does not read sdi-py snapshots. New schema version (1.0). Trend continuity for migrators is lost — acceptable. |
+      | `.sdi/cache/*`          | **Clean break**   | Internal; no compat concern. |
+      | Exit codes              | **Identical**     | Public API contract. |
+      | CLI flag surface        | **Compatible**    | Same commands, same primary flags. New flags additive. |
+
+      Determinism across platforms: bit-identical JSON output across runs on the
+      same platform. Byte-stable across platforms modulo documented float edge
+      cases (FMA on/off can cause last-bit differences in entropy scores —
+      documented and bounded; aggregate metrics still equal).
+  bundle_size_tree_shaking:
+    title: "Bundle Size & Tree-Shaking"
+    phase: 2
+    required: false
+    guidance: "Bundle size budget, tree-shaking, sideEffects, code splitting."
+    answer: |
+      Not applicable in the JavaScript bundling sense — sdi-rust ships as native
+      crates and prebuilt binaries, not as a browser bundle.
+
+      The analogous Rust concerns and how we handle them:
+      - Binary size: tracked manually per release in `CHANGELOG.md`. Strip
+        symbols on release builds. LTO enabled for the `sdi` binary. No hard
+        budget at MVP.
+      - Optional features: each language adapter is gated by a Cargo feature
+        (`lang-python`, `lang-typescript`, …). Consumers who want a smaller
+        binary can build with only the languages they need.
+      - Compile-time grammar inclusion: tree-sitter grammars are linked at
+        compile time (open question #3 — recommend compile-time for MVP). This
+        increases binary size for unused languages; the feature-flag approach
+        gives consumers a knob.
+      - Bindings size (post-MVP): the PyO3 wheel and napi-rs prebuilt are sized
+        per platform. We will revisit if a binding's size becomes a complaint.
+
+      Tree-shaking has no Rust analogue — `cargo` already drops unused code by
+      default, and `#[cfg(feature = "...")]` gates handle conditional compilation.
+
+  performance_characteristics:
+    title: "Performance Characteristics"
+    phase: 2
+    required: false
+    guidance: "Benchmarks, memory usage, concurrency, hot paths, performance trade-offs."
+    answer: |
+      Performance targets are inherited from sdi-py and tightened where Rust gives
+      headroom:
+
+      - Snapshot capture on a 50K-LOC repo: target sub-5-second wall-clock on
+        commodity hardware (single-snapshot run, cold cache). Same target as
+        sdi-py; Rust expected to comfortably beat it.
+      - 500K-LOC repo: target sub-30-second wall-clock. sdi-py struggles here
+        with parallel-parse memory pressure; Rust ownership rules make this
+        tractable.
+      - Memory ceiling: proportional to the largest single source file
+        (parsing CST) plus the dependency graph footprint, NOT total codebase
+        size. Enforced by ownership in `sdi-parsing`.
+
+      Hot paths:
+      - Stage 1 (parsing): parallelized via `rayon`. Per-worker grammar instance.
+        Watch tree-sitter grammar contention; if it shows up under profiling,
+        adopt one-grammar-per-language-per-worker pooling.
+      - Stage 3 (Leiden): the KD11 hot path. Targets ~1500–2500 LOC for the
+        port. Profile early; if `petgraph`'s adjacency representation becomes the
+        bottleneck, build a CSR view for detection (open question #2).
+
+      Concurrency: parsing is parallel; graph + detection are single-threaded
+      (matches sdi-py). The pipeline as a whole is `Send + Sync` so embedders
+      can run multiple snapshots concurrently against different repos.
+
+      Trade-offs:
+      - We pick determinism over raw throughput where they conflict — `BTreeMap`
+        over `HashMap`, ordered iteration, explicit RNG seed.
+      - We pick library-shape over CLI-shape where they conflict — the `sdi-cli`
+        crate cannot add code-paths that aren't reachable through `sdi-core`.
+
+      Benchmarks: `criterion` benches gated by a feature flag, run on release
+      tags only (matches sdi-py's CI-discipline benchmark approach). Track
+      regressions per release in `CHANGELOG.md`. No automated alerting on
+      benchmark drift at MVP.
+  versioning_release_strategy:
+    title: "Versioning & Release Strategy"
+    phase: 2
+    required: true
+    guidance: "Versioning scheme, deprecation, changelog, release process, pre-releases, breaking change process."
+    answer: |
+      sdi-rust uses **MAJOR.MILESTONE.PATCH** versioning, parallel to sdi-py's
+      scheme but with its own counter — the rewrite is a fresh start.
+
+      - **MAJOR** = design era. `0` while pre-MVP / iterating; `1` when the
+        first ratified post-MVP DESIGN_v1.md ships. Each design lives at
+        `.tekhton/DESIGN.md` (era v0) or `.tekhton/DESIGN_v<N>.md` (era v1+).
+      - **MILESTONE** = position within the current MAJOR. Increments on each
+        Tekhton milestone. Resets to 0 at every MAJOR bump.
+      - **PATCH** = bugfix / drift fix between milestones. Resets to 0 at
+        each new MILESTONE.
+
+      Era boundaries:
+
+      | Era | Versions      | Status                                                  |
+      |-----|---------------|---------------------------------------------------------|
+      | v0  | 0.1.0–0.x.y   | Active (this initiative)                                |
+      | v1  | 1.0.0+        | Future — opens with first ratified DESIGN_v1.md         |
+
+      sdi-rust does **not** inherit sdi-py's era counters or milestone numbers.
+      v0/m01 in sdi-rust is a fresh start.
+
+      Crates.io publishing: each Tekhton milestone that ships user-visible
+      surface area corresponds to a tag and a `cargo publish` of the affected
+      crates. Internal-only milestones bump PATCH and may not publish if no
+      crate's public API changed.
+
+      Pre-1.0 SemVer: any 0.x → 0.(x+1) bump may include breaking changes; we
+      document them in `CHANGELOG.md` and `MIGRATION_NOTES.md` if non-trivial.
+      0.x.(y+1) is reserved for non-breaking patches.
+
+      Post-1.0 SemVer: strict. `sdi-core` public surface stability per KD12;
+      breaking changes require a major bump and a `MIGRATION_NOTES.md` entry.
+
+      Deprecation policy: deprecated symbols are marked `#[deprecated(since,
+      note)]` and stay for at least one minor cycle before removal.
+
+      Changelog: hand-maintained `CHANGELOG.md` with conventional sections
+      (Added / Changed / Deprecated / Removed / Fixed / Security). Tekhton
+      milestones write entries; we do not auto-generate from commits.
+
+      Release process: tag-driven. `git tag vX.Y.Z` triggers the release
+      workflow which runs the matrix build, publishes affected crates, and
+      attaches binaries to the GitHub Release. Manual approval gate before
+      crates.io push (no auto-publish).
+  documentation_strategy:
+    title: "Documentation Strategy"
+    phase: 2
+    required: true
+    guidance: "API reference, guides, examples, hosting, doc tests."
+    answer: |
+      Three documentation surfaces:
+
+      1. **rustdoc / docs.rs** — the canonical API reference for `sdi-core` and
+         every public crate. `#![deny(missing_docs)]`. Every public item has a
+         doc comment with at least one `# Examples` block. Doc tests run in CI
+         (`cargo test --doc`); broken examples fail the build.
+
+      2. **`README.md` (root)** — quick start, installation paths (cargo, brew,
+         binary releases), one-paragraph "what is SDI", links to docs.rs and the
+         CLI guide. Stays under ~200 lines.
+
+      3. **`docs/` directory** — long-form guides:
+         - `docs/cli-integration.md` — manual CI integration recipe
+           (`cargo install sdi && sdi check`), GitHub Actions snippet, exit-code
+           reference. Polished GHA reusable action is post-MVP.
+         - `docs/library-embedding.md` — embedding `sdi-core` in a Rust agent
+           runtime; minimal viable consumer; common pitfalls (do not hold onto
+           `Snapshot` JSON across pipeline runs without re-parsing config).
+         - `docs/migrating-from-sdi-py.md` — what carries (`config.toml`,
+           `boundaries.yaml`, exit codes, CLI commands), what changes (snapshot
+           schema clean break, command flags that gained `--rust-only`
+           behaviors), explicit non-goals (we don't import sdi-py snapshots).
+         - `docs/determinism.md` — explains the BTreeMap discipline, the seed
+           contract, the float / FMA notes. Intended as both user reference and
+           contributor onboarding.
+
+      Examples crate: `examples/` directory in the workspace (not a published
+      crate) with runnable consumer snippets:
+      - `examples/embed_pipeline.rs` — minimal embedder
+      - `examples/custom_config.rs` — programmatic config building
+      - `examples/binding_python.py` — usage of the PyO3 binding (post-MVP)
+
+      Hosting: docs.rs auto-builds on crate publish. `docs/` lives in-repo and
+      is served as-is on GitHub. We do NOT stand up a marketing site at MVP.
+
+      Doc-test discipline: every code block in rustdoc that uses `///` and isn't
+      annotated `no_run` or `ignore` is a doc test. CI fails on broken doc tests.
+      This applies to `sdi-core` from m01.
+  config_architecture:
+    title: "Config Architecture"
+    phase: 3
+    required: true
+    guidance: "What values must live in config? Show full default config. Merge strategy. Runtime mutability."
+    answer: |
+      Config architecture mirrors sdi-py exactly (KD13 read-compatibility): same
+      precedence, same TOML schema, same defaults. Plus additive `sdi-rust`-only
+      sections (`[determinism]`, `[bindings]`).
+
+      ### Precedence (highest to lowest)
+
+      1. Function arguments (library) / CLI flags (binary)
+      2. Environment variables (`SDI_LOG_LEVEL`, `SDI_WORKERS`, `SDI_CONFIG_PATH`,
+         `SDI_SNAPSHOT_DIR`, `NO_COLOR`)
+      3. Project-local `.sdi/config.toml`
+      4. Global `$XDG_CONFIG_HOME/sdi/config.toml` (fallback `~/.config/sdi/config.toml`)
+      5. Built-in defaults (compiled into `sdi-core`)
+
+      ### Complete default configuration
+
+      ```toml
+      [core]
+      languages = "auto"
+      exclude = [
+        "**/vendor/**",
+        "**/node_modules/**",
+        "**/__pycache__/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/target/**",
+        "**/.git/**",
+      ]
+      random_seed = 42
+
+      [snapshots]
+      dir = ".sdi/snapshots"
+      retention = 100
+
+      [boundaries]
+      spec_file = ".sdi/boundaries.yaml"
+      leiden_gamma = 1.0
+      stability_threshold = 3
+      weighted_edges = false
+
+      [patterns]
+      categories = "auto"
+      min_pattern_nodes = 5
+      scope_exclude = []
+
+      [thresholds]
+      pattern_entropy_rate = 2.0
+      convention_drift_rate = 3.0
+      coupling_delta_rate = 0.15
+      boundary_violation_rate = 2.0
+
+      [change_coupling]
+      min_frequency = 0.6
+      history_depth = 500
+
+      [output]
+      format = "text"
+      color = "auto"
+
+      [determinism]
+      enforce_btree_order = true
+
+      [bindings]
+      # Reserved for future binding-specific knobs.
+      ```
+
+      ### Per-category threshold overrides
+
+      Mandatory `expires` field. Same shape as sdi-py:
+
+      ```toml
+      [thresholds.overrides.error_handling]
+      pattern_entropy_rate = 5.0
+      expires = "2026-09-30"
+      reason = "Migrating to ? operator from `match Err(_)` chains"
+      ```
+
+      Missing `expires` returns `ConfigError` (CLI exit 2). After expiry, override
+      is silently ignored and defaults resume.
+
+      ### Merge strategy
+
+      Section-by-section override (later wins). Within a section, key-by-key
+      override. Lists in `core.exclude` and `patterns.scope_exclude` are
+      **replaced**, not merged — same semantics as sdi-py. Threshold override
+      sub-tables are merged per-category (each `[thresholds.overrides.<cat>]` is
+      added; existing categories are replaced wholesale).
+
+      ### Runtime mutability
+
+      `Config` is consumed at `Pipeline::new`. The pipeline does not mutate
+      config during a run. To run two snapshots with different configs, build
+      two `Pipeline` instances. There is no global mutable config in `sdi-core`.
+
+      ### CLI ↔ config mapping
+
+      Flags map 1:1 to config keys. Examples:
+      - `--format json` ↔ `output.format = "json"`
+      - `--no-color` ↔ `output.color = "never"` (also `NO_COLOR=1` env)
+      - `--workers N` ↔ effective parallelism (no config key; CLI/env only)
+      - `--seed N` ↔ `core.random_seed = N`
+  testing_strategy:
+    title: "Testing Strategy"
+    phase: 3
+    required: false
+    guidance: "Unit tests, property tests, integration tests, compatibility tests, benchmarks, consumer tests."
+    answer: |
+      Three test tiers:
+
+      ### Unit + integration tests (`cargo test`)
+
+      Default `cargo test` runs:
+      - Per-crate unit tests (`#[cfg(test)] mod tests` or `tests/` files in each
+        crate). Coverage target 80%+ for `sdi-core`, `sdi-parsing`, `sdi-graph`,
+        `sdi-detection`, `sdi-patterns`, `sdi-snapshot`. CLI crate target 60%+
+        with the rest covered by integration tests.
+      - Cross-crate integration tests in the workspace-level `tests/` directory.
+        Real tree-sitter parsing, real `petgraph` graphs, real fixture repos,
+        real filesystem temp dirs.
+      - Doc tests (`cargo test --doc`). Every public function with a `# Examples`
+        block has a runnable doc test.
+
+      Fixture repos (parallel to sdi-py's `tests/fixtures/`):
+      - `tests/fixtures/simple-rust/` — 5–10 file Rust crate with known imports
+      - `tests/fixtures/simple-python/` — known structure, used for cross-language
+        and verification against sdi-py outputs
+      - `tests/fixtures/multi-language/` — Python + TypeScript adapter exercise
+      - `tests/fixtures/high-entropy/` — deliberate pattern variance
+      - `tests/fixtures/evolving/` — git repo with progressive drift (built by a
+        setup script run before the test, stored under `target/test-fixtures`)
+
+      ### Property tests (`proptest`)
+
+      Determinism is the primary property:
+      - `prop_test_pipeline_deterministic`: same input → bit-identical Snapshot
+        JSON across N runs.
+      - `prop_test_delta_pure`: `compute_delta(a, b)` is referentially
+        transparent.
+      - `prop_test_leiden_seeded`: native Leiden with the same seed produces the
+        same partition.
+
+      ### KD11 verification suite
+
+      Native Leiden vs `leidenalg`. Gated behind feature `verify-leiden` which
+      requires Python + leidenalg installed. Pass criteria are partition quality
+      (modularity within 1%, community count within ±10%), NOT bit-identity. CI
+      runs this on a dedicated job.
+
+      ### CLI integration tests
+
+      `assert_cmd` + `predicates` to assert exit codes, stdout/stderr discipline,
+      and atomic-write behavior. The exit-code contract is exhaustively tested
+      because it is a public API.
+
+      ### Benchmarks
+
+      `criterion` benches behind feature `bench`. Run on release tags only;
+      tracked in CHANGELOG.
+
+      ### What we do NOT test
+
+      - Real network: no network access from any test (rule 1 from sdi-py).
+      - Cross-version migration of sdi-py snapshot JSON: KD13 is a clean break;
+        we do not import sdi-py snapshots.
+      - Bit-identity of snapshot output across platforms: we test
+        modularity/aggregate-equality across platforms, not last-bit equality of
+        floats.
+  naming_conventions:
+    title: "Naming Conventions"
+    phase: 3
+    required: false
+    guidance: "Code naming per language. Public API naming. File structure. Test file naming. Domain terms."
+    answer: |
+      Rust standard naming, no project-specific overrides:
+
+      - Crates: `kebab-case`, prefix `sdi-` (`sdi-core`, `sdi-cli`,
+        `sdi-lang-python`).
+      - Modules: `snake_case`. One concern per module; group related items.
+      - Types, traits: `PascalCase` (`PatternFingerprint`, `BoundarySpec`,
+        `LanguageAdapter`).
+      - Functions, methods, fields, variables: `snake_case`.
+      - Constants: `SCREAMING_SNAKE_CASE` (`DEFAULT_GAMMA`, `MAX_RETENTION`,
+        `EXIT_THRESHOLD_EXCEEDED`).
+      - Generics: single-letter when local context is unambiguous (`T`, `E`),
+        descriptive when not (`Lang`, `Adapter`).
+      - Lifetime parameters: `'a`, `'src`, etc. — descriptive when more than
+        one is in scope.
+
+      File structure:
+      - One concern per file; group related types and functions in the same
+        module file.
+      - File ceiling guideline: 500 lines. Above that, split by sub-concern.
+        (sdi-py guideline carries over.)
+      - Tests co-located via `#[cfg(test)] mod tests` for unit tests; integration
+        tests in `tests/<crate-or-feature>.rs`.
+
+      Domain terms (carry over from sdi-py for cross-tool consistency):
+      - Snapshot: a single point-in-time capture.
+      - Delta: a `prev`/`curr` snapshot pair's computed difference.
+      - Trend: aggregation across multiple snapshots over time.
+      - Boundary: an inferred or ratified module grouping.
+      - Ratification: human acceptance of an inferred boundary.
+      - Pattern fingerprint: a structural hash of a tree-sitter subtree.
+      - Pattern category: a named group of patterns (e.g. "error_handling",
+        "async_patterns").
+      - Pattern entropy: distinct shape count adjusted for instance distribution.
+      - Drift: rate-of-change of a metric across snapshots.
+      - Velocity: per-pattern instance-count delta across snapshots.
+      - Threshold override: a per-category, time-boxed exemption from a default
+        threshold rate.
+
+      Imports / `use` ordering: rustfmt default. We do not enforce a stricter
+      grouping.
+  open_design_questions:
+    title: "Open Design Questions"
+    phase: 3
+    required: true
+    guidance: "Decisions deliberately deferred. What needs data or feedback before resolving?"
+    answer: |
+      These are the open questions named in `sdi-rust-scope.md` and a couple of
+      additions surfaced while drafting this DESIGN.
+
+      1. **YAML library choice.** `serde_yaml` is the obvious read path. Comment-
+         preserving write is the open question — sdi-py uses `ruamel.yaml` for this.
+         Options: (a) accept comment loss on programmatic write, document it; (b)
+         use a comment-preserving Rust YAML crate (verify maturity); (c) hand-write
+         a minimal YAML emitter that preserves the boundary spec's specific comment
+         patterns. **Recommendation:** (a) for MVP, revisit if users complain. Decide
+         before m01.
+
+      2. **Graph library.** `petgraph` is the default. If Leiden's hot path needs a
+         more cache-friendly representation (CSR), we may roll our own minimal graph
+         type for the detection stage. **Decide after the Leiden port spike.**
+
+      3. **Tree-sitter grammar distribution.** Compile-time linking (each grammar a
+         build dependency) vs. runtime dynamic loading. Compile-time is simpler and
+         matches Rust ecosystem norms; runtime gives smaller binaries when not all
+         grammars are needed. **Recommend compile-time for MVP with feature flags
+         per language.**
+
+      4. **MSRV.** Rust minimum supported version. **Recommend "stable latest minus
+         2"** — generous enough for distros, conservative enough to use modern
+         features. Decide before m01.
+
+      5. **Crate name on crates.io.** Verify `sdi`, `sdi-core`, `sdi-cli` are
+         available before committing. **Reserve early** — pre-work item before m01.
+
+      6. **License.** sdi-py says MIT or Apache 2.0. The GitHub-side initial commit
+         used MIT. **Recommend Apache 2.0** for the patent grant; the gardener-LLM
+         use case has corporate adopters in mind. Decide and update LICENSE before
+         the first crates.io publish.
+
+      7. **Bindings publish cadence.** PyO3 and napi-rs bindings are post-MVP. Open:
+         do they live in this repo (`bindings/` directory in the workspace) or in
+         their own repos? Recommendation is in-repo until they have non-trivial
+         consumer-side surface area; split out only if cross-repo CI complexity
+         outweighs the workspace benefit.
+
+      8. **Snapshot file naming.** sdi-py uses `snapshot_<timestamp>_<sha>.json`.
+         Carry forward unchanged unless we hit a real-world filename-length issue
+         on one of the supported platforms.
+
+      9. **`BTreeMap` vs `IndexMap` for catalogs.** `BTreeMap` orders by key
+         (deterministic); `IndexMap` preserves insertion order (also deterministic
+         given deterministic insertion). `BTreeMap` is the safer default. Revisit
+         only if profiling shows the comparison cost on a hot path.
+
+      10. **Determinism across FMA.** Float fused-multiply-add can produce different
+          last-bit results across CPU microarchitectures. We document this and
+          assert aggregate equality, not bit equality, in cross-platform tests. If
+          a real adopter needs bit-identical output across platforms, we revisit
+          via a build flag that disables FMA in entropy code paths.
+  what_not_to_build_yet:
+    title: "What Not to Build Yet"
+    phase: 3
+    required: false
+    guidance: "Features explicitly deferred. What, why, what milestone might add it."
+    answer: |
+      Items moved into MVP scope (vs sdi-py's defer list) because they are the
+      reason for the rewrite:
+      - **Embeddable library API.** Was deferred in sdi-py (CLI-only); now MVP
+        scope as `sdi-core`.
+      - **Standalone binary distribution.** Was deferred (PyInstaller complexity);
+        trivially in-scope here (`cargo build --release`).
+      - **Native Leiden.** Was deferred / reliant on `leidenalg`; now MVP via the
+        KD11 native port.
+
+      Items still deferred:
+
+      - **GitHub Actions reusable action.** Easier with a single binary, but still
+        post-MVP polish. Document manual `cargo install sdi && sdi check` for
+        m01–m03; revisit after stable schema.
+      - **WASM bindings.** KD14: not MVP. Lands when a concrete consumer exists.
+      - **IDE/editor plugin.** Requires stable API and snapshot schema. Post-1.0.
+      - **SaaS dashboard / web UI.** sdi-rust is a measurement instrument, not a
+        platform. Output is JSON; existing dashboards (Grafana, Datadog) consume it.
+      - **Auto-remediation / gardener agent.** sdi-rust detects and measures
+        drift; it never fixes it. A companion tool generating consolidation PRs
+        is a separate project.
+      - **Plugin system for custom analyzers.** Built-in pattern categories only
+        at MVP (KD6 from sdi-py carries over). Extensibility design after real
+        user feedback.
+      - **Cross-language dependency inference.** v0 tracks only explicit in-language
+        imports. Modeling cross-language coupling (TypeScript → Python via API)
+        requires API contract parsing — out of scope.
+      - **Historical backfill UX.** `sdi snapshot --commit REF` works for individual
+        commits. Batch backfill across hundreds of commits (parallelism, progress,
+        storage) is not designed; users script it with a bash loop.
+      - **Real-time / watch mode.** No file watcher daemon. CLI invocation on
+        merge events is the intended cadence. Watch mode violates the Unix
+        philosophy constraint.
+      - **Automatic drift-vs-evolution classification.** Explicitly rejected (KD1
+        from sdi-py). Humans declare migration intent via threshold overrides.
+      - **Stdin input for `sdi diff`.** Carries forward as deferred from sdi-py.
+      - **`sdi config` subcommand.** Edit `.sdi/config.toml` directly. Same
+        deferral as sdi-py.
