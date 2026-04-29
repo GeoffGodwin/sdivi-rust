@@ -125,8 +125,6 @@ fn merge_into(base: &mut toml::Table, overlay: toml::Table) {
                     (base_val, section_val)
                 {
                     merge_section(base_t, overlay_t, &section);
-                } else {
-                    // Non-table top-level value: overlay wins (shouldn't normally occur).
                 }
             }
             None => {

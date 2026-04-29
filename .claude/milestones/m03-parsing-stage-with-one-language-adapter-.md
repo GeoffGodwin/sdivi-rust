@@ -1,4 +1,9 @@
 #### Milestone 3: Parsing Stage with One Language Adapter (Rust)
+<!-- milestone-meta
+id: "3"
+status: "done"
+-->
+
 
 **Scope:** Stand up the parsing pipeline end-to-end with a single language: Rust itself (dogfood). File walker, `LanguageAdapter` trait, `FeatureRecord` struct, parallel parsing via `rayon`. Enforce the CST-drop ownership invariant. The other five adapters land in Milestone 4.
 

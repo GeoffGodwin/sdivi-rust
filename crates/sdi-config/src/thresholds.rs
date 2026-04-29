@@ -6,7 +6,7 @@ use crate::ConfigError;
 ///
 /// Uses the Gregorian calendar algorithm from the proleptic calendar system,
 /// derived from the Unix epoch. No external dependencies required.
-pub fn today_iso8601() -> String {
+pub(crate) fn today_iso8601() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -37,13 +37,13 @@ fn days_since_epoch_to_ymd(days: u32) -> (u32, u32, u32) {
 ///
 /// `expires_str` must be in `"YYYY-MM-DD"` format. An unparseable string is treated as
 /// non-expired (a separate validation step handles format errors).
-pub fn is_expired(expires_str: &str) -> bool {
+pub(crate) fn is_expired(expires_str: &str) -> bool {
     // ISO-8601 date strings in YYYY-MM-DD format compare correctly lexicographically.
     expires_str < today_iso8601().as_str()
 }
 
 /// Validates that `expires_str` is a well-formed `"YYYY-MM-DD"` date string.
-pub fn validate_date_format(expires_str: &str) -> bool {
+pub(crate) fn validate_date_format(expires_str: &str) -> bool {
     let parts: Vec<&str> = expires_str.split('-').collect();
     if parts.len() != 3 {
         return false;
@@ -63,7 +63,7 @@ pub fn validate_date_format(expires_str: &str) -> bool {
 /// override is missing the mandatory `expires` field. Removes expired overrides in-place.
 ///
 /// `table` is the fully-merged `toml::Table` before deserialization into [`Config`].
-pub fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<(), ConfigError> {
+pub(crate) fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<(), ConfigError> {
     let Some(toml::Value::Table(thresholds)) = table.get_mut("thresholds") else {
         return Ok(());
     };

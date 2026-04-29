@@ -9,6 +9,14 @@ description = "Rust language adapter for sdi-rust"
 
 [features]
 lang-rust = []
+# Enables ACTIVE_TREES counter in sdi-parsing for CST-drop invariant tests.
+test-tree-counter = ["sdi-parsing/test-tree-counter"]
 
 [dependencies]
-sdi-parsing = { workspace = true }
+sdi-parsing      = { workspace = true }
+tree-sitter      = { workspace = true }
+tree-sitter-rust = { workspace = true }
+
+[dev-dependencies]
+sdi-config = { workspace = true }
+tempfile   = { workspace = true }

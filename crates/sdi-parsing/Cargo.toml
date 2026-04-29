@@ -7,7 +7,22 @@ authors.workspace = true
 repository.workspace = true
 description = "File discovery and AST parsing stage for sdi-rust"
 
+[features]
+# Enables ACTIVE_TREES counter for CST-drop invariant tests.
+test-tree-counter = []
+
 [dependencies]
 sdi-config = { workspace = true }
 thiserror  = { workspace = true }
 serde      = { workspace = true }
+serde_json = { workspace = true }
+walkdir    = { workspace = true }
+globset    = { workspace = true }
+ignore     = { workspace = true }
+rayon      = { workspace = true }
+rayon-core = { workspace = true }   # explicit cap on transitive dep MSRV
+
+[dev-dependencies]
+sdi-lang-rust = { path = "../sdi-lang-rust", features = ["test-tree-counter"] }
+tempfile      = { workspace = true }
+proptest      = { workspace = true }
