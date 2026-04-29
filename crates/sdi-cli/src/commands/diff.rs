@@ -1,0 +1,51 @@
+//! `sdi diff` — compare two snapshots and display the divergence summary.
+
+use std::path::Path;
+
+use anyhow::{Context, Result};
+use sdi_core::{Pipeline, Snapshot, SNAPSHOT_VERSION};
+
+use crate::output;
+
+/// Runs `sdi diff` by loading two snapshot files and printing the divergence summary.
+///
+/// Loads `prev_path` and `curr_path` as [`Snapshot`] JSON files, computes the
+/// per-dimension delta via [`Pipeline::delta`], and writes the result to stdout
+/// in `format` (either `"json"` or `"text"`).  Logs and progress go to stderr
+/// per CLAUDE.md Rule 8.
+///
+/// If either snapshot has an incompatible `snapshot_version`, a warning is
+/// printed to stderr but processing continues (Rule 17).
+///
+/// # Errors
+///
+/// Returns an error if either snapshot file cannot be read or deserialized.
+pub fn run(prev_path: &Path, curr_path: &Path, format: &str) -> Result<()> {
+    let prev = Snapshot::load(prev_path)
+        .with_context(|| format!("failed to load previous snapshot: {}", prev_path.display()))?;
+    let curr = Snapshot::load(curr_path)
+        .with_context(|| format!("failed to load current snapshot: {}", curr_path.display()))?;
+
+    // Warn on incompatible snapshot versions but continue (Rule 17).
+    if prev.snapshot_version != SNAPSHOT_VERSION {
+        eprintln!(
+            "sdi: warning: previous snapshot version {:?} != {:?} — treating as baseline",
+            prev.snapshot_version, SNAPSHOT_VERSION,
+        );
+    }
+    if curr.snapshot_version != SNAPSHOT_VERSION {
+        eprintln!(
+            "sdi: warning: current snapshot version {:?} != {:?} — treating as baseline",
+            curr.snapshot_version, SNAPSHOT_VERSION,
+        );
+    }
+
+    let delta = Pipeline::delta(Some(&prev), &curr);
+
+    match format {
+        "json" => output::json::print_divergence(&delta)?,
+        _ => output::text::print_divergence(&delta),
+    }
+
+    Ok(())
+}

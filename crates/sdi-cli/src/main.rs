@@ -29,6 +29,25 @@ enum Commands {
         #[arg(long, default_value = "text")]
         format: String,
     },
+    /// Capture a snapshot of the repository's current structural state.
+    Snapshot {
+        /// Git commit SHA to record (optional).
+        #[arg(long)]
+        commit: Option<String>,
+        /// Output format: `text` (default) or `json`.
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+    /// Compare two snapshots and display the divergence summary.
+    Diff {
+        /// Path to the previous (older) snapshot JSON file.
+        prev: PathBuf,
+        /// Path to the current (newer) snapshot JSON file.
+        curr: PathBuf,
+        /// Output format: `text` (default) or `json`.
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
 }
 
 fn main() {
@@ -47,6 +66,12 @@ fn main() {
         Some(Commands::Init) => commands::init::run(&cli.repo),
         Some(Commands::Catalog { format }) => {
             commands::catalog::run(&cli.repo, &config, &format)
+        }
+        Some(Commands::Snapshot { commit, format }) => {
+            commands::snapshot::run(&cli.repo, &config, commit.as_deref(), &format)
+        }
+        Some(Commands::Diff { prev, curr, format }) => {
+            commands::diff::run(&prev, &curr, &format)
         }
         None => {
             eprintln!("sdi: no subcommand given — try `sdi --help`");

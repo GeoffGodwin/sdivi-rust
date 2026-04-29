@@ -22,7 +22,7 @@ use crate::queries;
 /// let loc = PatternLocation { file: PathBuf::from("src/lib.rs"), start_row: 10, start_col: 4 };
 /// assert_eq!(loc.start_row, 10);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PatternLocation {
     /// Source file path relative to the repository root.
     pub file: PathBuf,
@@ -42,7 +42,7 @@ pub struct PatternLocation {
 /// let stats = PatternStats { count: 3, locations: vec![] };
 /// assert_eq!(stats.count, 3);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PatternStats {
     /// Total number of instances across all non-excluded files.
     pub count: u32,
@@ -64,7 +64,7 @@ pub struct PatternStats {
 /// let catalog = build_catalog(&[], &Config::default().patterns);
 /// assert!(catalog.entries.is_empty());
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct PatternCatalog {
     /// Outer key: category name; inner key: pattern fingerprint.
     pub entries: BTreeMap<String, BTreeMap<PatternFingerprint, PatternStats>>,

@@ -8,7 +8,20 @@ repository.workspace = true
 description = "Snapshot assembly, delta, and persistence for sdi-rust"
 
 [dependencies]
-sdi-config  = { workspace = true }
-thiserror   = { workspace = true }
-serde       = { workspace = true }
-serde_json  = { workspace = true }
+sdi-config    = { workspace = true }
+sdi-graph     = { workspace = true }
+sdi-detection = { workspace = true }
+sdi-patterns  = { workspace = true }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+blake3        = { workspace = true }
+tempfile      = { workspace = true }
+tracing       = { workspace = true }
+
+[dev-dependencies]
+tempfile      = { workspace = true }
+proptest      = { workspace = true }
+sdi-graph     = { workspace = true }
+sdi-detection = { workspace = true }
+sdi-patterns  = { workspace = true }

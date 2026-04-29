@@ -8,7 +8,12 @@ repository.workspace = true
 description = "Core library for the Structural Divergence Indexer"
 
 [dependencies]
-sdi-config   = { workspace = true }
-sdi-patterns = { workspace = true }
-thiserror    = { workspace = true }
-serde        = { workspace = true }
+sdi-config    = { workspace = true }
+sdi-parsing   = { workspace = true }
+sdi-graph     = { workspace = true }
+sdi-detection = { workspace = true }
+sdi-patterns  = { workspace = true }
+sdi-snapshot  = { workspace = true }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+tracing       = { workspace = true }

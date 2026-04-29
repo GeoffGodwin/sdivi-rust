@@ -24,7 +24,7 @@ use crate::dependency_graph::DependencyGraph;
 /// assert_eq!(m.node_count, 0);
 /// assert_eq!(m.edge_count, 0);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GraphMetrics {
     /// Total number of nodes (source files).
     pub node_count: usize,

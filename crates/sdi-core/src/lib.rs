@@ -21,8 +21,12 @@ pub mod error;
 /// Exit codes for the `sdi` binary — public API, adding variants is a breaking change.
 pub mod exit_code;
 
+/// Five-stage analysis pipeline — [`Pipeline::snapshot`] and [`Pipeline::delta`].
+pub mod pipeline;
+
 pub use error::AnalysisError;
 pub use exit_code::ExitCode;
+pub use pipeline::Pipeline;
 
 /// Pattern fingerprinting and catalog — re-exported from `sdi-patterns`.
 pub use sdi_patterns::{
@@ -30,8 +34,15 @@ pub use sdi_patterns::{
     PatternLocation, PatternStats, FINGERPRINT_KEY,
 };
 
+/// Snapshot types and functions — re-exported from `sdi-snapshot`.
+pub use sdi_snapshot::{
+    build_snapshot, compute_delta, enforce_retention, null_summary, write_snapshot,
+    DivergenceSummary, IntentDivergenceInfo, Snapshot, SNAPSHOT_VERSION,
+};
+
 /// Commonly-imported items from sdi-core.
 pub mod prelude {
     pub use crate::error::AnalysisError;
     pub use crate::exit_code::ExitCode;
+    pub use crate::pipeline::Pipeline;
 }

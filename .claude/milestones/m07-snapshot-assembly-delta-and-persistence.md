@@ -1,4 +1,9 @@
 #### Milestone 7: Snapshot Assembly, Delta, and Persistence
+<!-- milestone-meta
+id: "7"
+status: "done"
+-->
+
 
 **Scope:** Assemble the `Snapshot` from graph + partition + catalog + boundary spec. Implement `compute_delta` as a pure function. Atomic snapshot write to `.sdi/snapshots/`. Retention enforcement. Wire `sdi snapshot` and `sdi diff` end-to-end. The pipeline is now usable.
 

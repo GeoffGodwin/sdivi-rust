@@ -19,4 +19,12 @@ pub enum AnalysisError {
     /// Configuration error surfaced from within the pipeline.
     #[error("configuration error: {0}")]
     Config(#[from] sdi_config::ConfigError),
+
+    /// I/O error while writing a snapshot file or persisting the partition cache.
+    ///
+    /// Distinguished from [`AnalysisError::Io`] so callers can handle
+    /// snapshot-write failures separately from source-file read failures.
+    /// Not `#[from]` because `std::io::Error` is already claimed by [`AnalysisError::Io`].
+    #[error("snapshot write error: {0}")]
+    SnapshotIo(std::io::Error),
 }

@@ -15,17 +15,25 @@
 /// `gamma` = resolution parameter.
 ///
 /// Positive return value means the move improves CPM quality.
-///
-/// # Examples
-///
-/// ```rust
-/// use sdi_detection::leiden::cpm::cpm_move_gain;
-///
-/// // Moving a node with 3 connections to a 4-node community, gamma=1.
-/// // gain = 3 - 1*4 = -1 (no improvement)
-/// let gain = cpm_move_gain(3.0, 4.0, 1.0);
-/// assert!(gain < 0.0);
-/// ```
 pub fn cpm_move_gain(k_in_to: f64, n_to: f64, gamma: f64) -> f64 {
     k_in_to - gamma * n_to
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn negative_gain_when_few_connections() {
+        // 3 connections into 4-node community, gamma=1 → gain = 3 - 4 = -1
+        let gain = cpm_move_gain(3.0, 4.0, 1.0);
+        assert!(gain < 0.0);
+    }
+
+    #[test]
+    fn positive_gain_when_many_connections() {
+        // 5 connections into 2-node community, gamma=1 → gain = 5 - 2 = 3
+        let gain = cpm_move_gain(5.0, 2.0, 1.0);
+        assert!(gain > 0.0);
+    }
 }
