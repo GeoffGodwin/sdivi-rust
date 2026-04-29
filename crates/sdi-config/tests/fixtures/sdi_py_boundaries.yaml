@@ -1,0 +1,22 @@
+# sdi-py style boundaries.yaml — used for read-compat testing.
+version: "1"
+boundaries:
+  - name: api
+    description: "Public API surface"
+    modules:
+      - "src/api/**"
+    allow_imports_from:
+      - models
+      - utils
+
+  - name: models
+    description: "Data models and domain types"
+    modules:
+      - "src/models/**"
+    allow_imports_from: []
+
+  - name: utils
+    description: "Shared utilities"
+    modules:
+      - "src/utils/**"
+    allow_imports_from: []

@@ -20,4 +20,8 @@ pub enum ConfigError {
     /// I/O error reading a config file.
     #[error("I/O error reading config: {0}")]
     Io(#[from] std::io::Error),
+
+    /// YAML parse failure reading `.sdi/boundaries.yaml`.
+    #[error("failed to parse boundary spec: {0}")]
+    BoundaryParse(String),
 }

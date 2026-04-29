@@ -8,21 +8,21 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `crates/sdi-cli/src/main.rs` — `main()` returns `()` and never propagates `sdi_core::ExitCode` to the process exit code. Fine for M01 (no subcommands yet), but M08 must wire `std::process::exit(code.as_i32())` or use `ExitCode` as the `main` return type, or CI exit-code tests will never pass.
-- `Cargo.toml` — `clap = ">=4.4, <4.5"` restricts to 4.4.x only; security patches in 4.5+ are blocked. Coder acknowledged this and deferred relaxation to M11; ensure it is not forgotten.
-- `crates/sdi-core/src/lib.rs` — `pub mod prelude` is defined inline rather than as a separate `prelude.rs` file as shown in the CLAUDE.md repo layout. Code is correct; layout drifts from spec.
-- `.github/workflows/` — `verify-leiden.yml` (required by CLAUDE.md repo layout and KD11 verification job) was not created. Acceptable for M01; must land before the Leiden port milestone (M05).
-- `crates/sdi-config/src/config.rs:183` — `expires: String` relies on serde to error when the field is absent, but that yields a generic deserialization error, not `ConfigError::MissingExpiresOnOverride { category }`. The specific error variant and exit-2 contract (CLAUDE.md Rule 12 / Critical Rule 6) must be enforced via post-deserialization validation in M02's loader.
+- `init.rs:84` prints "use --force to overwrite" but `--force` is not wired into clap; a user who follows the hint gets a clap unknown-argument error. Remove the hint or implement the flag before 0.1.0.
+- `init.rs:63-68` (`config_path_for`) duplicates the `SDI_CONFIG_PATH` env-var lookup already in `load_or_default` (`load.rs:39-43`). If one drifts the other won't follow; extract a shared helper or delegate inside `load_or_default`.
+- `load.rs:122-131` (`merge_into`) silently drops a non-Table top-level overlay value (empty `else {}` branch). The comment explains it, but the function signature doesn't enforce the precondition (base derived from `Config::default()`) that makes it unreachable. Low risk now; high confusion risk for future maintainers.
+- Security (pre-noted by security agent, LOW): `load.rs:98` and `boundary.rs:60` check `path.exists()` then `read_to_string` separately (TOCTOU). Fix by calling `read_to_string` directly and matching `ErrorKind::NotFound` to return `Ok(None)`.
+- Security (pre-noted by security agent, LOW): `load.rs:111` formats the TOML key name with `{key}` not `{key:?}`; a malicious config could embed ANSI escape sequences. Fix with `{key:?}`.
+- `thresholds.rs:46-60` (`validate_date_format`) accepts semantically invalid days like `"2026-02-30"` (checks only `1..=31`, not month-specific bounds). Non-exploitable but could mislead a caller that relies on this function for semantic validity.
 
 ## Coverage Gaps
-- `ConfigError` variants have no test — `MissingExpiresOnOverride` and `InvalidValue` are never instantiated or formatted in the test suite; add in M02 when the loader validates them.
-- No property test for `Config::default()` determinism (proptest round-trip through serde_json → Config).
-- `crates/sdi-core/tests/` is missing `pipeline_smoke.rs` (listed in CLAUDE.md layout); expected once `Pipeline` exists but should be tracked.
-
-## ACP Verdicts
-- ACP: sdi-rust meta-crate has no `[[bin]]` section — ACCEPT — Two workspace crates cannot both declare `[[bin]] name = "sdi"`; KD12 gives the binary to `sdi-cli`. The lib-only meta-crate with `pub use sdi_core as core` is the correct name-reservation pattern. Install story (`cargo install sdi-cli`) is documented in the crate's rustdoc.
+- No test for `BoundarySpec::load` with a file that exists but contains invalid YAML — would exercise `ConfigError::BoundaryParse`.
+- `validate_and_prune_overrides` has no unit test for the `Some(other)` branch (expires is a non-String TOML value, e.g. an integer), which returns `ConfigError::InvalidValue`.
+- No integration test exercises the global config path (`$XDG_CONFIG_HOME/sdi/config.toml`) merge level — only `load_with_paths` with explicit paths is tested.
 
 ## Drift Observations
-- `Cargo.toml:41` — `serde_yaml = "0.9"` is unmaintained (last release 2023-06). Coder added `# note: unmaintained upstream; revisit in M10` comment. No action needed now; revisit in M02 when the YAML loader is written.
-- `crates/sdi-cli/src/output/mod.rs` — `pub mod json` and `pub mod text` are exposed with empty bodies. IDEs and rustdoc will surface them as public API with no content. Low-risk for a scaffold; ensure they receive content (or become private) before the first `0.1.0` publish.
-- `crates/sdi-config/src/lib.rs` — `#![deny(missing_docs)]` is absent. All public items currently have doc comments, but there is no compile-time enforcement. CLAUDE.md mandates it on `sdi-core` only; no action required, but worth adding before the config surface stabilizes.
+- `thresholds.rs` is declared `pub(crate)` at module level but its functions (`today_iso8601`, `is_expired`, `validate_date_format`, `validate_and_prune_overrides`) are all `pub`. They are unreachable from outside the crate regardless; tightening to `pub(crate)` removes the mismatch.
+- `init.rs` writes progress lines (`"sdi: created .sdi/config.toml"`, `"sdi: detected languages: ..."`) to stdout. Rule 8 reserves stdout for snapshot JSON, summaries, and table output and assigns progress/status to stderr. The integration tests pin these on stdout, so this is intentional, but the choice is worth flagging before 0.1.0 stdout/stderr contract is locked.
+- `load.rs:122-131` has an `else {}` block with only a comment and no code; clippy's `clippy::redundant_else` or empty-block lint may or may not fire depending on the version. Worth verifying in CI.
+- `Cargo.toml` (carried from M01): `clap = ">=4.4, <4.5"` restricts to 4.4.x only, blocking security patches in 4.5+. Deferred to M11 per coder; must not be forgotten.
+- `crates/sdi-cli/src/output/mod.rs` (carried from M01): `pub mod json` and `pub mod text` are exposed with empty bodies. Ensure they receive content or become private before 0.1.0 publish.

@@ -9,8 +9,12 @@ description = "Configuration loading and validation for sdi-rust"
 
 [dependencies]
 serde = { workspace = true }
+serde_yaml = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }
+dirs = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 # proptest = { workspace = true }  # re-enable when CI toolchain (MSRV 1.85+) resolves getrandom 0.4

@@ -1,4 +1,9 @@
 #### Milestone 2: Config Loading + Boundary Spec Reader
+<!-- milestone-meta
+id: "2"
+status: "done"
+-->
+
 
 **Scope:** Make `Config::load_or_default` actually walk the 5-level precedence chain and parse TOML. Implement `BoundarySpec` reader from YAML (read-only — write is Milestone 9). Threshold overrides with `expires` validation. Wire `sdi init` so we have a usable command.
 

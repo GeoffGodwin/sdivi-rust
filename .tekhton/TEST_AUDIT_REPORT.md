@@ -1,34 +1,49 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 3 files, 18 test functions
-Verdict: PASS
+Tests audited: 6 files, 45 test functions
+Verdict: CONCERNS
+
+---
 
 ### Findings
 
-#### COVERAGE: ConfigError::Io variant not tested
-- File: crates/sdi-config/tests/config_errors.rs
-- Issue: The `config_error_variants_are_debug_formattable` test constructs three of four `ConfigError` variants (Parse, InvalidValue, MissingExpiresOnOverride) but omits the `Io` variant, which wraps `std::io::Error` via `#[from]`. No test constructs `ConfigError::Io` or checks its Display output (format: `"I/O error reading config: {0}"`). This variant is reachable via `ConfigError::Io(std::io::Error::new(...))` and could be included in the existing parametric tests.
-- Severity: LOW
-- Action: Add a test constructing `ConfigError::Io(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "cannot read config"))` and asserting `msg.contains("cannot read config")`. Include the variant in `config_error_variants_are_debug_formattable`.
+#### ISOLATION: Two env-var tests read from the live project filesystem
+- File: `crates/sdi-config/tests/precedence.rs:86-93` (`env_var_snapshot_dir_overrides_file_config`) and `precedence.rs:97-106` (`env_var_no_color_sets_never`)
+- Issue: Both tests call `load_or_default(std::path::Path::new("."))`. `load_or_default` reads `./.sdi/config.toml` from the real project directory when that file exists. Milestone 2 introduces `sdi init`, which creates `.sdi/config.toml` in the current directory. Once any developer (or CI runner) runs `sdi init` at the project root, both tests acquire a dependency on that file's contents. If the file contains a threshold override with a missing `expires`, `load_or_default` returns `Err` and `.unwrap()` panics — the test fails for reasons entirely unrelated to the env-var behavior under test. Neither test snapshots or restores `SDI_CONFIG_PATH`, so an inherited value from the caller's environment would further redirect the config read. The two long-form XDG tests added immediately below them in the same file (`load_or_default_reads_global_config_via_xdg_config_home`, `global_config_is_lower_precedence_than_project_config_via_load_or_default`) correctly avoid all of this by using `tempfile::TempDir` as the repo root and by snapshotting/restoring every relevant env var. The two shorter tests must be brought up to the same standard.
+- Severity: HIGH
+- Action: In both tests, replace `std::path::Path::new(".")` with a `tempfile::TempDir::new().unwrap()` repo root. Also snapshot and restore `SDI_CONFIG_PATH` before/after the `load_or_default` call, following the pattern already established in `load_or_default_reads_global_config_via_xdg_config_home`.
 
-#### COVERAGE: Weak Display assertions in pipeline_smoke.rs
-- File: crates/sdi-core/tests/pipeline_smoke.rs:15 and :37
-- Issue: `no_grammars_available_is_constructable_and_has_message` asserts `!msg.is_empty()` — any single character would pass. The actual message is `"no grammar available for any detected language in the repository"` (error.rs:16). `analysis_error_accessible_via_prelude` has the same issue: the assertion `!err.to_string().is_empty()` does nothing beyond confirming the code compiled. In both cases a substring check on the actual message text would meaningfully distinguish a regression (e.g., an accidental `#[error("")]` change) from a passing test.
+#### COVERAGE: `AnalysisError::Config` variant untested
+- File: `crates/sdi-core/tests/pipeline_smoke.rs`
+- Issue: `AnalysisError` has three variants — `Io`, `NoGrammarsAvailable`, and `Config` (wrapping `sdi_config::ConfigError` via `#[from]`, defined at `crates/sdi-core/src/error.rs:21`). The first two are tested; `Config` is not. Its Display format is `"configuration error: {0}"`. The file's stated purpose is to verify that `AnalysisError` is correctly exported and reachable from `sdi_core` before Pipeline arrives in M06; leaving one of three variants unexercised is a gap in that coverage.
 - Severity: LOW
-- Action: Replace `assert!(!msg.is_empty())` with `assert!(msg.contains("grammar"), "...")` and similarly for the prelude test. The file's own doc comment already explains this is a placeholder, so the weakness is partially justified by milestone scope; nonetheless the fix is one line per test.
+- Action: Add a test constructing `AnalysisError::Config(sdi_config::ConfigError::Parse("bad".into()))` and asserting `err.to_string().contains("configuration error")`.
 
-#### COVERAGE: Exit-code assertions partially duplicate existing tests
-- File: crates/sdi-core/tests/pipeline_smoke.rs:47 and :55
-- Issue: `analysis_error_exit_code_is_three` and `threshold_exceeded_exit_code_is_ten_and_exclusive_to_check` test `ExitCode::as_i32()` values. The coder's pre-existing `crates/sdi-core/tests/exit_code_contract.rs` (6 tests) already covers every `ExitCode` variant via both `as i32` cast and `.as_i32()` / `i32::from()`. The duplication is harmless (the tester's tests use `.as_i32()` which the contract file also covers in `as_i32_matches_cast`) but adds no new surface coverage.
+#### COVERAGE: Weak Display assertions in `pipeline_smoke.rs`
+- File: `crates/sdi-core/tests/pipeline_smoke.rs:18` (`no_grammars_available_is_constructable_and_has_message`) and `:40` (`analysis_error_accessible_via_prelude`)
+- Issue: Both tests assert `!msg.is_empty()` — any single character satisfies this. The actual message is `"no grammar available for any detected language in the repository"` (error.rs:17). A substring check against a key word (e.g., `"grammar"`) would catch a regression from an accidental `#[error("")]` or `#[error(" ")]` change; `!is_empty()` would not. The weakness is partially justified by the placeholder milestone scope, but the fix is one line each.
 - Severity: LOW
-- Action: No immediate action required. If `pipeline_smoke.rs` is refactored when Pipeline arrives in M06, consolidate exit-code assertions into `exit_code_contract.rs` and keep `pipeline_smoke.rs` focused on Pipeline-level integration.
+- Action: Replace `assert!(!msg.is_empty(), ...)` with `assert!(msg.contains("grammar"), ...)` in `no_grammars_available_is_constructable_and_has_message`, and similarly for the prelude test.
 
-#### NAMING: File name misrepresents current test scope
-- File: crates/sdi-core/tests/pipeline_smoke.rs
-- Issue: The file is named `pipeline_smoke.rs` but contains no Pipeline tests — it tests `AnalysisError` variants and `ExitCode` values. The file's own module doc explains the mismatch ("Placeholder tracking file … Pipeline arrives in M06"), but a reader navigating the test directory will expect Pipeline invocations. This creates a discovery gap that grows as M06 approaches.
+#### COVERAGE: `ConfigError::Io` variant still untested in config_errors.rs
+- File: `crates/sdi-config/tests/config_errors.rs`
+- Issue: The prior audit (M01) flagged that `config_error_variants_are_debug_formattable` omits `ConfigError::Io`. That finding was not addressed this run: the `Io` variant (`#[error("I/O error reading config: {0}")]`) still has no Display assertion and is still absent from the Debug-formattability test. `BoundarySpec::load` surfaces `ConfigError::Io` on read failures; the path is exercisable without filesystem mocking via `std::io::Error::new(...)`.
 - Severity: LOW
-- Action: Either rename to `analysis_error_and_exit_code.rs` now and add the Pipeline tests to a new `pipeline_smoke.rs` in M06, or add a `// TODO(M06): expand with Pipeline invocations` comment at the top (already partially done) and accept the name until M06. Either is acceptable for M01.
+- Action: Add `ConfigError::Io(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "cannot read"))` to the `config_error_variants_are_debug_formattable` loop, and add a standalone test asserting `err.to_string().contains("cannot read")`.
 
-#### None: Assertion honesty, implementation exercise, test weakening, isolation
-- All 18 tests construct or call real implementation types (`ConfigError`, `Config`, `AnalysisError`, `ExitCode`) without mocks. Assertions are derived from actual function calls; no hard-coded values appear that are disconnected from implementation logic. No existing tests were modified (all three files are new), so no weakening occurred. No test reads `.tekhton/` files, `.claude/` logs, or any other mutable project-state artifact — all fixture data is constructed inline.
+---
+
+### Rubric Assessment (non-finding dimensions)
+
+**Assertion Honesty — PASS.** All assertions derive from actual function return values. Hard-coded check values (`random_seed == 42`, `retention == 100`, `leiden_gamma == 1.2`, etc.) match `Config::default()` and the fixture files verbatim. No tautological assertions detected across any of the 45 test functions.
+
+**Edge Case Coverage — PASS.** `threshold_overrides.rs` covers missing, malformed-string, integer, and boolean `expires` values, plus the expired/valid split and mixed-expiry batches. `precedence.rs` covers absent files, empty TOML, list replacement, and full global/project/env-var precedence ordering. `sdi_py_compat.rs` covers missing file (`None`), valid file, and two distinct invalid-YAML shapes.
+
+**Implementation Exercise — PASS.** All test files call real implementation code. No dependency mocking observed. Fixture files (`sdi_py_config.toml`, `sdi_py_boundaries.yaml`) exist and their values match exactly what the tests assert.
+
+**Test Weakening — PASS.** The tester added new tests throughout. No assertions were removed or broadened in any pre-existing test function. `pipeline_smoke.rs` gained two new functions (`io_variant_wraps_std_io_error`, `analysis_error_accessible_via_prelude`) over its prior state; `config_errors.rs` and `serde_round_trip.rs` gained additional parametric coverage; no functions were deleted or weakened.
+
+**Test Naming — PASS.** All 45 test function names encode both the scenario and the expected outcome (e.g., `expired_override_is_silently_ignored`, `integer_expires_returns_invalid_value`, `global_config_wins_when_project_absent`, `config_default_serde_round_trip_is_identity`). No vague names detected.
+
+**Scope Alignment — PASS.** No orphaned imports. The deleted `.tekhton/test_dedup.fingerprint` is not referenced by any test file. The duplicate entries in the audit context's modified-file list are list repetitions — both `config_errors.rs` and `serde_round_trip.rs` exist once on disk and are distinct files.
