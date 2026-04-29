@@ -14,6 +14,9 @@
 - [2026-04-29 | "architect audit"] **`crates/sdi-cli/src/output/mod.rs` empty `pub mod json` / `pub mod text`** — intentional scaffolding; the file's own comment dates resolution to Milestone 8. Remove from drift log when M08 begins or completes.
 - [2026-04-29 | "architect audit"] **`crates/sdi-config/src/lib.rs` missing `#![deny(missing_docs)]`** — CLAUDE.md mandates this only on `sdi-core`. `sdi-config` is not in scope. Remove permanently.
 
+## Decisions (Declined / Will Not Implement)
+- [2026-04-29 | declined by user] **`sdi init --force` flag — DECLINED, will not implement.** `init.rs:78–106` currently does the safe thing: atomic `create_new(true)` write on first run; idempotent skip + load-validation of the existing config on re-run. A `--force` overwrite mode would silently clobber user-edited config (custom thresholds, per-category overrides with `expires` dates, exclude lists) — working against KDD-1's read-compatibility posture, which exists *because* `.sdi/config.toml` is intentionally human-curated. No user demand; the rare re-init case is covered by `rm .sdi/config.toml && sdi init`. Future audits MUST NOT re-raise this item.
+
 ## Resolved
 - [RESOLVED 2026-04-29] `crates/sdi-lang-rust/src/extract.rs:103–113` — `collect_hints` truncation logic: `take_while(|(i, _)| *i < 256)` keeps chars whose START byte is < 256, so a 2-byte char at position 255 yields `end = 257`. This is the root cause of the test failure above; the fix is `take_while(|(i, _)| *i + c.len_utf8() <= 256)` (or equivalently, use `floor_char_boundary` once stabilised).
 - [RESOLVED 2026-04-29] `crates/sdi-lang-rust/src/extract.rs:62–75` — `extract_exports` pushes all children of every node including nested `mod_item` children, so `pub fn` items inside `pub mod` blocks are collected as if they were top-level exports. The intended behaviour (top-level only) would require stopping recursion at `mod_item` boundaries.
