@@ -413,6 +413,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libyml"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3302702afa434ffa30847a83305f0a69d6abd74293b6554c18ec85c7ef30c980"
+dependencies = [
+ "anyhow",
+ "version_check",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -719,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-cli"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -735,12 +745,12 @@ dependencies = [
 
 [[package]]
 name = "sdi-config"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "dirs",
  "serde",
  "serde_json",
- "serde_yaml",
+ "serde_yml",
  "tempfile",
  "thiserror 2.0.18",
  "toml",
@@ -748,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-core"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "serde",
@@ -757,7 +767,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-detection"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "serde",
@@ -766,7 +776,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-graph"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "serde",
@@ -775,35 +785,35 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-go"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-parsing",
 ]
 
 [[package]]
 name = "sdi-lang-java"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-parsing",
 ]
 
 [[package]]
 name = "sdi-lang-javascript"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-parsing",
 ]
 
 [[package]]
 name = "sdi-lang-python"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-parsing",
 ]
 
 [[package]]
 name = "sdi-lang-rust"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "sdi-parsing",
@@ -814,14 +824,14 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-typescript"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-parsing",
 ]
 
 [[package]]
 name = "sdi-parsing"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "globset",
  "ignore",
@@ -839,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-patterns"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "serde",
@@ -848,14 +858,14 @@ dependencies = [
 
 [[package]]
 name = "sdi-rust"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-core",
 ]
 
 [[package]]
 name = "sdi-snapshot"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "sdi-config",
  "serde",
@@ -916,16 +926,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
+name = "serde_yml"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+checksum = "59e2dd588bf1597a252c3b920e0143eb99b0f76e4e082f4c92ce34fbc9e71ddd"
 dependencies = [
  "indexmap",
  "itoa",
+ "libyml",
+ "memchr",
  "ryu",
  "serde",
- "unsafe-libyaml",
+ "version_check",
 ]
 
 [[package]]
@@ -1162,12 +1174,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
-name = "unsafe-libyaml"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
-
-[[package]]
 name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1178,6 +1184,12 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
+
+[[package]]
+name = "version_check"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "wait-timeout"
@@ -1219,7 +1231,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

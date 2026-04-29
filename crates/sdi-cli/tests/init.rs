@@ -141,7 +141,7 @@ fn init_is_idempotent() {
         .arg("init")
         .assert()
         .success()
-        .stdout(predicate::str::contains("already exists"));
+        .stderr(predicate::str::contains("already exists"));
 
     let content = std::fs::read_to_string(&config_path).unwrap();
     assert!(
@@ -151,6 +151,8 @@ fn init_is_idempotent() {
 }
 
 /// `sdi init` exits 0 and prints a success message referencing config.toml.
+/// Per CLAUDE.md Rule 8, progress/status lines go to stderr — `sdi init` produces
+/// no stdout payload, so this test pins the success message on stderr.
 #[test]
 fn init_exits_zero_and_prints_success() {
     let dir = TempDir::new().unwrap();
@@ -160,7 +162,7 @@ fn init_exits_zero_and_prints_success() {
         .arg("init")
         .assert()
         .success()
-        .stdout(predicate::str::contains("config.toml"));
+        .stderr(predicate::str::contains("config.toml"));
 }
 
 /// `SDI_CONFIG_PATH=/tmp/x.toml sdi init` writes to that path, not `.sdi/config.toml`.

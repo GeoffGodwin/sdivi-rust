@@ -61,7 +61,7 @@ impl BoundarySpec {
             return Ok(None);
         }
         let content = std::fs::read_to_string(path).map_err(ConfigError::Io)?;
-        let spec: Self = serde_yaml::from_str(&content)
+        let spec: Self = serde_yml::from_str(&content)
             .map_err(|e| ConfigError::BoundaryParse(e.to_string()))?;
         Ok(Some(spec))
     }

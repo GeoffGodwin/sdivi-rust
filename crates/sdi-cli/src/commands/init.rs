@@ -81,7 +81,7 @@ pub fn run(repo_root: &Path) -> Result<()> {
     let config_path = config_path_for(repo_root);
 
     if config_path.exists() {
-        println!(
+        eprintln!(
             "sdi: .sdi/config.toml already exists — skipping (use --force to overwrite)"
         );
         // Validate the existing config (surfaces unknown-key warnings and config errors).
@@ -95,14 +95,14 @@ pub fn run(repo_root: &Path) -> Result<()> {
             .with_context(|| format!("could not create directory: {}", sdi_dir.display()))?;
         std::fs::write(&config_path, DEFAULT_CONFIG_TOML)
             .with_context(|| format!("could not write: {}", config_path.display()))?;
-        println!("sdi: created .sdi/config.toml");
+        eprintln!("sdi: created .sdi/config.toml");
     }
 
     let langs = detect_languages(repo_root);
     if langs.is_empty() {
-        println!("sdi: no source files detected (language detection skipped)");
+        eprintln!("sdi: no source files detected (language detection skipped)");
     } else {
-        println!("sdi: detected languages: {}", langs.join(", "));
+        eprintln!("sdi: detected languages: {}", langs.join(", "));
     }
 
     Ok(())

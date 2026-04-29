@@ -79,7 +79,7 @@ fn boundary_spec_load_invalid_yaml_returns_boundary_parse_error() {
     use sdi_config::ConfigError;
 
     let mut f = tempfile::NamedTempFile::new().unwrap();
-    // `boundaries` expects Vec<BoundaryDef>; a plain string forces a serde_yaml error.
+    // `boundaries` expects Vec<BoundaryDef>; a plain string forces a serde_yml error.
     f.write_all(b"boundaries: \"this must be a sequence, not a string\"\n")
         .expect("write fixture");
 

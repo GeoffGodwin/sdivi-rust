@@ -38,7 +38,7 @@ sdi-snapshot  = { path = "crates/sdi-snapshot" }
 # ── serialization ────────────────────────────────────────────────────────────
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9"      # note: unmaintained upstream; revisit in M10
+serde_yml  = "0.0.12"   # maintained fork of serde_yaml (which was archived 2024)
 toml       = ">=0.8, <0.8.20"
 # Pin indexmap below 2.14.0 (edition2024) so Cargo 1.75 (MSRV-1 env) can parse the manifest.
 # Remove this pin once CI mandates Cargo >= 1.85 in the lock.
