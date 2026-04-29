@@ -1,55 +1,42 @@
+# Coder Summary
 ## Status: COMPLETE
 
-## Summary
-.tekhton/CODER_SUMMARY.md was reconstructed by the pipeline after the coder agent
-failed to produce or maintain it. The following files were modified based
-on git state. The reviewer should assess actual changes directly.
+## What Was Implemented
+- Added `crates/sdi-lang-rust/build.rs` as a layout-conformance placeholder (item 1)
+- Removed redundant `record.path = relative` overwrite in `parse.rs` and the unnecessary `mut` binding (item 2)
+- Fixed `extract_imports` in `extract.rs` to handle visibility modifiers (`pub use`, `pub(crate) use`) by using `str::find("use ")` instead of `strip_prefix("use ")` (item 3); this also fixed the pre-existing `pub_use_import_path_excludes_pub_keyword` test
+- Added M3 milestone attribution comment to `tests/full_pipeline.rs` placeholder (item 4)
+- Removed misleading `--force` hint from `init.rs` "already exists" message (item 5)
+- Added `.github/workflows/verify-leiden.yml` placeholder with KD11 verification job structure, gated `if: false` until the Leiden port lands in M05 (item 6)
+- Verified item 7 (`expires` validation) is already correctly implemented by `validate_and_prune_overrides` in M02 — no code change needed (item 7)
+
+## Root Cause (bugs only)
+- Item 2: `parse_file` already sets `record.path = path.to_path_buf()` where `path` is `&relative`, so the subsequent `record.path = relative` was a no-op duplicate assignment
+- Item 3: `strip_prefix("use ")` only matches bare `use` declarations; declarations with visibility modifiers (`pub use …`) don't start with `"use "` so the fallback returned the full raw text including the `pub` keyword
 
 ## Files Modified
-- .claude/milestones/MANIFEST.cfg
-- .claude/milestones/m03-parsing-stage-with-one-language-adapter-.md
-- .tekhton/CODER_SUMMARY.md
-- .tekhton/DRIFT_LOG.md
-- .tekhton/REVIEWER_REPORT.md
-- .tekhton/test_dedup.fingerprint
-- Cargo.lock
-- Cargo.toml
-- crates/sdi-config/src/load.rs
-- crates/sdi-config/src/thresholds.rs
-- crates/sdi-lang-rust/Cargo.toml
-- crates/sdi-lang-rust/src/lib.rs
-- crates/sdi-parsing/Cargo.toml
-- crates/sdi-parsing/src/adapter.rs
-- crates/sdi-parsing/src/lib.rs
+- `crates/sdi-lang-rust/build.rs` (NEW) — layout conformance placeholder
+- `crates/sdi-lang-rust/src/extract.rs` — fixed `extract_imports` visibility-modifier handling
+- `crates/sdi-parsing/src/parse.rs` — removed redundant path overwrite and `mut` binding
+- `crates/sdi-cli/src/commands/init.rs` — removed misleading `--force` hint from stderr message
+- `tests/full_pipeline.rs` — added M3 milestone attribution to placeholder comment
+- `.github/workflows/verify-leiden.yml` (NEW) — KD11 verification workflow placeholder
+- `.tekhton/NON_BLOCKING_LOG.md` — moved all 7 items from Open to Resolved
 
-## New Files Created
-- .tekhton/HUMAN_ACTION_REQUIRED.md (new)
-- .tekhton/JR_CODER_SUMMARY.md (new)
-- crates/sdi-lang-rust/src/extract.rs (new)
-- crates/sdi-parsing/src/feature_record.rs (new)
-- crates/sdi-parsing/src/parse.rs (new)
-- crates/sdi-parsing/src/walker.rs (new)
-- crates/sdi-parsing/tests/full_pipeline.rs (new)
-- crates/sdi-parsing/tests/memory_invariant.rs (new)
-- crates/sdi-parsing/tests/proptest.rs (new)
-- crates/sdi-parsing/tests/walk_ordering.rs (new)
-- tests/fixtures/simple-rust/Cargo.toml (new)
-- tests/fixtures/simple-rust/src/config.rs (new)
-- tests/fixtures/simple-rust/src/errors.rs (new)
-- tests/fixtures/simple-rust/src/lib.rs (new)
-- tests/fixtures/simple-rust/src/models.rs (new)
-- tests/fixtures/simple-rust/src/utils.rs (new)
-- tests/full_pipeline.rs (new)
+## Human Notes Status
+- Item 1 (`build.rs` absent in sdi-lang-rust): COMPLETED — added `crates/sdi-lang-rust/build.rs`
+- Item 2 (redundant path overwrite in parse.rs): COMPLETED — removed redundant line and `mut`
+- Item 3 (extract_imports fallback in extract.rs): COMPLETED — uses `str::find` instead of `strip_prefix`
+- Item 4 (tests/full_pipeline.rs placeholder comment): COMPLETED — added M3 milestone reference
+- Item 5 (--force hint in init.rs): COMPLETED — removed the misleading hint
+- Item 6 (verify-leiden.yml missing): COMPLETED — added placeholder workflow file
+- Item 7 (expires: String serde error): COMPLETED — already implemented in M02 via `validate_and_prune_overrides`; verified correct and marked resolved
 
-## Git Diff Summary
-```
- crates/sdi-lang-rust/src/lib.rs                    |  97 ++++++-
- crates/sdi-parsing/Cargo.toml                      |  15 ++
- crates/sdi-parsing/src/adapter.rs                  |  48 +++-
- crates/sdi-parsing/src/lib.rs                      |  19 +-
- 15 files changed, 525 insertions(+), 134 deletions(-)
-```
+## Docs Updated
+None — no public-surface changes in this task. All changes are internal cleanup (comment fixes, redundant assignment removal, dead fallback removal, new layout file, workflow placeholder).
 
-## Remaining Work
-Unable to determine — coder did not report remaining items.
-Review the task description against actual changes to identify gaps.
+## Observed Issues (out of scope)
+- `crates/sdi-parsing/tests/extract_behavior.rs` — two pre-existing test failures unrelated to my changes:
+  - `collect_hints_long_unicode_text_truncated_at_char_boundary`: truncation logic in `collect_hints` produces 257 bytes instead of ≤ 256; off-by-one in the char-boundary calculation
+  - `pub_fn_inside_pub_mod_not_in_top_level_exports`: `extract_exports` recurses into `mod_item` children, collecting nested `pub fn` items as if they were top-level exports
+- `crates/sdi-cli/tests/version.rs` — pre-existing test `version_flag_prints_crate_version` hardcodes `"0.0.1"` but the crate is now at `0.0.3`

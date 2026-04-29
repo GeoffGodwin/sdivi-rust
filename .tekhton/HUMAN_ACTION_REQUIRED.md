@@ -6,7 +6,6 @@ all items are resolved.
 
 ## Action Items
 
-_None at present. Resolved items move to the section below._
 
 ## Resolved
 

@@ -81,9 +81,7 @@ pub fn run(repo_root: &Path) -> Result<()> {
     let config_path = config_path_for(repo_root);
 
     if config_path.exists() {
-        eprintln!(
-            "sdi: .sdi/config.toml already exists — skipping (use --force to overwrite)"
-        );
+        eprintln!("sdi: .sdi/config.toml already exists — skipping");
         // Validate the existing config (surfaces unknown-key warnings and config errors).
         sdi_config::load_with_paths(Some(&config_path), None)
             .with_context(|| format!("config validation failed: {}", config_path.display()))?;

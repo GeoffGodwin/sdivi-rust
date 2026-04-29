@@ -6,4 +6,5 @@
 //   crates/sdi-parsing/tests/full_pipeline.rs
 //
 // This file is kept here as a layout placeholder per CLAUDE.md conventions.
+// Added in Milestone 3 (Parsing Stage with One Language Adapter — Rust).
 // When a root package is introduced in a future milestone, move the test here.

@@ -31,15 +31,17 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     while let Some(node) = stack.pop() {
         if node.kind() == "use_declaration" {
             if let Ok(text) = node.utf8_text(source) {
-                let import = text
-                    .trim()
-                    .strip_prefix("use ")
-                    .unwrap_or(text.trim())
-                    .trim_end_matches(';')
-                    .trim()
-                    .to_string();
-                if !import.is_empty() {
-                    imports.push(import);
+                // use_declaration text may be `use …;`, `pub use …;`, or
+                // `pub(crate) use …;`. Find the `use ` keyword and take
+                // everything after it so visibility modifiers are stripped.
+                if let Some(pos) = text.find("use ") {
+                    let import = text[pos + 4..]
+                        .trim_end_matches(';')
+                        .trim()
+                        .to_string();
+                    if !import.is_empty() {
+                        imports.push(import);
+                    }
                 }
             }
             continue; // don't recurse into use_declaration children

@@ -1,34 +1,39 @@
+# Reviewer Report
+Review cycle: 1 of 2
+Reviewer: Code Review Agent
+
+---
+
 ## Verdict
 APPROVED_WITH_NOTES
 
+---
+
 ## Complex Blockers (senior coder)
-- None
-
-## Simple Blockers (jr coder)
-- None
-
-## Non-Blocking Notes
-- `crates/sdi-lang-rust/` — `build.rs` is absent. CLAUDE.md architecture and the M3 milestone spec both list it as a required file. Tree-sitter-rust 0.21 carries its own `build.rs` so the omission does not break compilation, but the layout deviates from the specified contract. Add an empty or comment-only `build.rs` for layout conformance, or remove the entry from CLAUDE.md.
-- `crates/sdi-parsing/src/parse.rs:61-63` — `adapter.parse_file(&relative, content)` already sets `record.path = path.to_path_buf()`, so the immediately following `record.path = relative` is a redundant overwrite. Either remove the second assignment, or pass `relative.clone()` into `parse_file` and drop the second line.
-- `crates/sdi-lang-rust/src/extract.rs:28-44` — `extract_imports` silently falls back to the full declaration text when the prefix `"use "` is not found (e.g., `pub use crate::something;` produces `"pub use crate::something"` as the import string). No breakage in M3 since the graph stage isn't built yet, but this will produce malformed import strings in M5.
-- `tests/full_pipeline.rs` — placeholder comment only; the real test is in `crates/sdi-parsing/tests/full_pipeline.rs`. The comment should reference the milestone spec so future readers understand the intent.
-- `crates/sdi-config/src/load.rs:108-113` — `warn_unknown_keys` uses `eprintln!` directly. CLAUDE.md specifies `tracing` for warnings/logs going to stderr. Not new to M3; flagged for the tracing migration pass.
-- `## Docs Updated` section is absent from `.tekhton/CODER_SUMMARY.md` (reconstructed by pipeline). Public-surface items were added and all carry doc comments with `# Examples` blocks; documentation freshness policy appears satisfied. The missing section is a pipeline-reconstruction artifact.
-
-## Coverage Gaps
-- `crates/sdi-parsing/tests/proptest.rs` — the arbitrary-content strategy `[ -~\n\t]{0,2048}` is ASCII-only. Add a Unicode variant (e.g., `proptest::string::string_regex(r"[\u{0}-\u{FFFF}]{0,512}")`) to exercise the fixed char-safe truncation path in `collect_hints`.
-- No test for `pub use` import extraction correctness; `extract_imports` silently misbehaves on `pub use` forms.
-- No test asserting that `extract_exports` does not double-count public items nested inside public `mod` items.
-
-## ACP Verdicts
-- None
-
-## Drift Observations
-- `crates/sdi-lang-rust/src/lib.rs:66,86` — the `ACTIVE_TREES` doc comment says adapters "increment on tree creation and decrement on drop," but the code decrements after the `PARSER.with` closure returns rather than on `tree`'s `Drop`. The invariant is correctly tested (counter is 0 when `parse_file` returns), but the comment is misleading.
-- `crates/sdi-lang-rust/src/extract.rs:56-73` — `extract_exports` does not stop traversal when entering an `EXPORTABLE_KINDS` node. A `pub fn` inside a `pub mod` will appear in `exports` twice: once when the `mod_item` is visited and once when the `function_item` is visited. Latent correctness issue for the patterns and graph stages that consume `FeatureRecord.exports`.
-- Carried from M02 (still unresolved): TOCTOU on `path.exists()` + `read_to_string` in `load.rs:98` and `boundary.rs:60`; `load.rs:111` key formatted with `{key}` not `{key:?}` (ANSI escape risk); `validate_date_format` accepts semantically invalid day values (e.g. `2026-02-30`); `init.rs:84` `--force` hint not wired into clap; `init.rs:63-68` duplicate `SDI_CONFIG_PATH` lookup.
+None
 
 ---
-## Prior Blocker Resolution
 
-**[FIXED]** `crates/sdi-lang-rust/src/extract.rs:101-102` — The UTF-8 panic-on-slice blocker is resolved. The rework at lines 101-111 now uses `char_indices().take_while(|(i, _)| *i < 256).last().map(|(i, c)| i + c.len_utf8()).unwrap_or(0)` to compute a safe character-boundary endpoint before slicing, exactly as prescribed. The fix is correct and the CST truncation path is safe for multi-byte Unicode input.
+## Simple Blockers (jr coder)
+None
+
+---
+
+## Non-Blocking Notes
+- `extract.rs:37` — `text.find("use ")` is correct for `use_declaration` nodes (tree-sitter guarantees no preceding string literals), but a brief comment on WHY `find` rather than `strip_prefix` would help future readers since the old fallback was a latent bug for years.
+- `.github/workflows/verify-leiden.yml:48` — `cargo test --workspace --features verify-leiden -p sdi-detection` combines `--workspace` with `-p`; the recommended form when targeting one crate with a crate-local feature is `cargo test -p sdi-detection --features verify-leiden` to avoid ambiguous feature propagation to other workspace crates.
+- Pre-existing LOW security findings (not introduced by this PR): TOCTOU in `crates/sdi-config/src/load.rs:98` and `boundary.rs:60`, terminal injection via TOML key in `load.rs:111` — flagged by the security agent; should be addressed in a dedicated cleanup pass.
+
+---
+
+## Coverage Gaps
+- `crates/sdi-lang-rust/tests/extract_behavior.rs` — pre-existing: `collect_hints_long_unicode_text_truncated_at_char_boundary` fails because truncation can emit up to 257 bytes for a 2-byte char starting at byte 255 (off-by-one in the `take_while(*i < 256)` guard).
+- `crates/sdi-lang-rust/tests/extract_behavior.rs` — pre-existing: `pub_fn_inside_pub_mod_not_in_top_level_exports` fails because `extract_exports` recurses unconditionally into `mod_item` children, collecting nested `pub fn` items as top-level exports.
+- `crates/sdi-cli/tests/version.rs` — pre-existing: `version_flag_prints_crate_version` hardcodes `"0.0.1"` but `sdi-cli` is at `0.0.3`; either use `env!("CARGO_PKG_VERSION")` in the test or update the literal.
+
+---
+
+## Drift Observations
+- `crates/sdi-lang-rust/src/extract.rs:103–113` — `collect_hints` truncation logic: `take_while(|(i, _)| *i < 256)` keeps chars whose START byte is < 256, so a 2-byte char at position 255 yields `end = 257`. This is the root cause of the test failure above; the fix is `take_while(|(i, _)| *i + c.len_utf8() <= 256)` (or equivalently, use `floor_char_boundary` once stabilised).
+- `crates/sdi-lang-rust/src/extract.rs:62–75` — `extract_exports` pushes all children of every node including nested `mod_item` children, so `pub fn` items inside `pub mod` blocks are collected as if they were top-level exports. The intended behaviour (top-level only) would require stopping recursion at `mod_item` boundaries.
+- `crates/sdi-cli/src/commands/init.rs:83–84` — the `config_path.exists()` → `load_with_paths` pattern inherits the TOCTOU race noted by the security agent (same pattern as `load.rs`); a symlink swap between the `.exists()` check and the subsequent read would silently validate the wrong file.

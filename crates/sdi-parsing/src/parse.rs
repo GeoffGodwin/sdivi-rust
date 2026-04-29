@@ -58,8 +58,7 @@ pub fn parse_repository(
                 .strip_prefix(repo_root)
                 .unwrap_or(&path)
                 .to_path_buf();
-            let mut record = adapter.parse_file(&relative, content);
-            record.path = relative;
+            let record = adapter.parse_file(&relative, content);
             Some(record)
         })
         .collect();
