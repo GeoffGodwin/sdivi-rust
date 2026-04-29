@@ -1,4 +1,9 @@
 #### Milestone 1: Workspace Scaffold and `sdi-core` Skeleton
+<!-- milestone-meta
+id: "01"
+status: "pending"
+-->
+
 
 **Scope:** Create the Cargo workspace with all crates as empty shells, wire up CI, finalize MSRV, reserve crate names on crates.io with `0.0.0` placeholders, and stand up the `Config` struct and `ExitCode` enum — the two types every other crate depends on. License (Apache 2.0) and `sdi`-name workaround are already ratified during planning; this milestone just executes them. No real analysis logic yet.
 
