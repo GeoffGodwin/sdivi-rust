@@ -15,7 +15,9 @@ pub mod walker;
 #[cfg(feature = "test-tree-counter")]
 /// Global counter of live tree-sitter `Tree` objects (test feature only).
 ///
-/// Language adapters increment this on tree creation and decrement it on drop.
-/// Tests assert the value returns to zero after each `parse_file` call.
+/// Incremented at the start of `parse_file` and decremented after the
+/// `PARSER.with` closure returns; tracks active `parse_file` invocations,
+/// not live `Tree` objects. Tests assert the value returns to zero after
+/// each `parse_file` call.
 pub static ACTIVE_TREES: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);

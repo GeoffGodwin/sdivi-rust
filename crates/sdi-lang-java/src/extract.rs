@@ -1,50 +1,40 @@
-//! AST extraction helpers for the Rust language adapter.
+//! AST extraction helpers for the Java language adapter.
 
 use sdi_parsing::feature_record::PatternHint;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
 const PATTERN_KINDS: &[&str] = &[
-    "try_expression",
-    "match_expression",
-    "macro_invocation",
-    "await_expression",
-    "closure_expression",
+    "try_statement",
+    "try_with_resources_statement",
+    "catch_clause",
+    "lambda_expression",
+    "enhanced_for_statement",
+    "throw_statement",
 ];
 
-/// Node kinds that can be exported from a Rust file.
+/// Top-level declaration kinds whose public visibility makes them exports.
 const EXPORTABLE_KINDS: &[&str] = &[
-    "function_item",
-    "struct_item",
-    "enum_item",
-    "trait_item",
-    "type_item",
-    "const_item",
-    "static_item",
-    "mod_item",
+    "class_declaration",
+    "interface_declaration",
+    "enum_declaration",
+    "annotation_type_declaration",
+    "record_declaration",
 ];
 
-/// Extracts `use` import paths from the root node.
+/// Extracts `import_declaration` text from the AST.
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
-        if node.kind() == "use_declaration" {
+        if node.kind() == "import_declaration" {
             if let Ok(text) = node.utf8_text(source) {
-                // use_declaration text may be `use …;`, `pub use …;`, or
-                // `pub(crate) use …;`. Find the `use ` keyword and take
-                // everything after it so visibility modifiers are stripped.
-                if let Some(pos) = text.find("use ") {
-                    let import = text[pos + 4..]
-                        .trim_end_matches(';')
-                        .trim()
-                        .to_string();
-                    if !import.is_empty() {
-                        imports.push(import);
-                    }
+                let text = text.trim().to_string();
+                if !text.is_empty() {
+                    imports.push(text);
                 }
             }
-            continue; // don't recurse into use_declaration children
+            continue;
         }
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i) {
@@ -55,33 +45,29 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     imports
 }
 
-/// Extracts names of publicly exported items.
+/// Extracts names of `public` top-level declarations.
 pub(crate) fn extract_exports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut exports = Vec::new();
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if EXPORTABLE_KINDS.contains(&node.kind()) && is_public(node, source) {
+    for i in 0..root.child_count() {
+        let Some(node) = root.child(i) else { continue };
+        if EXPORTABLE_KINDS.contains(&node.kind()) && has_public_modifier(node, source) {
             if let Some(name) = first_identifier(node, source) {
                 exports.push(name);
-            }
-            continue; // don't surface nested items as top-level exports
-        }
-        for i in 0..node.child_count() {
-            if let Some(child) = node.child(i) {
-                stack.push(child);
             }
         }
     }
     exports
 }
 
-/// Extracts function signatures (text up to the opening `{` of the body).
+/// Extracts `public` method and constructor signatures.
 pub(crate) fn extract_signatures(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut sigs = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
-        if node.kind() == "function_item" {
-            if let Some(sig) = function_signature(node, source) {
+        if (node.kind() == "method_declaration" || node.kind() == "constructor_declaration")
+            && has_public_modifier(node, source)
+        {
+            if let Some(sig) = java_signature(node, source) {
                 sigs.push(sig);
             }
         }
@@ -101,17 +87,7 @@ pub(crate) fn collect_hints(root: Node<'_>, source: &[u8]) -> Vec<PatternHint> {
     while let Some(node) = stack.pop() {
         if PATTERN_KINDS.contains(&node.kind()) {
             let raw = node.utf8_text(source).unwrap_or("").to_string();
-            let text = if raw.len() > 256 {
-                let end = raw
-                    .char_indices()
-                    .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-                    .last()
-                    .map(|(i, c)| i + c.len_utf8())
-                    .unwrap_or(0);
-                raw[..end].to_string()
-            } else {
-                raw
-            };
+            let text = truncate_to_256_bytes(raw);
             hints.push(PatternHint {
                 node_kind: node.kind().to_string(),
                 start_byte: node.start_byte(),
@@ -130,14 +106,14 @@ pub(crate) fn collect_hints(root: Node<'_>, source: &[u8]) -> Vec<PatternHint> {
     hints
 }
 
-fn is_public(node: Node<'_>, source: &[u8]) -> bool {
+/// Returns true if the node has a `modifiers` child containing `public`.
+fn has_public_modifier(node: Node<'_>, source: &[u8]) -> bool {
     for i in 0..node.child_count() {
         if let Some(child) = node.child(i) {
-            if child.kind() == "visibility_modifier" {
-                return child
-                    .utf8_text(source)
-                    .map(|t| t.trim().starts_with("pub"))
-                    .unwrap_or(false);
+            if child.kind() == "modifiers" {
+                if let Ok(text) = child.utf8_text(source) {
+                    return text.split_whitespace().any(|t| t == "public");
+                }
             }
         }
     }
@@ -147,19 +123,15 @@ fn is_public(node: Node<'_>, source: &[u8]) -> bool {
 fn first_identifier(node: Node<'_>, source: &[u8]) -> Option<String> {
     for i in 0..node.child_count() {
         if let Some(child) = node.child(i) {
-            if child.kind() == "identifier" || child.kind() == "type_identifier" {
-                return child
-                    .utf8_text(source)
-                    .ok()
-                    .map(|s| s.trim().to_string());
+            if child.kind() == "identifier" {
+                return child.utf8_text(source).ok().map(|s| s.trim().to_string());
             }
         }
     }
     None
 }
 
-fn function_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
-    // Find the block child; signature is everything before it.
+fn java_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
     for i in 0..node.child_count() {
         if let Some(child) = node.child(i) {
             if child.kind() == "block" {
@@ -172,6 +144,19 @@ fn function_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
             }
         }
     }
-    // Fallback: no block found (e.g. extern fn declaration).
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
+}
+
+/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
+pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
+    if raw.len() <= 256 {
+        return raw;
+    }
+    let end = raw
+        .char_indices()
+        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
+        .last()
+        .map(|(i, c)| i + c.len_utf8())
+        .unwrap_or(0);
+    raw[..end].to_string()
 }

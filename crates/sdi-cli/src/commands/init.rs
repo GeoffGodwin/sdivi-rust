@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -58,13 +59,10 @@ enforce_btree_order = true
 
 /// Determine the config path for `sdi init`.
 ///
-/// If `SDI_CONFIG_PATH` is set, that path is used. Otherwise, defaults to
-/// `repo_root/.sdi/config.toml`.
+/// Delegates to [`sdi_config::project_config_path`] — the single source of truth
+/// for `SDI_CONFIG_PATH` resolution.
 pub fn config_path_for(repo_root: &Path) -> PathBuf {
-    std::env::var("SDI_CONFIG_PATH")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| repo_root.join(".sdi").join("config.toml"))
+    sdi_config::project_config_path(repo_root)
 }
 
 /// Run the `sdi init` command in `repo_root`.
@@ -80,20 +78,31 @@ pub fn config_path_for(repo_root: &Path) -> PathBuf {
 pub fn run(repo_root: &Path) -> Result<()> {
     let config_path = config_path_for(repo_root);
 
-    if config_path.exists() {
-        eprintln!("sdi: .sdi/config.toml already exists — skipping");
-        // Validate the existing config (surfaces unknown-key warnings and config errors).
-        sdi_config::load_with_paths(Some(&config_path), None)
-            .with_context(|| format!("config validation failed: {}", config_path.display()))?;
-    } else {
-        let sdi_dir = config_path
-            .parent()
-            .expect("config path must have a parent directory");
-        std::fs::create_dir_all(sdi_dir)
-            .with_context(|| format!("could not create directory: {}", sdi_dir.display()))?;
-        std::fs::write(&config_path, DEFAULT_CONFIG_TOML)
-            .with_context(|| format!("could not write: {}", config_path.display()))?;
-        eprintln!("sdi: created .sdi/config.toml");
+    let sdi_dir = config_path
+        .parent()
+        .expect("config path must have a parent directory");
+    std::fs::create_dir_all(sdi_dir)
+        .with_context(|| format!("could not create directory: {}", sdi_dir.display()))?;
+
+    match std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&config_path)
+    {
+        Ok(mut file) => {
+            file.write_all(DEFAULT_CONFIG_TOML.as_bytes())
+                .with_context(|| format!("could not write: {}", config_path.display()))?;
+            eprintln!("sdi: created .sdi/config.toml");
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            eprintln!("sdi: .sdi/config.toml already exists — skipping");
+            sdi_config::load_with_paths(Some(&config_path), None)
+                .with_context(|| format!("config validation failed: {}", config_path.display()))?;
+        }
+        Err(e) => {
+            return Err(e)
+                .with_context(|| format!("could not write: {}", config_path.display()));
+        }
     }
 
     let langs = detect_languages(repo_root);

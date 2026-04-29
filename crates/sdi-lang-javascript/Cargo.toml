@@ -11,4 +11,6 @@ description = "JavaScript language adapter for sdi-rust"
 lang-javascript = []
 
 [dependencies]
-sdi-parsing = { workspace = true }
+sdi-parsing            = { workspace = true }
+tree-sitter            = { workspace = true }
+tree-sitter-javascript = { workspace = true }

@@ -51,12 +51,17 @@ pub(crate) fn validate_date_format(expires_str: &str) -> bool {
     let Ok(year) = parts[0].parse::<u16>() else { return false };
     let Ok(month) = parts[1].parse::<u8>() else { return false };
     let Ok(day) = parts[2].parse::<u8>() else { return false };
+    let max_day: u8 = match month {
+        2 => 29,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
     parts[0].len() == 4
         && parts[1].len() == 2
         && parts[2].len() == 2
         && year >= 1970
         && (1..=12).contains(&month)
-        && (1..=31).contains(&day)
+        && (1..=max_day).contains(&day)
 }
 
 /// Validates all threshold override entries in `table`, returning an error if any
@@ -149,5 +154,14 @@ mod tests {
         assert!(!validate_date_format("2026-09-3"));
         assert!(!validate_date_format("not-a-date"));
         assert!(!validate_date_format("2026/09/30"));
+    }
+
+    #[test]
+    fn validate_date_format_rejects_impossible_days() {
+        assert!(!validate_date_format("2026-02-30")); // Feb 30 never exists
+        assert!(!validate_date_format("2026-04-31")); // April has 30 days
+        assert!(!validate_date_format("2026-06-31")); // June has 30 days
+        assert!(validate_date_format("2026-02-29")); // Feb 29 accepted (no leap-year check)
+        assert!(validate_date_format("2026-12-31")); // Dec 31 valid
     }
 }

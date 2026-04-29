@@ -11,4 +11,6 @@ description = "Java language adapter for sdi-rust"
 lang-java = []
 
 [dependencies]
-sdi-parsing = { workspace = true }
+sdi-parsing      = { workspace = true }
+tree-sitter      = { workspace = true }
+tree-sitter-java = { workspace = true }

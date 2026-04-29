@@ -11,4 +11,6 @@ description = "Python language adapter for sdi-rust"
 lang-python = []
 
 [dependencies]
-sdi-parsing = { workspace = true }
+sdi-parsing       = { workspace = true }
+tree-sitter       = { workspace = true }
+tree-sitter-python = { workspace = true }

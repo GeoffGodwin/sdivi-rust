@@ -11,4 +11,6 @@ description = "TypeScript language adapter for sdi-rust"
 lang-typescript = []
 
 [dependencies]
-sdi-parsing = { workspace = true }
+sdi-parsing            = { workspace = true }
+tree-sitter            = { workspace = true }
+tree-sitter-typescript = { workspace = true }

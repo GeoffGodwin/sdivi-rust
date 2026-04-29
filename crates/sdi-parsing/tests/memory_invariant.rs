@@ -8,6 +8,10 @@ use sdi_lang_rust::RustAdapter;
 use sdi_parsing::parse::parse_repository;
 use std::sync::atomic::Ordering;
 
+// Serializes tests that read/write ACTIVE_TREES to prevent spurious failures
+// when cargo test runs them in parallel on the same process.
+static COUNTER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Generates a syntactically valid Rust source file of approximately `size`
 /// bytes by repeating simple function declarations.
 fn generate_rust_source(size: usize) -> String {
@@ -21,19 +25,23 @@ fn generate_rust_source(size: usize) -> String {
 fn tree_counter_zero_after_each_parse() {
     use sdi_parsing::ACTIVE_TREES;
 
+    let _guard = COUNTER_LOCK.lock().unwrap();
+
     let adapter = RustAdapter;
     use sdi_parsing::adapter::LanguageAdapter;
 
     for _ in 0..10 {
         let content = generate_rust_source(4_096);
         let _record = adapter.parse_file(std::path::Path::new("test.rs"), content);
-        let live = ACTIVE_TREES.load(Ordering::Relaxed);
+        let live = ACTIVE_TREES.load(Ordering::SeqCst);
         assert_eq!(live, 0, "ACTIVE_TREES must be 0 after parse_file returns");
     }
 }
 
 #[test]
 fn parse_many_large_files_completes() {
+    let _guard = COUNTER_LOCK.lock().unwrap();
+
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("src");
     std::fs::create_dir_all(&src).unwrap();

@@ -22,4 +22,4 @@ pub use config::{
     ThresholdOverride, ThresholdsConfig,
 };
 pub use error::ConfigError;
-pub use load::{load_or_default, load_with_paths};
+pub use load::{load_or_default, load_with_paths, project_config_path};

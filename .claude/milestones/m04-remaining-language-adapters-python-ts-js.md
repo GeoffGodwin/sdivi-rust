@@ -1,4 +1,9 @@
 #### Milestone 4: Remaining Language Adapters (Python, TS, JS, Go, Java)
+<!-- milestone-meta
+id: "04"
+status: "done"
+-->
+
 
 **Scope:** Implement `LanguageAdapter` for the five remaining default languages. Each in its own crate behind a Cargo feature flag. Compile-time grammar linking. Per-language test fixture.
 

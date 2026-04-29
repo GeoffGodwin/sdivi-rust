@@ -14,6 +14,26 @@ const KNOWN_SECTIONS: &[&str] = &[
     "bindings",
 ];
 
+/// Resolve the project config path for `repo_root`.
+///
+/// Returns `SDI_CONFIG_PATH` if set; otherwise `<repo_root>/.sdi/config.toml`.
+/// This is the single source of truth for that rule — call it instead of
+/// duplicating the `std::env::var("SDI_CONFIG_PATH")` lookup.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdi_config::project_config_path;
+/// let p = project_config_path(std::path::Path::new("/my/repo"));
+/// assert!(p.ends_with("config.toml"));
+/// ```
+pub fn project_config_path(repo_root: &Path) -> PathBuf {
+    std::env::var("SDI_CONFIG_PATH")
+        .ok()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| repo_root.join(".sdi").join("config.toml"))
+}
+
 /// Load configuration for the repository rooted at `repo_root`.
 ///
 /// Walks the 5-level precedence chain:
@@ -36,10 +56,7 @@ const KNOWN_SECTIONS: &[&str] = &[
 /// assert_eq!(config.core.random_seed, 42);
 /// ```
 pub fn load_or_default(repo_root: &Path) -> Result<Config, ConfigError> {
-    let project_config = std::env::var("SDI_CONFIG_PATH")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| repo_root.join(".sdi").join("config.toml"));
+    let project_config = project_config_path(repo_root);
 
     let global_config = dirs::config_dir().map(|d| d.join("sdi").join("config.toml"));
 
@@ -95,10 +112,11 @@ pub fn load_with_paths(
 
 /// Parse a TOML file, returning `None` if the file does not exist.
 fn load_toml_file(path: &Path) -> Result<Option<toml::Table>, ConfigError> {
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content = std::fs::read_to_string(path).map_err(ConfigError::Io)?;
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(ConfigError::Io(e)),
+    };
     let table: toml::Table =
         toml::from_str(&content).map_err(|e| ConfigError::Parse(e.to_string()))?;
     Ok(Some(table))
@@ -108,7 +126,7 @@ fn load_toml_file(path: &Path) -> Result<Option<toml::Table>, ConfigError> {
 fn warn_unknown_keys(table: &toml::Table, source: &str) {
     for key in table.keys() {
         if !KNOWN_SECTIONS.contains(&key.as_str()) {
-            eprintln!("sdi: warning: unknown config section '[{key}]' in {source} (ignored)");
+            eprintln!("sdi: warning: unknown config section '[{key:?}]' in {source} (ignored)");
         }
     }
 }

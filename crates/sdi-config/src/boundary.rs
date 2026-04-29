@@ -57,10 +57,11 @@ impl BoundarySpec {
     ///
     /// Returns [`ConfigError`] on I/O or parse failure.
     pub fn load(path: &Path) -> Result<Option<Self>, ConfigError> {
-        if !path.exists() {
-            return Ok(None);
-        }
-        let content = std::fs::read_to_string(path).map_err(ConfigError::Io)?;
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(ConfigError::Io(e)),
+        };
         let spec: Self = serde_yml::from_str(&content)
             .map_err(|e| ConfigError::BoundaryParse(e.to_string()))?;
         Ok(Some(spec))
