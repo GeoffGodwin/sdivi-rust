@@ -1,0 +1,11 @@
+[package]
+name = "sdi-rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Structural Divergence Indexer — install-discovery meta-crate (see sdi-cli for the binary)"
+
+[dependencies]
+sdi-core = { workspace = true }

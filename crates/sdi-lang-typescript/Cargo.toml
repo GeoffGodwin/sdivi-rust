@@ -1,0 +1,14 @@
+[package]
+name = "sdi-lang-typescript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "TypeScript language adapter for sdi-rust"
+
+[features]
+lang-typescript = []
+
+[dependencies]
+sdi-parsing = { workspace = true }

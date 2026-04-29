@@ -1,3 +1,12 @@
+# Milestone Archive
+
+Completed milestone definitions archived from CLAUDE.md.
+See git history for the commit that completed each milestone.
+
+---
+
+## Archived: 2026-04-28 — Unknown Initiative
+
 #### Milestone 1: Workspace Scaffold and `sdi-core` Skeleton
 <!-- milestone-meta
 id: "01"

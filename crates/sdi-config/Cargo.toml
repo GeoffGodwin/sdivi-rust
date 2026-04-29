@@ -1,0 +1,16 @@
+[package]
+name = "sdi-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Configuration loading and validation for sdi-rust"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+# proptest = { workspace = true }  # re-enable when CI toolchain (MSRV 1.85+) resolves getrandom 0.4
