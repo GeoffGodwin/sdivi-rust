@@ -19,7 +19,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.6"
+version = "0.0.7"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -34,6 +34,12 @@ sdi-graph   = { path = "crates/sdi-graph" }
 sdi-detection = { path = "crates/sdi-detection" }
 sdi-patterns  = { path = "crates/sdi-patterns" }
 sdi-snapshot  = { path = "crates/sdi-snapshot" }
+sdi-lang-rust       = { path = "crates/sdi-lang-rust" }
+sdi-lang-python     = { path = "crates/sdi-lang-python" }
+sdi-lang-typescript = { path = "crates/sdi-lang-typescript" }
+sdi-lang-javascript = { path = "crates/sdi-lang-javascript" }
+sdi-lang-go         = { path = "crates/sdi-lang-go" }
+sdi-lang-java       = { path = "crates/sdi-lang-java" }
 
 # ── serialization ────────────────────────────────────────────────────────────
 serde      = { version = "1", features = ["derive"] }

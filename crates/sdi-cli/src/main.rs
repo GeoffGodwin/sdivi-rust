@@ -23,14 +23,31 @@ struct Cli {
 enum Commands {
     /// Initialize `.sdi/` and write a default config.
     Init,
+    /// Build and display the pattern catalog for the repository.
+    Catalog {
+        /// Output format: `text` (default) or `json`.
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
     logging::init();
 
+    let config = match sdi_config::load_or_default(&cli.repo) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("sdi: error: {e:#}");
+            std::process::exit(ExitCode::ConfigError.as_i32());
+        }
+    };
+
     let result = match cli.command {
         Some(Commands::Init) => commands::init::run(&cli.repo),
+        Some(Commands::Catalog { format }) => {
+            commands::catalog::run(&cli.repo, &config, &format)
+        }
         None => {
             eprintln!("sdi: no subcommand given — try `sdi --help`");
             return;

@@ -24,6 +24,12 @@ pub mod exit_code;
 pub use error::AnalysisError;
 pub use exit_code::ExitCode;
 
+/// Pattern fingerprinting and catalog — re-exported from `sdi-patterns`.
+pub use sdi_patterns::{
+    build_catalog, compute_entropy, fingerprint_node_kind, PatternCatalog, PatternFingerprint,
+    PatternLocation, PatternStats, FINGERPRINT_KEY,
+};
+
 /// Commonly-imported items from sdi-core.
 pub mod prelude {
     pub use crate::error::AnalysisError;

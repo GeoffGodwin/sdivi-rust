@@ -9,5 +9,16 @@ description = "Pattern fingerprinting and catalog for sdi-rust"
 
 [dependencies]
 sdi-config  = { workspace = true }
+sdi-parsing = { workspace = true }
 thiserror   = { workspace = true }
 serde       = { workspace = true }
+serde_json  = { workspace = true }
+blake3      = { workspace = true }
+globset     = { workspace = true }
+
+[dev-dependencies]
+serde_json          = { workspace = true }
+sdi-parsing         = { workspace = true }
+sdi-lang-rust       = { workspace = true }
+sdi-config          = { workspace = true }
+proptest            = { workspace = true }

@@ -12,10 +12,19 @@ name = "sdi"
 path = "src/main.rs"
 
 [dependencies]
-sdi-core   = { workspace = true }
-sdi-config = { workspace = true }
+sdi-core    = { workspace = true }
+sdi-config  = { workspace = true }
+sdi-parsing = { workspace = true }
+sdi-patterns = { workspace = true }
+sdi-lang-rust       = { workspace = true }
+sdi-lang-python     = { workspace = true }
+sdi-lang-typescript = { workspace = true }
+sdi-lang-javascript = { workspace = true }
+sdi-lang-go         = { workspace = true }
+sdi-lang-java       = { workspace = true }
 clap       = { workspace = true }
 anyhow     = { workspace = true }
+serde_json = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 walkdir = { workspace = true }
@@ -24,4 +33,5 @@ walkdir = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 sdi-config = { workspace = true }
-tempfile = { workspace = true }
+tempfile   = { workspace = true }
+serde_json = { workspace = true }
