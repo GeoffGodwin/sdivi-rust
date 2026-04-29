@@ -9,5 +9,13 @@ description = "Dependency graph construction for sdi-rust"
 
 [dependencies]
 sdi-config  = { workspace = true }
+sdi-parsing = { workspace = true }
 thiserror   = { workspace = true }
 serde       = { workspace = true }
+serde_json  = { workspace = true }
+petgraph    = { workspace = true }
+tracing     = { workspace = true }
+
+[dev-dependencies]
+sdi-lang-rust = { path = "../sdi-lang-rust" }
+tempfile      = { workspace = true }

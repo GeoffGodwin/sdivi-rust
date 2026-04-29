@@ -1,4 +1,9 @@
 #### Milestone 5: Dependency Graph + Native Leiden Port
+<!-- milestone-meta
+id: "5"
+status: "done"
+-->
+
 
 **Scope:** Build the dependency graph from `FeatureRecord` outputs (`sdi-graph`) and implement the native Leiden community detection (`sdi-detection`). This is the KD11 hot zone — the largest single milestone. Verification suite against `leidenalg` is set up here, gated behind feature `verify-leiden`.
 

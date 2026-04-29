@@ -1,63 +1,57 @@
-# Coder Summary — M04: Remaining Language Adapters — 2026-04-29
 ## Status: COMPLETE
 
-## What Was Implemented
-
-### Prior Run (completed before this session)
-- **Python adapter** (`sdi-lang-python`): `lib.rs` + `extract.rs` with import/export/signature/hint extraction; 8 tests in `tests/extract_behavior.rs`
-- **TypeScript adapter** (`sdi-lang-typescript`): `lib.rs` + `extract.rs` with dual TS/TSX parser; 8 tests in `tests/extract_behavior.rs`
-- **JavaScript adapter** (`sdi-lang-javascript`): `lib.rs` + `extract.rs`; 8 tests in `tests/extract_behavior.rs`
-- **Go adapter** (`sdi-lang-go`): `lib.rs` + `extract.rs` with capitalized-name export rule; 8 tests in `tests/extract_behavior.rs`
-- **Java adapter** (`sdi-lang-java`): `lib.rs` + `extract.rs` with `public` modifier check; 8 tests in `tests/extract_behavior.rs`
-- **Rust adapter bug fixes** (`sdi-lang-rust/src/extract.rs`):
-  - `collect_hints`: truncation check now `*i + c.len_utf8() <= 256` (was `*i < 256`)
-  - `extract_exports`: `continue` after recording a top-level item prevents recursing into nested items
-- **load.rs doc comment misplacement** fixed: `load_or_default` and `project_config_path` doc blocks separated
-- **ACTIVE_TREES doc comment** updated to accurately describe invocation tracking
-
-### This Session
-- Fixed `crates/sdi-cli/tests/version.rs`: updated hardcoded version from `0.0.3` → `0.0.4` (workspace was bumped in prior run)
-- Fixed `crates/sdi-parsing/tests/memory_invariant.rs`: added `COUNTER_LOCK: Mutex<()>` to serialize `tree_counter_zero_after_each_parse` and `parse_many_large_files_completes`; both shared the global `ACTIVE_TREES` counter and were failing due to a race when run in parallel by the test runner
-
-## Root Cause (bugs only)
-- **Version test failure**: workspace Cargo.toml version was bumped to `0.0.4` in the prior run but `version.rs` test was only updated to `0.0.3`.
-- **Memory invariant race**: `parse_many_large_files_completes` uses rayon to parse 20 files in parallel; while those 20 rayon tasks were in-flight, they held the `ACTIVE_TREES` counter at 20. `tree_counter_zero_after_each_parse` ran concurrently and observed `ACTIVE_TREES == 20` instead of 0 after its own sequential `parse_file` call.
+## Summary
+.tekhton/CODER_SUMMARY.md was reconstructed by the pipeline after the coder agent
+failed to produce or maintain it. The following files were modified based
+on git state. The reviewer should assess actual changes directly.
 
 ## Files Modified
+- .claude/milestones/MANIFEST.cfg
+- .claude/milestones/m05-dependency-graph-native-leiden-port.md
+- .github/workflows/verify-leiden.yml
+- .tekhton/CODER_SUMMARY.md
+- .tekhton/DRIFT_LOG.md
+- .tekhton/test_dedup.fingerprint
+- CLAUDE.md
+- Cargo.lock
+- crates/sdi-detection/Cargo.toml
+- crates/sdi-detection/src/lib.rs
+- crates/sdi-graph/Cargo.toml
+- crates/sdi-graph/src/lib.rs
 
-### Prior run (already in git working tree)
-- `crates/sdi-lang-python/Cargo.toml` — added tree-sitter-python dependency
-- `crates/sdi-lang-python/src/lib.rs` — Python `LanguageAdapter` impl
-- `crates/sdi-lang-python/src/extract.rs` (NEW) — Python AST extraction helpers
-- `crates/sdi-lang-python/tests/extract_behavior.rs` (NEW) — Python adapter tests
-- `crates/sdi-lang-typescript/Cargo.toml` — added tree-sitter-typescript dependency
-- `crates/sdi-lang-typescript/src/lib.rs` — TypeScript `LanguageAdapter` impl
-- `crates/sdi-lang-typescript/src/extract.rs` (NEW) — TypeScript AST extraction helpers
-- `crates/sdi-lang-typescript/tests/extract_behavior.rs` (NEW) — TypeScript adapter tests
-- `crates/sdi-lang-javascript/Cargo.toml` — added tree-sitter-javascript dependency
-- `crates/sdi-lang-javascript/src/lib.rs` — JavaScript `LanguageAdapter` impl
-- `crates/sdi-lang-javascript/src/extract.rs` (NEW) — JavaScript AST extraction helpers
-- `crates/sdi-lang-javascript/tests/extract_behavior.rs` (NEW) — JavaScript adapter tests
-- `crates/sdi-lang-go/Cargo.toml` — added tree-sitter-go dependency
-- `crates/sdi-lang-go/src/lib.rs` — Go `LanguageAdapter` impl
-- `crates/sdi-lang-go/src/extract.rs` (NEW) — Go AST extraction helpers
-- `crates/sdi-lang-go/tests/extract_behavior.rs` (NEW) — Go adapter tests
-- `crates/sdi-lang-java/Cargo.toml` — added tree-sitter-java dependency
-- `crates/sdi-lang-java/src/lib.rs` — Java `LanguageAdapter` impl
-- `crates/sdi-lang-java/src/extract.rs` (NEW) — Java AST extraction helpers
-- `crates/sdi-lang-java/tests/extract_behavior.rs` (NEW) — Java adapter tests
-- `crates/sdi-lang-rust/src/extract.rs` — fixed truncation and nested-export bugs
-- `crates/sdi-config/src/load.rs` — doc comment fix (separate `load_or_default` and `project_config_path` doc blocks)
-- `crates/sdi-parsing/src/lib.rs` — ACTIVE_TREES doc comment updated
-- `Cargo.toml` — workspace version bumped to 0.0.4
-- `Cargo.lock` — updated
+## New Files Created
+- crates/sdi-detection/src/leiden/aggregate.rs (new)
+- crates/sdi-detection/src/leiden/cpm.rs (new)
+- crates/sdi-detection/src/leiden/graph.rs (new)
+- crates/sdi-detection/src/leiden/mod.rs (new)
+- crates/sdi-detection/src/leiden/modularity.rs (new)
+- crates/sdi-detection/src/leiden/refine.rs (new)
+- crates/sdi-detection/src/partition.rs (new)
+- crates/sdi-detection/src/warm_start.rs (new)
+- crates/sdi-detection/tests/leiden_quality.rs (new)
+- crates/sdi-detection/tests/proptest_seeded.proptest-regressions (new)
+- crates/sdi-detection/tests/proptest_seeded.rs (new)
+- crates/sdi-detection/tests/warm_start.rs (new)
+- crates/sdi-graph/src/dependency_graph.rs (new)
+- crates/sdi-graph/src/metrics.rs (new)
+- crates/sdi-graph/tests/metrics.rs (new)
+- tests/fixtures/leiden-graphs/large/adjacency.json (new)
+- tests/fixtures/leiden-graphs/large/metadata.json (new)
+- tests/fixtures/leiden-graphs/medium/adjacency.json (new)
+- tests/fixtures/leiden-graphs/medium/metadata.json (new)
+- tests/fixtures/leiden-graphs/small/adjacency.json (new)
+- tests/fixtures/leiden-graphs/small/metadata.json (new)
+- tools/generate-leiden-fixtures.py (new)
 
-### This session
-- `crates/sdi-cli/tests/version.rs` — bumped expected version from `0.0.3` to `0.0.4`
-- `crates/sdi-parsing/tests/memory_invariant.rs` — added `COUNTER_LOCK` mutex to serialize concurrent tests
+## Git Diff Summary
+```
+ crates/sdi-detection/Cargo.toml                    | 15 ++++++
+ crates/sdi-detection/src/lib.rs                    | 28 +++++++++-
+ crates/sdi-graph/Cargo.toml                        |  8 +++
+ crates/sdi-graph/src/lib.rs                        | 24 ++++++++-
+ 12 files changed, 158 insertions(+), 91 deletions(-)
+```
 
-## Human Notes Status
-- Non-blocking note (load.rs doc comment misplacement): COMPLETED — fixed in prior run
-
-## Docs Updated
-None — no public-surface changes in this task (all new public items in sdi-lang-* crates are documented inline with rustdoc + `# Examples` blocks).
+## Remaining Work
+Unable to determine — coder did not report remaining items.
+Review the task description against actual changes to identify gaps.

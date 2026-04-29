@@ -7,7 +7,22 @@ authors.workspace = true
 repository.workspace = true
 description = "Native Leiden community detection for sdi-rust"
 
+[features]
+# Enables the cross-check suite against leidenalg (requires Python + leidenalg).
+verify-leiden = []
+
 [dependencies]
 sdi-config  = { workspace = true }
+sdi-graph   = { workspace = true }
 thiserror   = { workspace = true }
 serde       = { workspace = true }
+serde_json  = { workspace = true }
+rand        = { workspace = true }
+tracing     = { workspace = true }
+tempfile    = { workspace = true }
+
+[dev-dependencies]
+proptest    = { workspace = true }
+tempfile    = { workspace = true }
+sdi-graph   = { workspace = true }
+sdi-parsing = { workspace = true }

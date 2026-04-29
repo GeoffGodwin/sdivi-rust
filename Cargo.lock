@@ -266,6 +266,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
 name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -481,6 +487,16 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "petgraph"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
+dependencies = [
+ "fixedbitset",
+ "indexmap",
+]
 
 [[package]]
 name = "pin-project-lite"
@@ -719,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-cli"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -735,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-config"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "dirs",
  "serde",
@@ -748,7 +764,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-core"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-config",
  "serde",
@@ -757,25 +773,38 @@ dependencies = [
 
 [[package]]
 name = "sdi-detection"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
+ "proptest",
+ "rand",
  "sdi-config",
+ "sdi-graph",
+ "sdi-parsing",
  "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
 name = "sdi-graph"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
+ "petgraph",
  "sdi-config",
+ "sdi-lang-rust",
+ "sdi-parsing",
  "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
 name = "sdi-lang-go"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -784,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-java"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -793,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-javascript"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -802,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-python"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -811,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-rust"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-config",
  "sdi-parsing",
@@ -822,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-typescript"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -831,7 +860,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-parsing"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "globset",
  "ignore",
@@ -849,7 +878,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-patterns"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-config",
  "serde",
@@ -858,14 +887,14 @@ dependencies = [
 
 [[package]]
 name = "sdi-rust"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-core",
 ]
 
 [[package]]
 name = "sdi-snapshot"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "sdi-config",
  "serde",

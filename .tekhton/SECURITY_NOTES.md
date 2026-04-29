@@ -1,6 +1,6 @@
 # Security Notes
 
-Generated: 2026-04-29 08:21:04
+Generated: 2026-04-29 10:56:04
 
 ## Non-Blocking Findings (MEDIUM/LOW)
 - [LOW] [category:A07] [crates/sdi-config/src/load.rs:98, crates/sdi-config/src/boundary.rs:60] fixable:yes — TOCTOU: both `load_toml_file` and `BoundarySpec::load` call `path.exists()` and then `fs::read_to_string` as separate operations. A symlink swap between the two syscalls could redirect the read to an unintended file. The idiomatic fix eliminates the race: call `fs::read_to_string` directly and match `Err(e) if e.kind() == ErrorKind::NotFound` to return `Ok(None)`.

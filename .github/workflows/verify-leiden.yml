@@ -3,30 +3,35 @@
 #   - modularity within 1% of leidenalg on all fixture graphs
 #   - community count within ±10% of leidenalg on all fixture graphs
 #
-# This workflow is a placeholder. It will be populated when the native Leiden
-# port lands in Milestone 5 (sdi-detection). The feature flag `verify-leiden`
-# and the Python side of the cross-check live in:
-#   crates/sdi-detection/tests/leiden_quality.rs
+# Implementation lives in:
+#   crates/sdi-detection/src/leiden/
+#   crates/sdi-detection/tests/leiden_quality.rs  (gated: verify-leiden feature)
 #   tests/fixtures/leiden-graphs/{small,medium,large}/
+#   tools/generate-leiden-fixtures.py
 #
-# DO NOT enable this workflow until the Leiden port exists — it will fail.
+# Regenerate reference fixtures:
+#   pip install leidenalg igraph
+#   python tools/generate-leiden-fixtures.py --leiden
 
 name: Verify Leiden (KD11)
 
 on:
   workflow_dispatch:
-  # Uncomment when the Leiden port lands (Milestone 5):
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - "crates/sdi-detection/**"
+  push:
+    branches: [main]
+    paths:
+      - "crates/sdi-detection/**"
+      - "tests/fixtures/leiden-graphs/**"
+      - "tools/generate-leiden-fixtures.py"
+  pull_request:
+    paths:
+      - "crates/sdi-detection/**"
+      - "tests/fixtures/leiden-graphs/**"
 
 jobs:
   verify:
     name: Leiden quality cross-check
     runs-on: ubuntu-latest
-    # Remove this `if` when the Leiden port exists.
-    if: false
 
     steps:
       - uses: actions/checkout@v4
@@ -44,5 +49,8 @@ jobs:
       - name: Install leidenalg
         run: pip install leidenalg igraph
 
+      - name: Regenerate reference fixtures from leidenalg
+        run: python tools/generate-leiden-fixtures.py --leiden
+
       - name: Run Leiden verification tests
-        run: cargo test --workspace --features verify-leiden -p sdi-detection
+        run: cargo test -p sdi-detection --features verify-leiden -- --nocapture

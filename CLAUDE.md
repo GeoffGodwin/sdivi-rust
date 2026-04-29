@@ -280,11 +280,11 @@ sdi-rust/
 
 **Rationale (Open Q #3):** Compile-time is simpler and matches ecosystem norms. The feature-flag knob lets binary-size-sensitive consumers strip languages they don't need.
 
-### KDD-5: `petgraph` is the default; CSR view is conditional
+### KDD-5: `petgraph` is the default; CSR view **RATIFIED: NO CSR VIEW**
 
-**Decision:** Use `petgraph::Graph<NodeId, EdgeWeight>` for the default path. Build a custom CSR (compressed sparse row) view in `sdi-graph::csr_view` only if Leiden profiling shows `petgraph`'s adjacency dominates.
+**Decision (ratified Milestone 5):** Use `petgraph::Graph<NodeId, EdgeWeight>` everywhere in `sdi-graph`. The Leiden algorithm builds its own internal `LeidenGraph` (`Vec<Vec<usize>>` adjacency list) at the start of each run; a separate CSR module in `sdi-graph::csr_view` would duplicate that conversion without benefit. Decided during Milestone 5 profiling; recorded in `DRIFT_LOG.md`.
 
-**Rationale (Open Q #2):** Defer the optimization until measured. Decide after the Leiden port spike (Milestone 5).
+**Rationale:** The Leiden hot path already converts the petgraph to an internal adjacency list. Adding a CSR module would cost an additional copy of the same data. `petgraph` is fast enough for the 5000-node benchmark graphs. Revisit only if a measured bottleneck demands it.
 
 ### KDD-6: YAML write — accept comment loss for MVP
 
@@ -533,7 +533,7 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 - **Stdin input for `sdi diff`** — carries forward as deferred from sdi-py.
 - **`sdi config` subcommand** — edit `.sdi/config.toml` directly. Same deferral as sdi-py.
 - **Comment-preserving YAML write** — KDD-6 accepts comment loss for MVP. Revisit only on user complaint.
-- **CSR-view custom graph type** — KDD-5 defers until profiling demands. Stay on `petgraph` until measured.
+- **CSR-view custom graph type** — KDD-5 ratified NO in Milestone 5. No CSR module; `petgraph` is fast enough.
 - **Importing sdi-py snapshots** — KDD-1 clean break. Trend continuity for migrators is acceptably lost.
 - **Bit-identical snapshot output across platforms** — Open Q #10. Aggregate equality only across platforms; revisit via build flag if a real adopter needs it.
 - **Bindings split into separate repos** — KDD-11 in-repo until non-trivial cross-repo CI complexity earns the split.
