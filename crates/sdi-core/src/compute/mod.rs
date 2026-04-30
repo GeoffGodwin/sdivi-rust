@@ -1,0 +1,7 @@
+//! Pure-compute functions — all referentially transparent, WASM-compatible.
+
+pub mod boundaries;
+pub mod coupling;
+pub mod normalize;
+pub mod patterns;
+pub mod thresholds;

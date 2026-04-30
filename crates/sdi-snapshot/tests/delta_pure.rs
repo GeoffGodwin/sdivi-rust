@@ -1,10 +1,11 @@
+use sdi_snapshot::PatternMetricsResult;
 use std::collections::BTreeMap;
 
 use proptest::prelude::*;
 use sdi_detection::partition::LeidenPartition;
 use sdi_graph::metrics::GraphMetrics;
 use sdi_patterns::PatternCatalog;
-use sdi_snapshot::build_snapshot;
+use sdi_snapshot::assemble_snapshot;
 use sdi_snapshot::compute_delta;
 use sdi_snapshot::Snapshot;
 
@@ -13,7 +14,7 @@ fn make_snap(density: f64, comm: usize) -> Snapshot {
     for i in 0..comm {
         stability.insert(i, 1.0f64);
     }
-    build_snapshot(
+    assemble_snapshot(
         GraphMetrics {
             node_count: 2,
             edge_count: 0,
@@ -29,6 +30,7 @@ fn make_snap(density: f64, comm: usize) -> Snapshot {
             seed: 42,
         },
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         None,
         "2026-04-29T00:00:00Z",
         None,

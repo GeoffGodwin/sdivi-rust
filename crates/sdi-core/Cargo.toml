@@ -5,15 +5,24 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Core library for the Structural Divergence Indexer"
+description = "Pure-compute facade for the Structural Divergence Indexer — WASM-compatible, no I/O"
 
 [dependencies]
-sdi-config    = { workspace = true }
-sdi-parsing   = { workspace = true }
-sdi-graph     = { workspace = true }
-sdi-detection = { workspace = true }
-sdi-patterns  = { workspace = true }
-sdi-snapshot  = { workspace = true }
+# All compute crates declared with default-features = false so the
+# pipeline-records feature (sdi-parsing dep) is not pulled in.
+# This keeps sdi-core free of tree-sitter, walkdir, ignore, rayon, tempfile,
+# and std::fs — required for wasm32-unknown-unknown builds.
+sdi-config    = { workspace = true, default-features = false }
+sdi-graph     = { workspace = true, default-features = false }
+sdi-detection = { workspace = true, default-features = false }
+sdi-patterns  = { workspace = true, default-features = false }
+sdi-snapshot  = { workspace = true, default-features = false }
 thiserror     = { workspace = true }
 serde         = { workspace = true }
+# Clock feature deliberately absent — sdi-core must not call SystemTime::now().
+# NaiveDate is in the features = ["serde"] set which is in workspace default.
+chrono        = { workspace = true }
 tracing       = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

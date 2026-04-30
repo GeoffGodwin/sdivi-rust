@@ -8,12 +8,9 @@
 //! ```rust
 //! use sdi_detection::leiden::run_leiden;
 //! use sdi_detection::partition::{LeidenConfig, LeidenPartition};
-//! use sdi_graph::dependency_graph::build_dependency_graph;
-//! use sdi_parsing::feature_record::FeatureRecord;
-//! use std::path::PathBuf;
+//! use sdi_graph::dependency_graph::build_dependency_graph_from_edges;
 //!
-//! let records: Vec<FeatureRecord> = vec![];
-//! let dg = build_dependency_graph(&records);
+//! let dg = build_dependency_graph_from_edges(&[], &[]);
 //! let cfg = LeidenConfig::default();
 //! let partition = run_leiden(&dg, &cfg, None);
 //! assert_eq!(partition.community_count(), 0);
@@ -25,4 +22,4 @@ pub mod warm_start;
 
 pub use partition::{LeidenConfig, LeidenPartition, QualityFunction};
 pub use leiden::run_leiden;
-pub use warm_start::{load_cached_partition, save_cached_partition, CACHE_FILENAME};
+pub use warm_start::{initial_assignment_from_cache, CACHE_FILENAME};

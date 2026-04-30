@@ -7,14 +7,22 @@ authors.workspace = true
 repository.workspace = true
 description = "Configuration loading and validation for sdi-rust"
 
+[features]
+# Gates FS-touching code (Config::load_or_default, BoundarySpec::load, env
+# overrides). With default-features = false only pure data structs and
+# validators compile — required for WASM-compatible consumers.
+loader = ["dep:chrono", "dep:dirs"]
+default = ["loader"]
+
 [dependencies]
-serde = { workspace = true }
+serde     = { workspace = true }
 serde_yml = { workspace = true }
 thiserror = { workspace = true }
-toml = { workspace = true }
-dirs = { workspace = true }
+toml      = { workspace = true }
+dirs      = { workspace = true, optional = true }
+chrono    = { workspace = true, optional = true, features = ["clock"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-tempfile = { workspace = true }
+tempfile   = { workspace = true }
 # proptest = { workspace = true }  # re-enable when CI toolchain (MSRV 1.85+) resolves getrandom 0.4

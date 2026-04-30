@@ -2,6 +2,7 @@
 members = [
     "crates/sdi-rust",
     "crates/sdi-core",
+    "crates/sdi-pipeline",
     "crates/sdi-cli",
     "crates/sdi-config",
     "crates/sdi-parsing",
@@ -19,7 +20,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.8"
+version = "0.0.9"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -27,13 +28,19 @@ repository = "https://github.com/geoffgodwin/sdi-rust"
 
 [workspace.dependencies]
 # ── internal crates ──────────────────────────────────────────────────────────
-sdi-core    = { path = "crates/sdi-core" }
-sdi-config  = { path = "crates/sdi-config" }
-sdi-parsing = { path = "crates/sdi-parsing" }
-sdi-graph   = { path = "crates/sdi-graph" }
-sdi-detection = { path = "crates/sdi-detection" }
-sdi-patterns  = { path = "crates/sdi-patterns" }
-sdi-snapshot  = { path = "crates/sdi-snapshot" }
+sdi-core     = { path = "crates/sdi-core" }
+sdi-pipeline = { path = "crates/sdi-pipeline" }
+# default-features = false so crates can opt into features explicitly.
+# sdi-config: loader feature gates load_or_default / BoundarySpec::load.
+# sdi-graph, sdi-patterns: pipeline-records gates sdi-parsing dep + from-records paths.
+# sdi-detection: pipeline-records is empty but listed for uniformity.
+# sdi-snapshot: pipeline-records gates tempfile + write/retention FS paths.
+sdi-config    = { path = "crates/sdi-config",    default-features = false }
+sdi-parsing   = { path = "crates/sdi-parsing" }
+sdi-graph     = { path = "crates/sdi-graph",     default-features = false }
+sdi-detection = { path = "crates/sdi-detection", default-features = false }
+sdi-patterns  = { path = "crates/sdi-patterns",  default-features = false }
+sdi-snapshot  = { path = "crates/sdi-snapshot",  default-features = false }
 sdi-lang-rust       = { path = "crates/sdi-lang-rust" }
 sdi-lang-python     = { path = "crates/sdi-lang-python" }
 sdi-lang-typescript = { path = "crates/sdi-lang-typescript" }
@@ -99,6 +106,11 @@ rand = "0.8"
 # ── logging / tracing ─────────────────────────────────────────────────────────
 tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ── date / time ───────────────────────────────────────────────────────────────
+# default-features = false omits clock/std — WASM-compatible. Clock feature is
+# opt-in per crate (sdi-cli enables it; sdi-core must not).
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
 
 # ── filesystem helpers ────────────────────────────────────────────────────────
 dirs     = "5"

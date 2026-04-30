@@ -1,25 +1,10 @@
-use std::path::Path;
-
 use serde::{Deserialize, Serialize};
-
-use crate::ConfigError;
 
 /// A ratified boundary specification loaded from `.sdi/boundaries.yaml`.
 ///
 /// A missing file is normal operation (Rule 16): call [`BoundarySpec::load`] and
 /// treat `Ok(None)` as "no declared intent." Intent divergence fields are absent
 /// from the snapshot when no spec is present.
-///
-/// # Examples
-///
-/// ```rust
-/// use std::path::Path;
-/// use sdi_config::BoundarySpec;
-///
-/// // Missing file is OK — returns None, not an error.
-/// let spec = BoundarySpec::load(Path::new("/nonexistent/boundaries.yaml")).unwrap();
-/// assert!(spec.is_none());
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundarySpec {
     /// Schema version string (optional; presence enables forward-compat checks).
@@ -53,17 +38,26 @@ impl BoundarySpec {
     /// Returns `Err(ConfigError::BoundaryParse)` if the file exists but is malformed.
     /// Returns `Err(ConfigError::Io)` on read failures.
     ///
-    /// # Errors
+    /// Only available with the `loader` feature (default ON).
     ///
-    /// Returns [`ConfigError`] on I/O or parse failure.
-    pub fn load(path: &Path) -> Result<Option<Self>, ConfigError> {
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::path::Path;
+    /// use sdi_config::BoundarySpec;
+    ///
+    /// let spec = BoundarySpec::load(Path::new("/nonexistent/boundaries.yaml")).unwrap();
+    /// assert!(spec.is_none());
+    /// ```
+    #[cfg(feature = "loader")]
+    pub fn load(path: &std::path::Path) -> Result<Option<Self>, crate::ConfigError> {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(ConfigError::Io(e)),
+            Err(e) => return Err(crate::ConfigError::Io(e)),
         };
         let spec: Self = serde_yml::from_str(&content)
-            .map_err(|e| ConfigError::BoundaryParse(e.to_string()))?;
+            .map_err(|e| crate::ConfigError::BoundaryParse(e.to_string()))?;
         Ok(Some(spec))
     }
 }

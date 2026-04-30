@@ -1,10 +1,11 @@
+use sdi_snapshot::PatternMetricsResult;
 use std::collections::BTreeMap;
 
 use sdi_config::{BoundaryDef, BoundarySpec};
 use sdi_detection::partition::LeidenPartition;
 use sdi_graph::metrics::GraphMetrics;
 use sdi_patterns::PatternCatalog;
-use sdi_snapshot::build_snapshot;
+use sdi_snapshot::assemble_snapshot;
 
 fn empty_graph() -> GraphMetrics {
     GraphMetrics {
@@ -35,7 +36,7 @@ fn make_boundary(name: &str) -> BoundaryDef {
     }
 }
 
-/// build_snapshot with Some(BoundarySpec) sets intent_divergence to Some.
+/// assemble_snapshot with Some(BoundarySpec) sets intent_divergence to Some.
 #[test]
 fn with_boundary_spec_intent_divergence_is_some() {
     let spec = BoundarySpec {
@@ -43,10 +44,11 @@ fn with_boundary_spec_intent_divergence_is_some() {
         boundaries: vec![make_boundary("api"), make_boundary("models")],
     };
 
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
@@ -70,10 +72,11 @@ fn boundary_count_matches_spec_length() {
         ],
     };
 
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
@@ -94,10 +97,11 @@ fn violation_count_is_zero() {
         boundaries: vec![make_boundary("core"), make_boundary("ui")],
     };
 
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
@@ -118,10 +122,11 @@ fn empty_boundary_spec_sets_intent_divergence_with_zero_count() {
         boundaries: vec![],
     };
 
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
@@ -142,10 +147,11 @@ fn intent_divergence_present_in_json_when_spec_given() {
         boundaries: vec![make_boundary("api")],
     };
 
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
@@ -165,10 +171,11 @@ fn intent_divergence_present_in_json_when_spec_given() {
 /// intent_divergence is omitted from JSON when no boundary spec is given (Rule 16).
 #[test]
 fn intent_divergence_absent_from_json_when_no_spec() {
-    let snap = build_snapshot(
+    let snap = assemble_snapshot(
         empty_graph(),
         empty_partition(),
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         None,
         "2026-04-29T00:00:00Z",
         None,

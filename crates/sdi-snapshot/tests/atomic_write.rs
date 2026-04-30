@@ -1,13 +1,14 @@
+use sdi_snapshot::PatternMetricsResult;
 use std::collections::BTreeMap;
 
 use sdi_detection::partition::LeidenPartition;
 use sdi_graph::metrics::GraphMetrics;
 use sdi_patterns::PatternCatalog;
-use sdi_snapshot::build_snapshot;
+use sdi_snapshot::assemble_snapshot;
 use sdi_snapshot::write_snapshot;
 
 fn empty_snap(ts: &str) -> sdi_snapshot::Snapshot {
-    build_snapshot(
+    assemble_snapshot(
         GraphMetrics {
             node_count: 0,
             edge_count: 0,
@@ -23,6 +24,7 @@ fn empty_snap(ts: &str) -> sdi_snapshot::Snapshot {
             seed: 42,
         },
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         None,
         ts,
         None,

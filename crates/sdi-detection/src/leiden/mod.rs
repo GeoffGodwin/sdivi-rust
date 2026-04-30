@@ -8,6 +8,7 @@ mod aggregate;
 pub(crate) mod graph;
 mod modularity;
 mod cpm;
+mod quality;
 mod refine;
 
 use std::collections::BTreeMap;
@@ -23,6 +24,7 @@ use crate::warm_start::initial_assignment_from_cache;
 use aggregate::{AggregateResult, aggregate_network, flatten_partition, map_to_aggregate_init};
 use graph::LeidenGraph;
 use modularity::ModularityState;
+use quality::{compute_modularity, compute_stability};
 use refine::refine_partition;
 
 /// Runs the Leiden algorithm on a [`DependencyGraph`].
@@ -135,10 +137,16 @@ fn local_move_phase(
     gamma: f64,
 ) -> bool {
     let n = graph.n;
-    let max_comm = partition.iter().copied().max().unwrap_or(0) + 1;
 
-    // Build state from current partition.
-    let mut state = ModularityState::from_assignment(graph, partition.clone(), max_comm);
+    // Offset community IDs by n so they never collide with node indices used as
+    // singleton community IDs inside ModularityState::remove_node.  Without the
+    // offset, a node at index X that happens to share its ID with an existing
+    // community would corrupt that community's size counter when placed in its
+    // singleton slot, causing an underflow on a later remove_node call.
+    let offset_partition: Vec<usize> = partition.iter().map(|&c| c + n).collect();
+    let max_comm = offset_partition.iter().copied().max().unwrap_or(0) + 1;
+
+    let mut state = ModularityState::from_assignment(graph, offset_partition, max_comm);
 
     let mut order: Vec<usize> = (0..n).collect();
     order.shuffle(rng);
@@ -156,12 +164,12 @@ fn local_move_phase(
 
         let (best_comm, best_gain) = best;
 
-        if best_comm != node && best_gain > 1e-10 {
-            // Move to the better community.
+        // best_comm is always >= n (offset community) so best_comm != node always;
+        // the gain threshold is the only check needed here.
+        if best_gain > 1e-10 {
             state.add_node(graph, node, best_comm);
             any_moved = true;
         } else {
-            // Stay in (or return to) old community or singleton.
             let target = if state.size[old_comm] == 0 { node } else { old_comm };
             state.add_node(graph, node, target);
         }
@@ -258,55 +266,3 @@ fn build_partition(
     LeidenPartition { assignments, stability, modularity, seed }
 }
 
-/// Computes per-community stability (internal edge density).
-fn compute_stability(graph: &LeidenGraph, assignment: &[usize]) -> BTreeMap<usize, f64> {
-    let max_comm = assignment.iter().copied().max().map(|m| m + 1).unwrap_or(0);
-    let mut size = vec![0usize; max_comm];
-    let mut inner = vec![0.0f64; max_comm];
-
-    for (i, &c) in assignment.iter().enumerate() {
-        size[c] += 1;
-        for &j in &graph.adj[i] {
-            if assignment[j] == c && j > i {
-                inner[c] += 1.0;
-            }
-        }
-    }
-
-    let mut stability = BTreeMap::new();
-    for c in 0..max_comm {
-        if size[c] == 0 {
-            continue;
-        }
-        let n = size[c] as f64;
-        let max_possible = n * (n - 1.0) / 2.0;
-        let s = if max_possible > 0.0 { inner[c] / max_possible } else { 1.0 };
-        stability.insert(c, s);
-    }
-    stability
-}
-
-/// Computes overall modularity.
-fn compute_modularity(graph: &LeidenGraph, assignment: &[usize]) -> f64 {
-    let m = graph.total_weight;
-    if m == 0.0 {
-        return 0.0;
-    }
-    let max_comm = assignment.iter().copied().max().map(|m| m + 1).unwrap_or(0);
-    let mut sigma = vec![0.0f64; max_comm];
-    let mut inner = vec![0.0f64; max_comm];
-
-    for (i, &c) in assignment.iter().enumerate() {
-        sigma[c] += graph.degree[i];
-        for &j in &graph.adj[i] {
-            if assignment[j] == c && j > i {
-                inner[c] += 1.0;
-            }
-        }
-    }
-
-    let m2 = 2.0 * m;
-    sigma.iter().zip(inner.iter()).fold(0.0, |acc, (&s, &l)| {
-        acc + l / m - (s / m2).powi(2)
-    })
-}

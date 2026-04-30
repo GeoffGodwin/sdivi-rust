@@ -1,13 +1,10 @@
 use thiserror::Error;
 
-/// Errors produced by the sdi-core analysis pipeline.
-///
-/// This enum is `#[non_exhaustive]` — new variants will be added as the
-/// pipeline grows in later milestones.
+/// Errors produced by the sdi-core pure-compute API.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum AnalysisError {
-    /// I/O error during file reading, snapshot writing, or cache access.
+    /// I/O error (only reachable when the caller bridges to sdi-pipeline).
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -21,10 +18,17 @@ pub enum AnalysisError {
     Config(#[from] sdi_config::ConfigError),
 
     /// I/O error while writing a snapshot file or persisting the partition cache.
-    ///
-    /// Distinguished from [`AnalysisError::Io`] so callers can handle
-    /// snapshot-write failures separately from source-file read failures.
-    /// Not `#[from]` because `std::io::Error` is already claimed by [`AnalysisError::Io`].
     #[error("snapshot write error: {0}")]
     SnapshotIo(std::io::Error),
+
+    /// A node ID failed the canonicalization rules.
+    ///
+    /// See [`crate::input::validate_node_id`] for the full set of rules.
+    #[error("invalid node id {id:?}: {reason}")]
+    InvalidNodeId {
+        /// The offending node ID string.
+        id: String,
+        /// Human-readable reason.
+        reason: String,
+    },
 }

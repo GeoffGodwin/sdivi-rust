@@ -1,49 +1,18 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::ConfigError;
 
-/// Returns today's date as an ISO-8601 string (`"YYYY-MM-DD"`).
-///
-/// Uses the Gregorian calendar algorithm from the proleptic calendar system,
-/// derived from the Unix epoch. No external dependencies required.
-pub(crate) fn today_iso8601() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let days = (secs / 86400) as u32;
-    let (year, month, day) = days_since_epoch_to_ymd(days);
-    format!("{year:04}-{month:02}-{day:02}")
-}
-
-/// Converts days since Unix epoch (1970-01-01) to a Gregorian `(year, month, day)` tuple.
-fn days_since_epoch_to_ymd(days: u32) -> (u32, u32, u32) {
-    // Algorithm: shift to a civil calendar anchored at Mar 1, year 0
-    // Reference: http://howardhinnant.github.io/date_algorithms.html
-    let z = days + 719_468;
-    let era = z / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if m <= 2 { y + 1 } else { y };
-    (year, m, d)
-}
-
-/// Returns `true` if `expires_str` is a date strictly before today (i.e., the override has expired).
-///
-/// `expires_str` must be in `"YYYY-MM-DD"` format. An unparseable string is treated as
-/// non-expired (a separate validation step handles format errors).
-pub(crate) fn is_expired(expires_str: &str) -> bool {
-    // ISO-8601 date strings in YYYY-MM-DD format compare correctly lexicographically.
-    expires_str < today_iso8601().as_str()
-}
-
 /// Validates that `expires_str` is a well-formed `"YYYY-MM-DD"` date string.
-pub(crate) fn validate_date_format(expires_str: &str) -> bool {
+///
+/// Does not check leap-year validity; Feb 29 is accepted for any year.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdi_config::validate_date_format;
+///
+/// assert!(validate_date_format("2026-09-30"));
+/// assert!(!validate_date_format("26-09-30"));
+/// ```
+pub fn validate_date_format(expires_str: &str) -> bool {
     let parts: Vec<&str> = expires_str.split('-').collect();
     if parts.len() != 3 {
         return false;
@@ -64,11 +33,20 @@ pub(crate) fn validate_date_format(expires_str: &str) -> bool {
         && (1..=max_day).contains(&day)
 }
 
-/// Validates all threshold override entries in `table`, returning an error if any
-/// override is missing the mandatory `expires` field. Removes expired overrides in-place.
+/// Validates expires format and prunes expired overrides from `table`.
 ///
-/// `table` is the fully-merged `toml::Table` before deserialization into [`Config`].
-pub(crate) fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<(), ConfigError> {
+/// Validates that every override has a well-formed `expires` field in
+/// `"YYYY-MM-DD"` format, then removes any overrides whose expiry is strictly
+/// before today.  After expiry the override is silently ignored and defaults
+/// resume — per project rules.
+///
+/// `today` is the current date as a `"YYYY-MM-DD"` string for comparison.
+/// `table` is the fully-merged `toml::Table` before deserialization into
+/// [`Config`].
+pub(crate) fn validate_and_prune_overrides(
+    table: &mut toml::Table,
+    today: &str,
+) -> Result<(), ConfigError> {
     let Some(toml::Value::Table(thresholds)) = table.get_mut("thresholds") else {
         return Ok(());
     };
@@ -77,7 +55,7 @@ pub(crate) fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<()
     };
 
     let categories: Vec<String> = overrides.keys().cloned().collect();
-    let mut to_remove = Vec::new();
+    let mut to_remove: Vec<String> = Vec::new();
 
     for category in &categories {
         let Some(toml::Value::Table(entry)) = overrides.get(category) else {
@@ -98,7 +76,8 @@ pub(crate) fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<()
                         ),
                     });
                 }
-                if is_expired(date_str) {
+                // Prune expired: date_str < today means it expired before today.
+                if date_str.as_str() < today {
                     to_remove.push(category.clone());
                 }
             }
@@ -111,34 +90,24 @@ pub(crate) fn validate_and_prune_overrides(table: &mut toml::Table) -> Result<()
         }
     }
 
-    for cat in to_remove {
-        overrides.remove(&cat);
+    for cat in &to_remove {
+        overrides.remove(cat);
     }
+
     Ok(())
+}
+
+/// Returns today's date as a `"YYYY-MM-DD"` string using the system clock.
+#[cfg(feature = "loader")]
+pub(crate) fn today_iso8601() -> String {
+    use chrono::Datelike;
+    let today = chrono::Local::now().date_naive();
+    format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn today_iso8601_has_correct_format() {
-        let today = today_iso8601();
-        assert_eq!(today.len(), 10, "expected YYYY-MM-DD, got: {today}");
-        assert_eq!(&today[4..5], "-");
-        assert_eq!(&today[7..8], "-");
-    }
-
-    #[test]
-    fn past_date_is_expired() {
-        assert!(is_expired("2000-01-01"));
-        assert!(is_expired("1970-01-01"));
-    }
-
-    #[test]
-    fn future_date_is_not_expired() {
-        assert!(!is_expired("2099-12-31"));
-    }
 
     #[test]
     fn validate_date_format_accepts_valid_dates() {
@@ -158,10 +127,77 @@ mod tests {
 
     #[test]
     fn validate_date_format_rejects_impossible_days() {
-        assert!(!validate_date_format("2026-02-30")); // Feb 30 never exists
-        assert!(!validate_date_format("2026-04-31")); // April has 30 days
-        assert!(!validate_date_format("2026-06-31")); // June has 30 days
-        assert!(validate_date_format("2026-02-29")); // Feb 29 accepted (no leap-year check)
-        assert!(validate_date_format("2026-12-31")); // Dec 31 valid
+        assert!(!validate_date_format("2026-02-30"));
+        assert!(!validate_date_format("2026-04-31"));
+        assert!(!validate_date_format("2026-06-31"));
+        assert!(validate_date_format("2026-02-29"));
+        assert!(validate_date_format("2026-12-31"));
+    }
+
+    // ── validate_and_prune_overrides: strict-less-than boundary ──────────────
+
+    fn make_override_table(expires: &str) -> toml::Table {
+        toml::from_str(&format!(
+            "[thresholds.overrides.test_cat]\npattern_entropy_rate = 5.0\nexpires = \"{expires}\"\n"
+        ))
+        .expect("valid TOML")
+    }
+
+    fn override_present(table: &toml::Table) -> bool {
+        table
+            .get("thresholds")
+            .and_then(|t| t.as_table())
+            .and_then(|t| t.get("overrides"))
+            .and_then(|t| t.as_table())
+            .map(|ov| ov.contains_key("test_cat"))
+            .unwrap_or(false)
+    }
+
+    /// An override whose `expires` equals today must be KEPT.
+    ///
+    /// The predicate is `date_str < today` (strict less-than), so an override
+    /// expiring today is not yet expired.
+    #[test]
+    fn expires_equal_to_today_is_kept() {
+        let today = "2026-04-29";
+        let mut table = make_override_table(today);
+        validate_and_prune_overrides(&mut table, today)
+            .expect("valid expires must not error");
+        assert!(
+            override_present(&table),
+            "override expiring on today ({today}) must be kept because expires == today is not < today"
+        );
+    }
+
+    /// An override expiring one day before today must be PRUNED.
+    ///
+    /// "2026-04-28" < "2026-04-29" is true under lexicographic ISO comparison.
+    #[test]
+    fn expires_one_day_before_today_is_pruned() {
+        let today = "2026-04-29";
+        let yesterday = "2026-04-28";
+        let mut table = make_override_table(yesterday);
+        validate_and_prune_overrides(&mut table, today)
+            .expect("valid expires must not error");
+        assert!(
+            !override_present(&table),
+            "override expiring yesterday ({yesterday}) must be pruned (strictly before today {today})"
+        );
+    }
+
+    /// An override expiring one day after today must be KEPT.
+    ///
+    /// Verifies the boundary from the other direction.
+    #[test]
+    fn expires_one_day_after_today_is_kept() {
+        let today = "2026-04-29";
+        let tomorrow = "2026-04-30";
+        let mut table = make_override_table(tomorrow);
+        validate_and_prune_overrides(&mut table, today)
+            .expect("valid expires must not error");
+        assert!(
+            override_present(&table),
+            "override expiring tomorrow ({tomorrow}) must be kept"
+        );
     }
 }

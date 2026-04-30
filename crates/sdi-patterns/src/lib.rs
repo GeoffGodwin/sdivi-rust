@@ -2,30 +2,33 @@
 //! Pattern fingerprinting and catalog for sdi-rust.
 //!
 //! Implements Stage 4 of the five-stage analysis pipeline. Classifies
-//! [`sdi_parsing::feature_record::PatternHint`] instances into the five built-in
-//! categories, fingerprints their structural shapes with `blake3`, and assembles
-//! a [`PatternCatalog`] with per-category entropy.
+//! pattern hints into the five built-in categories, fingerprints their
+//! structural shapes with `blake3`, and assembles a [`PatternCatalog`] with
+//! per-category entropy.
 //!
 //! # Design constraints
 //!
-//! This crate must NOT depend on `sdi-graph` or `sdi-detection`. It operates
-//! solely on the output of the parsing stage (`Vec<FeatureRecord>`).
+//! This crate must NOT depend on `sdi-graph` or `sdi-detection`.
 //!
 //! # Quick start
 //!
 //! ```rust
-//! use sdi_config::Config;
-//! use sdi_patterns::build_catalog;
+//! use sdi_patterns::PatternCatalog;
 //!
-//! let catalog = build_catalog(&[], &Config::default().patterns);
+//! let catalog = PatternCatalog::default();
 //! assert!(catalog.entries.is_empty());
 //! ```
 
 pub mod catalog;
 pub mod entropy;
 pub mod fingerprint;
+pub mod normalize;
 pub mod queries;
 
-pub use catalog::{build_catalog, PatternCatalog, PatternLocation, PatternStats};
+pub use catalog::{PatternCatalog, PatternLocation, PatternStats};
 pub use entropy::compute_entropy;
 pub use fingerprint::{fingerprint_node_kind, PatternFingerprint, FINGERPRINT_KEY};
+pub use normalize::{normalize_and_hash, NormalizeNode};
+
+#[cfg(feature = "pipeline-records")]
+pub use catalog::build_catalog;

@@ -1,15 +1,16 @@
+use sdi_snapshot::PatternMetricsResult;
 use std::collections::BTreeMap;
 use std::io::ErrorKind;
 
 use sdi_detection::partition::LeidenPartition;
 use sdi_graph::metrics::GraphMetrics;
 use sdi_patterns::PatternCatalog;
-use sdi_snapshot::build_snapshot;
+use sdi_snapshot::assemble_snapshot;
 use sdi_snapshot::write_snapshot;
 use sdi_snapshot::Snapshot;
 
 fn sample_snap() -> Snapshot {
-    build_snapshot(
+    assemble_snapshot(
         GraphMetrics {
             node_count: 3,
             edge_count: 2,
@@ -25,6 +26,7 @@ fn sample_snap() -> Snapshot {
             seed: 42,
         },
         PatternCatalog::default(),
+        PatternMetricsResult::default(),
         None,
         "2026-04-29T09:00:00Z",
         Some("deadbeefdeadbeefdeadbeef"),

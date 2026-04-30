@@ -7,6 +7,12 @@ authors.workspace = true
 repository.workspace = true
 description = "Snapshot assembly, delta, and persistence for sdi-rust"
 
+[features]
+# Gates FS-touching code (write_snapshot, enforce_retention, Snapshot::load).
+# Default ON for sdi-pipeline; OFF for sdi-core's WASM-compatible build.
+pipeline-records = ["dep:tempfile"]
+default = ["pipeline-records"]
+
 [dependencies]
 sdi-config    = { workspace = true }
 sdi-graph     = { workspace = true }
@@ -16,7 +22,7 @@ thiserror     = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 blake3        = { workspace = true }
-tempfile      = { workspace = true }
+tempfile      = { workspace = true, optional = true }
 tracing       = { workspace = true }
 
 [dev-dependencies]

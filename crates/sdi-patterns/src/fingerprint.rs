@@ -34,6 +34,11 @@ pub const FINGERPRINT_KEY: [u8; 32] = *b"sdi-rust::patterns::fingerprint!";
 pub struct PatternFingerprint([u8; 32]);
 
 impl PatternFingerprint {
+    /// Constructs a [`PatternFingerprint`] from raw digest bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        PatternFingerprint(bytes)
+    }
+
     /// Returns the raw digest bytes.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
@@ -77,6 +82,9 @@ impl<'de> Deserialize<'de> for PatternFingerprint {
 
 /// Computes a [`PatternFingerprint`] for the given `node_kind` using the fixed key.
 ///
+/// Equivalent to `normalize_and_hash(node_kind, &[])` — the algorithm for a
+/// leaf node (empty children) is byte-identical to this function.
+///
 /// # Examples
 ///
 /// ```rust
@@ -87,7 +95,7 @@ impl<'de> Deserialize<'de> for PatternFingerprint {
 /// ```
 pub fn fingerprint_node_kind(node_kind: &str) -> PatternFingerprint {
     let hash = blake3::keyed_hash(&FINGERPRINT_KEY, node_kind.as_bytes());
-    PatternFingerprint(*hash.as_bytes())
+    PatternFingerprint::from_bytes(*hash.as_bytes())
 }
 
 #[cfg(test)]

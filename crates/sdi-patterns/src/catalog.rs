@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use sdi_config::PatternsConfig;
-use sdi_parsing::feature_record::FeatureRecord;
 
 use crate::fingerprint::{fingerprint_node_kind, PatternFingerprint};
 use crate::queries;
@@ -58,10 +57,9 @@ pub struct PatternStats {
 /// # Examples
 ///
 /// ```rust
-/// use sdi_config::Config;
-/// use sdi_patterns::catalog::build_catalog;
+/// use sdi_patterns::PatternCatalog;
 ///
-/// let catalog = build_catalog(&[], &Config::default().patterns);
+/// let catalog = PatternCatalog::default();
 /// assert!(catalog.entries.is_empty());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -76,7 +74,7 @@ pub struct PatternCatalog {
 /// pattern collection but remain in the graph and partition stages. Fingerprints
 /// with a total instance count below `config.min_pattern_nodes` are removed.
 ///
-/// `config.categories = "auto"` activates all five built-in categories.
+/// Only available with the `pipeline-records` feature (default ON).
 ///
 /// # Examples
 ///
@@ -87,7 +85,11 @@ pub struct PatternCatalog {
 /// let catalog = build_catalog(&[], &Config::default().patterns);
 /// assert!(catalog.entries.is_empty());
 /// ```
-pub fn build_catalog(records: &[FeatureRecord], config: &PatternsConfig) -> PatternCatalog {
+#[cfg(feature = "pipeline-records")]
+pub fn build_catalog(
+    records: &[sdi_parsing::feature_record::FeatureRecord],
+    config: &PatternsConfig,
+) -> PatternCatalog {
     let exclude_set = build_globset(&config.scope_exclude);
 
     let mut entries: BTreeMap<String, BTreeMap<PatternFingerprint, PatternStats>> =
@@ -145,76 +147,5 @@ fn is_excluded(path: &std::path::Path, exclude_set: &Option<GlobSet>) -> bool {
     match exclude_set {
         None => false,
         Some(gs) => gs.is_match(path),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use sdi_config::PatternsConfig;
-    use sdi_parsing::feature_record::{FeatureRecord, PatternHint};
-
-    use super::*;
-
-    fn make_record(path: &str, hints: Vec<PatternHint>) -> FeatureRecord {
-        FeatureRecord {
-            path: PathBuf::from(path),
-            language: "rust".to_string(),
-            imports: vec![],
-            exports: vec![],
-            signatures: vec![],
-            pattern_hints: hints,
-        }
-    }
-
-    fn make_hint(node_kind: &str) -> PatternHint {
-        PatternHint {
-            node_kind: node_kind.to_string(),
-            start_byte: 0,
-            end_byte: 10,
-            start_row: 0,
-            start_col: 0,
-            text: "stub".to_string(),
-        }
-    }
-
-    #[test]
-    fn empty_records_produces_empty_catalog() {
-        let config = PatternsConfig::default();
-        let catalog = build_catalog(&[], &config);
-        assert!(catalog.entries.is_empty());
-    }
-
-    #[test]
-    fn try_expression_appears_in_error_handling() {
-        let hints = vec![make_hint("try_expression")];
-        let records = vec![make_record("src/lib.rs", hints)];
-        let mut config = PatternsConfig::default();
-        config.min_pattern_nodes = 1;
-        let catalog = build_catalog(&records, &config);
-        assert!(catalog.entries.contains_key("error_handling"));
-    }
-
-    #[test]
-    fn scope_exclude_removes_file_from_catalog() {
-        let hints = vec![make_hint("try_expression")];
-        let records = vec![make_record("src/vendor/lib.rs", hints)];
-        let mut config = PatternsConfig::default();
-        config.min_pattern_nodes = 1;
-        config.scope_exclude = vec!["src/vendor/**".to_string()];
-        let catalog = build_catalog(&records, &config);
-        assert!(catalog.entries.is_empty(), "excluded file must not appear in catalog");
-    }
-
-    #[test]
-    fn min_pattern_nodes_filters_low_count_fingerprints() {
-        let hints = vec![make_hint("try_expression"), make_hint("try_expression")];
-        let records = vec![make_record("src/lib.rs", hints)];
-        let mut config = PatternsConfig::default();
-        config.min_pattern_nodes = 5;
-        let catalog = build_catalog(&records, &config);
-        assert!(
-            catalog.entries.is_empty(),
-            "fingerprint with count < min_pattern_nodes must be excluded"
-        );
     }
 }

@@ -23,40 +23,34 @@ use crate::snapshot::Snapshot;
 ///
 /// let s = null_summary();
 /// assert!(s.pattern_entropy_delta.is_none());
-/// assert!(s.coupling_delta.is_none());
-/// assert!(s.community_count_delta.is_none());
-/// assert!(s.boundary_violation_delta.is_none());
+/// assert!(s.convention_drift_delta.is_none());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DivergenceSummary {
     /// Change in total normalized pattern entropy (curr − prev).
-    ///
-    /// Computed as the sum over all categories of `compute_entropy(cat_stats)`,
-    /// then `curr_total − prev_total`.  `None` when either snapshot has no
-    /// catalog entries.
     pub pattern_entropy_delta: Option<f64>,
 
-    /// Change in graph density (curr − prev).
+    /// Change in `convention_drift` (curr − prev).
     ///
-    /// `density` is `edge_count / (node_count * (node_count − 1))` and is
-    /// always in `[0.0, 1.0]`.
+    /// `None` when either snapshot has no catalog entries.
+    pub convention_drift_delta: Option<f64>,
+
+    /// Change in graph density (curr − prev).
     pub coupling_delta: Option<f64>,
 
     /// Change in community count (curr − prev), as a signed integer.
     pub community_count_delta: Option<i64>,
 
-    /// Change in boundary violation count (curr − prev), as a signed integer.
+    /// Change in boundary violation count (curr − prev).
     ///
-    /// `None` when either snapshot is missing `intent_divergence` (i.e. no
-    /// boundary spec was loaded at snapshot time).
+    /// `None` when either snapshot is missing `intent_divergence`.
     pub boundary_violation_delta: Option<i64>,
 }
 
 /// Returns a [`DivergenceSummary`] with all fields `None`.
 ///
 /// Used for the first-snapshot case where no previous snapshot exists.
-/// Callers must never substitute `0` for `None` here — `None` explicitly
-/// means "no prior snapshot to compare" (Rule 14).
+/// Callers must never substitute `0` for `None` here (Rule 14).
 ///
 /// # Examples
 ///
@@ -64,16 +58,16 @@ pub struct DivergenceSummary {
 /// use sdi_snapshot::delta::null_summary;
 ///
 /// let s = null_summary();
-/// assert_eq!(s, sdi_snapshot::delta::DivergenceSummary {
-///     pattern_entropy_delta: None,
-///     coupling_delta: None,
-///     community_count_delta: None,
-///     boundary_violation_delta: None,
-/// });
+/// assert_eq!(s.pattern_entropy_delta, None);
+/// assert_eq!(s.convention_drift_delta, None);
+/// assert_eq!(s.coupling_delta, None);
+/// assert_eq!(s.community_count_delta, None);
+/// assert_eq!(s.boundary_violation_delta, None);
 /// ```
 pub fn null_summary() -> DivergenceSummary {
     DivergenceSummary {
         pattern_entropy_delta: None,
+        convention_drift_delta: None,
         coupling_delta: None,
         community_count_delta: None,
         boundary_violation_delta: None,
@@ -85,53 +79,31 @@ pub fn null_summary() -> DivergenceSummary {
 /// This function is **referentially transparent**: same inputs always produce
 /// the same output.  It performs no I/O, reads no globals, and uses no clock.
 ///
-/// ## Dimension computations
-///
-/// - `pattern_entropy_delta`: sum of `compute_entropy(cat)` across all
-///   categories in each snapshot's catalog, then `curr − prev`.
-/// - `coupling_delta`: `curr.graph.density − prev.graph.density`.
-/// - `community_count_delta`: `curr.partition.community_count() as i64
-///   − prev.partition.community_count() as i64`.
-/// - `boundary_violation_delta`: `Some(curr_violations − prev_violations)`
-///   only when **both** snapshots contain `intent_divergence`; otherwise `None`.
-///
 /// # Examples
 ///
 /// ```rust
 /// use std::collections::BTreeMap;
-/// use sdi_snapshot::snapshot::{build_snapshot, Snapshot};
+/// use sdi_snapshot::snapshot::{assemble_snapshot, PatternMetricsResult, Snapshot};
 /// use sdi_snapshot::delta::compute_delta;
 /// use sdi_graph::metrics::GraphMetrics;
 /// use sdi_detection::partition::LeidenPartition;
 /// use sdi_patterns::PatternCatalog;
 ///
-/// fn make_snap(density: f64, communities: usize) -> Snapshot {
-///     let mut stability = BTreeMap::new();
-///     for i in 0..communities {
-///         stability.insert(i, 1.0);
-///     }
+/// fn make_snap(density: f64) -> Snapshot {
 ///     let graph = GraphMetrics {
-///         node_count: 2,
-///         edge_count: 0,
-///         density,
-///         cycle_count: 0,
-///         top_hubs: vec![],
-///         component_count: 1,
+///         node_count: 2, edge_count: 0, density,
+///         cycle_count: 0, top_hubs: vec![], component_count: 1,
 ///     };
 ///     let partition = LeidenPartition {
-///         assignments: BTreeMap::new(),
-///         stability,
-///         modularity: 0.0,
-///         seed: 42,
+///         assignments: BTreeMap::new(), stability: BTreeMap::new(),
+///         modularity: 0.0, seed: 42,
 ///     };
-///     build_snapshot(graph, partition, PatternCatalog::default(), None, "T", None)
+///     assemble_snapshot(graph, partition, PatternCatalog::default(),
+///         PatternMetricsResult::default(), None, "T", None)
 /// }
 ///
-/// let prev = make_snap(0.1, 2);
-/// let curr = make_snap(0.3, 3);
-/// let delta = compute_delta(&prev, &curr);
+/// let delta = compute_delta(&make_snap(0.1), &make_snap(0.3));
 /// assert!((delta.coupling_delta.unwrap() - 0.2).abs() < 1e-10);
-/// assert_eq!(delta.community_count_delta, Some(1));
 /// ```
 pub fn compute_delta(prev: &Snapshot, curr: &Snapshot) -> DivergenceSummary {
     let pattern_entropy_delta = Some({
@@ -150,6 +122,10 @@ pub fn compute_delta(prev: &Snapshot, curr: &Snapshot) -> DivergenceSummary {
         curr_entropy - prev_entropy
     });
 
+    let convention_drift_delta = Some(
+        curr.pattern_metrics.convention_drift - prev.pattern_metrics.convention_drift,
+    );
+
     let coupling_delta = Some(curr.graph.density - prev.graph.density);
 
     let community_count_delta = Some(
@@ -165,6 +141,7 @@ pub fn compute_delta(prev: &Snapshot, curr: &Snapshot) -> DivergenceSummary {
 
     DivergenceSummary {
         pattern_entropy_delta,
+        convention_drift_delta,
         coupling_delta,
         community_count_delta,
         boundary_violation_delta,
@@ -180,40 +157,24 @@ mod tests {
     use sdi_patterns::PatternCatalog;
 
     use super::*;
-    use crate::snapshot::{IntentDivergenceInfo, build_snapshot};
-
-    fn make_graph(density: f64) -> GraphMetrics {
-        GraphMetrics {
-            node_count: 2,
-            edge_count: 0,
-            density,
-            cycle_count: 0,
-            top_hubs: vec![],
-            component_count: 1,
-        }
-    }
-
-    fn make_partition(community_count: usize) -> LeidenPartition {
-        let mut stability = BTreeMap::new();
-        for i in 0..community_count {
-            stability.insert(i, 1.0_f64);
-        }
-        LeidenPartition {
-            assignments: BTreeMap::new(),
-            stability,
-            modularity: 0.0,
-            seed: 42,
-        }
-    }
+    use crate::snapshot::{IntentDivergenceInfo, PatternMetricsResult, assemble_snapshot};
 
     fn make_snap(density: f64, communities: usize) -> Snapshot {
-        build_snapshot(
-            make_graph(density),
-            make_partition(communities),
-            PatternCatalog::default(),
-            None,
-            "T",
-            None,
+        let mut stability = BTreeMap::new();
+        for i in 0..communities {
+            stability.insert(i, 1.0_f64);
+        }
+        let graph = GraphMetrics {
+            node_count: 2, edge_count: 0, density,
+            cycle_count: 0, top_hubs: vec![], component_count: 1,
+        };
+        let partition = LeidenPartition {
+            assignments: BTreeMap::new(), stability,
+            modularity: 0.0, seed: 42,
+        };
+        assemble_snapshot(
+            graph, partition, PatternCatalog::default(),
+            PatternMetricsResult::default(), None, "T", None,
         )
     }
 
@@ -221,6 +182,7 @@ mod tests {
     fn null_summary_all_none() {
         let s = null_summary();
         assert!(s.pattern_entropy_delta.is_none());
+        assert!(s.convention_drift_delta.is_none());
         assert!(s.coupling_delta.is_none());
         assert!(s.community_count_delta.is_none());
         assert!(s.boundary_violation_delta.is_none());
@@ -228,36 +190,39 @@ mod tests {
 
     #[test]
     fn coupling_delta_correct() {
-        let prev = make_snap(0.1, 2);
-        let curr = make_snap(0.3, 2);
-        let d = compute_delta(&prev, &curr);
+        let d = compute_delta(&make_snap(0.1, 2), &make_snap(0.3, 2));
         let v = d.coupling_delta.unwrap();
         assert!((v - 0.2).abs() < 1e-10, "expected ~0.2, got {v}");
     }
 
     #[test]
     fn community_count_delta_correct() {
-        let prev = make_snap(0.0, 3);
-        let curr = make_snap(0.0, 5);
-        let d = compute_delta(&prev, &curr);
+        let d = compute_delta(&make_snap(0.0, 3), &make_snap(0.0, 5));
         assert_eq!(d.community_count_delta, Some(2));
     }
 
     #[test]
+    fn convention_drift_delta_zero_for_equal_snapshots() {
+        let snap = make_snap(0.0, 1);
+        let d = compute_delta(&snap, &snap);
+        assert_eq!(d.convention_drift_delta, Some(0.0));
+    }
+
+    #[test]
     fn boundary_violation_delta_none_when_both_missing() {
-        let prev = make_snap(0.0, 1);
-        let curr = make_snap(0.0, 1);
-        let d = compute_delta(&prev, &curr);
+        let d = compute_delta(&make_snap(0.0, 1), &make_snap(0.0, 1));
         assert!(d.boundary_violation_delta.is_none());
     }
 
     #[test]
-    fn boundary_violation_delta_none_when_one_missing() {
-        let mut prev = make_snap(0.0, 1);
-        prev.intent_divergence = Some(IntentDivergenceInfo { boundary_count: 2, violation_count: 1 });
-        let curr = make_snap(0.0, 1);
-        let d = compute_delta(&prev, &curr);
-        assert!(d.boundary_violation_delta.is_none());
+    fn null_summary_serde_produces_explicit_nulls() {
+        let s = null_summary();
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains("\"pattern_entropy_delta\":null"));
+        assert!(json.contains("\"convention_drift_delta\":null"));
+        assert!(json.contains("\"coupling_delta\":null"));
+        assert!(json.contains("\"community_count_delta\":null"));
+        assert!(json.contains("\"boundary_violation_delta\":null"));
     }
 
     #[test]
@@ -268,24 +233,5 @@ mod tests {
         curr.intent_divergence = Some(IntentDivergenceInfo { boundary_count: 2, violation_count: 3 });
         let d = compute_delta(&prev, &curr);
         assert_eq!(d.boundary_violation_delta, Some(2));
-    }
-
-    #[test]
-    fn pattern_entropy_delta_zero_for_empty_catalogs() {
-        let prev = make_snap(0.0, 1);
-        let curr = make_snap(0.0, 1);
-        let d = compute_delta(&prev, &curr);
-        assert_eq!(d.pattern_entropy_delta, Some(0.0));
-    }
-
-    #[test]
-    fn null_summary_serde_produces_explicit_nulls() {
-        let s = null_summary();
-        let json = serde_json::to_string(&s).unwrap();
-        // All four fields must appear as explicit null in JSON.
-        assert!(json.contains("\"pattern_entropy_delta\":null"));
-        assert!(json.contains("\"coupling_delta\":null"));
-        assert!(json.contains("\"community_count_delta\":null"));
-        assert!(json.contains("\"boundary_violation_delta\":null"));
     }
 }

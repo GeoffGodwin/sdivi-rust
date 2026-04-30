@@ -17,8 +17,6 @@ const KNOWN_SECTIONS: &[&str] = &[
 /// Resolve the project config path for `repo_root`.
 ///
 /// Returns `SDI_CONFIG_PATH` if set; otherwise `<repo_root>/.sdi/config.toml`.
-/// This is the single source of truth for that rule — call it instead of
-/// duplicating the `std::env::var("SDI_CONFIG_PATH")` lookup.
 ///
 /// # Examples
 ///
@@ -57,9 +55,7 @@ pub fn project_config_path(repo_root: &Path) -> PathBuf {
 /// ```
 pub fn load_or_default(repo_root: &Path) -> Result<Config, ConfigError> {
     let project_config = project_config_path(repo_root);
-
     let global_config = dirs::config_dir().map(|d| d.join("sdi").join("config.toml"));
-
     let mut config = load_with_paths(Some(&project_config), global_config.as_deref())?;
     apply_env_overrides(&mut config);
     Ok(config)
@@ -70,8 +66,6 @@ pub fn load_or_default(repo_root: &Path) -> Result<Config, ConfigError> {
 /// Both paths are optional — if `None` or the file does not exist, that level is skipped.
 /// Env variable overrides are **not** applied; use [`load_or_default`] for the full chain.
 ///
-/// Exposed as `pub` for testing without env-var mutation.
-///
 /// # Errors
 ///
 /// Returns [`ConfigError`] on parse or validation failure.
@@ -79,13 +73,11 @@ pub fn load_with_paths(
     project_config: Option<&Path>,
     global_config: Option<&Path>,
 ) -> Result<Config, ConfigError> {
-    // Serialize defaults to TOML, then back to Table, giving us a mutable base.
     let default_toml =
         toml::to_string(&Config::default()).expect("Config::default() must serialize to TOML");
     let mut base: toml::Table =
         toml::from_str(&default_toml).expect("serialized Config must round-trip through TOML");
 
-    // Level 2: global config
     if let Some(path) = global_config {
         if let Some(overlay) = load_toml_file(path)? {
             warn_unknown_keys(&overlay, "global config");
@@ -93,7 +85,6 @@ pub fn load_with_paths(
         }
     }
 
-    // Level 3: project config
     if let Some(path) = project_config {
         if let Some(overlay) = load_toml_file(path)? {
             warn_unknown_keys(&overlay, "project config");
@@ -101,16 +92,14 @@ pub fn load_with_paths(
         }
     }
 
-    // Validate and prune expired threshold overrides before deserialization.
-    thresholds::validate_and_prune_overrides(&mut base)?;
+    // Validate expires format and prune overrides that have already expired.
+    thresholds::validate_and_prune_overrides(&mut base, &thresholds::today_iso8601())?;
 
-    // Re-serialize merged table to TOML string, then deserialize into Config.
     let merged =
         toml::to_string(&toml::Value::Table(base)).map_err(|e| ConfigError::Parse(e.to_string()))?;
     toml::from_str(&merged).map_err(|e| ConfigError::Parse(e.to_string()))
 }
 
-/// Parse a TOML file, returning `None` if the file does not exist.
 fn load_toml_file(path: &Path) -> Result<Option<toml::Table>, ConfigError> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
@@ -122,7 +111,6 @@ fn load_toml_file(path: &Path) -> Result<Option<toml::Table>, ConfigError> {
     Ok(Some(table))
 }
 
-/// Emit a deprecation warning to stderr for any unrecognised top-level section.
 fn warn_unknown_keys(table: &toml::Table, source: &str) {
     for key in table.keys() {
         if !KNOWN_SECTIONS.contains(&key.as_str()) {
@@ -131,10 +119,6 @@ fn warn_unknown_keys(table: &toml::Table, source: &str) {
     }
 }
 
-/// Merge `overlay` into `base` following sdi-rust merge semantics:
-/// - Section-by-section: overlay sections merge key-by-key.
-/// - Arrays (e.g., `core.exclude`, `patterns.scope_exclude`): overlay replaces.
-/// - `thresholds.overrides`: per-category merge — new categories added, existing replaced.
 fn merge_into(base: &mut toml::Table, overlay: toml::Table) {
     for (section, section_val) in overlay {
         match base.get_mut(&section) {
@@ -152,8 +136,6 @@ fn merge_into(base: &mut toml::Table, overlay: toml::Table) {
     }
 }
 
-/// Merge keys from `overlay_section` into `base_section`.
-/// Special-cases `thresholds.overrides` for per-category merge semantics.
 fn merge_section(base_section: &mut toml::Table, overlay_section: toml::Table, section: &str) {
     for (key, val) in overlay_section {
         if section == "thresholds" && key == "overrides" {
@@ -164,7 +146,6 @@ fn merge_section(base_section: &mut toml::Table, overlay_section: toml::Table, s
     }
 }
 
-/// Merge override categories: each category is replaced wholesale; new ones are added.
 fn merge_overrides(base_section: &mut toml::Table, overlay_val: toml::Value) {
     let toml::Value::Table(overlay_ov) = overlay_val else {
         base_section.insert("overrides".to_string(), overlay_val);
@@ -182,10 +163,6 @@ fn merge_overrides(base_section: &mut toml::Table, overlay_val: toml::Value) {
     }
 }
 
-/// Apply env var overrides to the resolved [`Config`].
-///
-/// `SDI_SNAPSHOT_DIR` → overrides `config.snapshots.dir`.
-/// `NO_COLOR` → overrides `config.output.color` to `"never"`.
 fn apply_env_overrides(config: &mut Config) {
     if let Ok(dir) = std::env::var("SDI_SNAPSHOT_DIR") {
         config.snapshots.dir = dir;

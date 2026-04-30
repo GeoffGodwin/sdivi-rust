@@ -1,5 +1,9 @@
 //! Synchronous retention enforcement for the snapshot directory.
 //!
+//! Only compiled with the `pipeline-records` feature.
+
+#![cfg(feature = "pipeline-records")]
+//!
 //! After each successful atomic write, call [`enforce_retention`] to remove
 //! the oldest snapshots beyond the configured maximum.  Retention is
 //! **synchronous** — it runs in the same thread as the write so the

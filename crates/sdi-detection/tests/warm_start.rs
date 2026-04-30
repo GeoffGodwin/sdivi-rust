@@ -12,9 +12,8 @@ use std::path::PathBuf;
 
 use sdi_detection::leiden::run_leiden;
 use sdi_detection::partition::{LeidenConfig, LeidenPartition};
-use sdi_detection::warm_start::{
-    initial_assignment_from_cache, load_cached_partition, save_cached_partition,
-};
+use sdi_detection::warm_start::initial_assignment_from_cache;
+use sdi_pipeline::cache::{load_cached_partition, save_cached_partition};
 use sdi_graph::dependency_graph::build_dependency_graph;
 use sdi_parsing::feature_record::FeatureRecord;
 
