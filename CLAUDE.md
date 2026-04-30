@@ -2,18 +2,18 @@
 
 ## Project Identity
 
-sdi-rust is the Rust reimplementation of the Structural Divergence Indexer (SDI), a measurement instrument that tracks the rate of structural drift in a codebase. It is delivered as a Cargo workspace whose primary product is the `sdi-core` library crate, with a thin CLI shell (`sdi-cli`) re-exposing the `sdi` command surface (`init`, `snapshot`, `diff`, `trend`, `check`, `show`, `boundaries`, `catalog`). The audience is software engineers, tech leads, engineering managers responsible for structural health of codebases — and now tooling authors and gardener-LLM developers who want to embed the analysis pipeline directly via Rust, Python, or Node bindings rather than shelling out to a binary.
+sdi-rust is the Rust reimplementation of the Structural Divergence Indexer (SDI), a measurement instrument that tracks the rate of structural drift in a codebase. It is delivered as a Cargo workspace with a two-layer library shape: `sdi-core` (the pure-compute facade — no I/O, no clock, no tree-sitter, WASM-compatible; concrete `compute_*` functions over plain serde input structs) and `sdi-pipeline` (the orchestration crate that owns FS reads, snapshot writes, partition cache, and the five-stage `Pipeline::snapshot(&Path)` API). A thin CLI shell (`sdi-cli`) re-exposes the `sdi` command surface (`init`, `snapshot`, `diff`, `trend`, `check`, `show`, `boundaries`, `catalog`). The audience is software engineers, tech leads, engineering managers responsible for structural health of codebases — and now tooling authors, gardener-LLM developers, and TS/JS tools (e.g. the consumer app) that want to embed the analysis pipeline directly via Rust or WASM bindings rather than shelling out to a binary.
 
 **Languages:**
 - Rust
 
-**Frameworks and key dependencies:** `tree-sitter` (AST parsing, native Rust crate, per-language grammars gated by Cargo features), `petgraph` (default graph representation; custom CSR view possible for the Leiden hot path), `clap` v4 with derive macros (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yaml` + `toml` (serialization), `rand` with `StdRng` (explicit seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs). PyO3 (`sdi-py`) and napi-rs (`sdi-node`) for bindings — post-MVP.
+**Frameworks and key dependencies:** `tree-sitter` (AST parsing, native Rust crate, per-language grammars gated by Cargo features), `petgraph` (graph representation; KDD-5 ratified no CSR view), `clap` v4 with derive macros (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yml` (maintained `serde_yaml` fork) + `toml` (serialization), `rand` with `StdRng` (explicit seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs), `chrono` (M08+, `default-features = false` in sdi-core to avoid the clock feature). M12 adds `wasm-bindgen` + `tsify` + `serde-wasm-bindgen` for `bindings/sdi-wasm`. PyO3 (`sdi-py`) and napi-rs (`sdi-node`) remain post-MVP.
 
 **Target platforms and deployment model:**
 - Tier 1: Linux x86_64 + aarch64 (CI on `ubuntu-latest`); macOS x86_64 + aarch64 (CI on `macos-latest`)
 - Tier 2: Windows x86_64 (CI on `windows-latest`, release-only build verification)
 - MSRV: "stable latest minus 2", pinned in `rust-toolchain.toml`, verified in CI
-- Distribution: crates.io (`sdi-core`, `sdi-cli`, language adapters), GitHub Releases (prebuilt `sdi` binaries Linux/macOS/Windows), PyPI (PyO3 wheel, post-MVP), npm (napi-rs prebuilt, post-MVP). WASM is post-MVP and only when a real consumer exists.
+- Distribution: crates.io (`sdi-core`, `sdi-pipeline`, `sdi-cli`, language adapters), GitHub Releases (prebuilt `sdi` binaries Linux/macOS/Windows), npm (`@geoffgodwin/sdi-wasm` — wasm-bindgen + tsify-derived `.d.ts`, ships in v0 per KDD-13). PyPI (PyO3 wheel) and napi-rs Node prebuilt remain post-MVP / v1 era.
 - Invocation: typically once per merge to the primary branch (CI gate) plus ad-hoc human invocations; bindings introduce continuous in-process invocation from long-running agent runtimes. No daemon, no server, no interactive TUI.
 
 **License:** **Apache 2.0** (ratified 2026-04-28). Permissive open source with explicit attribution preservation, contributor patent grant, and broad enterprise acceptance. `LICENSE` and `NOTICE` are at the repo root; every published crate sets `license = "Apache-2.0"` in its `Cargo.toml`.
@@ -24,15 +24,15 @@ sdi-rust inherits sdi-py's principles unchanged — they are language-agnostic a
 
 ### Concrete Patterns This Project Follows
 
-- **Five-stage sequential pipeline.** `parsing → graph → detection → patterns → snapshot/delta`. No stage may reach backward; downstream stages consume the previous stage's output as data, not as a live reference into earlier internals.
-- **Composition root in `sdi-cli`.** All wiring of config, pipeline, and presentation lives in `sdi-cli`. Library crates expose data and pure functions; they never reach for stdout, env vars, or filesystem state outside what is passed to them.
-- **Concrete types over traits.** `FeatureRecord`, `Snapshot`, `BoundarySpec`, `PatternCatalog`, `DependencyGraph`, `LeidenPartition`, and `DivergenceSummary` are concrete `serde::Serialize + Deserialize` structs. Embedders see exact-shape data, not opaque handles. The single trait extension point is `LanguageAdapter`.
-- **Ownership-enforced memory discipline.** The parsing API consumes file content + grammar and returns a `FeatureRecord`; the tree-sitter CST is dropped before the function returns. Memory usage is proportional to the largest single source file plus the dependency graph footprint — not the total codebase size.
-- **Determinism by construction.** `BTreeMap` over `HashMap` everywhere output ordering matters. RNG is `StdRng` with an explicit seed (default `42`). `BTreeMap`-keyed pattern catalog with `blake3` hashing seeded from a fixed key.
-- **Pure functions for derived data.** `Pipeline::delta` and `compute_delta` are referentially transparent. The same two snapshots always produce the same `DivergenceSummary`.
-- **Library-shape supremacy (KD12).** The `sdi-cli` crate cannot add code paths that aren't reachable through `sdi-core`. Every CLI feature is a library feature first.
-- **Snapshot schema clean break (KD13).** sdi-rust uses `snapshot_version: "1.0"`. We do not import sdi-py snapshots; trend continuity for migrators is acceptably lost.
-- **Native Leiden, no FFI (KD11).** A native Rust port of Traag et al. 2019 Leiden, ~1500–2500 LOC, verified against `leidenalg` on partition quality (modularity within 1%, community count within ±10%) — not bit identity.
+- **Five-stage sequential pipeline.** `parsing → graph → detection → patterns → snapshot/delta`. No stage reaches backward; downstream stages consume the previous stage's output as data. The pipeline is owned by `sdi-pipeline`; the per-stage compute lives in `sdi-core` and the compute crates.
+- **Two-layer library shape (KDD-12).** `sdi-core` is the pure-compute facade exposing `compute_*` functions over plain serde `*Input` structs. `sdi-pipeline` is the orchestration crate adding FS, clock, and atomic-write I/O. CLI and FS-based Rust embedders use `sdi-pipeline`; bindings and embedders with their own extractors (e.g. the consumer app) use `sdi-core` directly.
+- **Composition root in `sdi-cli`.** All wiring of config, pipeline, and presentation lives in `sdi-cli`. Library crates never reach for stdout, env vars, or FS state beyond what's passed to them.
+- **Concrete types over traits.** `FeatureRecord`, `Snapshot`, `BoundarySpec`, `PatternCatalog`, `DependencyGraph`, `LeidenPartition`, `DivergenceSummary`, and the `*Input` family in `sdi-core::input` are concrete `serde` structs. The only trait extension point is `LanguageAdapter`.
+- **Ownership-enforced memory discipline.** Tree-sitter CSTs are dropped per file inside the parsing API. Memory stays proportional to the largest single source file, not the codebase total.
+- **Determinism by construction.** `BTreeMap` over `HashMap` everywhere output ordering matters. `StdRng` seeded from `Config::random_seed`. Pattern fingerprints via `blake3` keyed hash. `normalize_and_hash` is exposed in `sdi-core` so foreign extractors produce the same canonical hashes as the Rust pipeline.
+- **Pure functions for derived data.** `compute_delta`, `compute_thresholds_check`, `compute_pattern_metrics`, `detect_boundaries`, `infer_boundaries`, `compute_coupling_topology`, `compute_boundary_violations`, `compute_trend` are all referentially transparent. They live in `sdi-core` and are callable from CLI, Rust embedders, and WASM.
+- **Snapshot schema clean break (KDD-1).** `snapshot_version: "1.0"`. sdi-rust does not read sdi-py snapshots.
+- **Native Leiden, no FFI (KDD-2).** Native Rust port; verified against `leidenalg` on partition quality, not bit identity. Cluster assignments exposed as `BTreeMap<NodeId, ClusterId>`; consecutive-snapshot stability score computed against caller-supplied prior partitions.
 
 ### Anti-Patterns This Project Avoids
 
@@ -49,286 +49,192 @@ sdi-rust inherits sdi-py's principles unchanged — they are language-agnostic a
 
 ### Data Flow
 
+Two entry points: the orchestration path (`sdi-pipeline`, used by CLI and FS-based embedders) and the pure-compute path (`sdi-core`, used by WASM / the consumer app and any embedder that already has its own extractors).
+
 ```
+                    ── orchestration path (sdi-pipeline) ──
+
 config.toml + boundaries.yaml + repo path
        │
        ▼
 [Config::load_or_default] ──► Config (precedence resolved)
        │
        ▼
-[Pipeline::new(&Config)]
+[sdi_pipeline::Pipeline::new(&Config)]
        │
        ▼
 Stage 1: parsing       walkdir + ignore + tree-sitter ──► Iterator<FeatureRecord>
-       │
-       ▼                            (rayon-parallel; CST dropped per-file)
+       │                            (rayon-parallel; CST dropped per-file)
+       ▼
 Stage 2: graph         resolve imports, build petgraph ──► DependencyGraph
        │
        ▼
 Stage 3: detection     native Leiden(seed, gamma)      ──► LeidenPartition
-       │                            (warm-start from .sdi/cache/partition.json if present)
+       │                            (warm-start from .sdi/cache/partition.json — I/O in sdi-pipeline)
        ▼
 Stage 4: patterns      tree-sitter queries + blake3    ──► PatternCatalog
        │
        ▼
-Stage 5: snapshot      assemble + load BoundarySpec    ──► Snapshot {snapshot_version: "1.0"}
-       │                            (atomic tempfile + rename to .sdi/snapshots/)
+Stage 5: snapshot      sdi_core::assemble_snapshot(...)──► Snapshot {snapshot_version: "1.0"}
+       │                            (atomic tempfile + rename to .sdi/snapshots/ — I/O in sdi-pipeline)
        ▼
-[Pipeline::delta(prev, curr)] ──► DivergenceSummary  (null per-dim when no prev)
+sdi_core::compute_delta(prev, curr) ──► DivergenceSummary (null per-dim when no prev)
        │
        ▼
 sdi-cli formats text/JSON ──► stdout    (logs/progress ──► stderr)
+
+
+                    ── pure-compute path (sdi-core / WASM) ──
+
+caller-supplied:  DependencyGraphInput, PatternInstanceInput[], LeidenConfigInput,
+                  BoundarySpecInput, ThresholdsInput, PriorPartition[]
+       │
+       ▼
+sdi_core::detect_boundaries(graph, cfg, prior) ──► cluster_assignments,
+                                                   stability_score, modularity
+sdi_core::compute_coupling_topology(graph)     ──► CouplingTopologyResult
+sdi_core::compute_pattern_metrics(patterns)    ──► entropy, convention_drift
+sdi_core::compute_boundary_violations(...)     ──► BoundaryViolationResult
+sdi_core::compute_thresholds_check(...)        ──► ThresholdCheckResult (exit-10 logic)
+sdi_core::normalize_and_hash(kind, children)   ──► canonical blake3 fingerprint
+       │
+       ▼
+caller assembles its own report (the consumer app, agent runtime, etc.)
 ```
 
 ### Module Boundaries and Dependency Rules
 
-- `sdi-cli` is the composition root and depends on every library crate.
-- `sdi-parsing` depends only on `tree-sitter`, language grammars, and `sdi-config`.
-- `sdi-graph` depends on `sdi-parsing` output types and `petgraph`.
-- `sdi-detection` depends on `sdi-graph` output types only.
-- `sdi-patterns` depends on `sdi-parsing` output. **It must NOT depend on `sdi-graph` or `sdi-detection`.**
-- `sdi-snapshot` is the assembly point: depends on `sdi-graph`, `sdi-detection`, `sdi-patterns`, and `sdi-config`.
+- `sdi-cli` is the composition root for the binary; depends on `sdi-pipeline` (orchestration) and `sdi-core` (shared types + `compute_thresholds_check` for exit-10 logic).
+- `sdi-pipeline` depends on `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-config`, and `sdi-core`. It owns the `Pipeline::snapshot(&Path)` API and all FS/clock-touching code (partition cache, snapshot atomic writes, retention enforcement).
+- `sdi-core` is the pure-compute facade: **no I/O, no clock, no tree-sitter, WASM-compatible**. Depends on `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-config` — each declared with `default-features = false` to disable the `pipeline-records` feature. Exposes `compute_*` functions and the `*Input` struct family. **No module imports from `sdi-cli` or `sdi-pipeline`.**
+- `sdi-parsing` depends on `tree-sitter`, language grammars, `walkdir`, `ignore`, `rayon`, and `sdi-config`. Used only by `sdi-pipeline` and the language adapter crates.
+- `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot` each have a default Cargo feature `pipeline-records` that pulls `sdi-parsing` and exposes the `*_from_records` paths taking `&[FeatureRecord]`. With the feature disabled (sdi-core's WASM build), only the `*_from_input` paths taking `&DependencyGraphInput` / `&[PatternInstanceInput]` compile.
+- `sdi-graph` depends on `petgraph` and (feature-gated) `sdi-parsing`.
+- `sdi-detection` depends on `sdi-graph` output types only (no `sdi-parsing` even gated).
+- `sdi-patterns` depends on (feature-gated) `sdi-parsing`. **It must NOT depend on `sdi-graph` or `sdi-detection`.**
+- `sdi-snapshot` is the pure assembly + delta crate: depends on `sdi-graph`, `sdi-detection`, `sdi-patterns`, and `sdi-config`. Snapshot I/O (atomic write, retention) lives in `sdi-pipeline`, not here.
 - `sdi-config` is a leaf crate; depended on by all.
-- `sdi-core` re-exports the public pipeline API; **no module imports from `sdi-cli`.**
+- `sdi-wasm` (`bindings/sdi-wasm`) depends on `sdi-core` only, plus `wasm-bindgen` / `tsify` / `serde-wasm-bindgen`. **No `sdi-pipeline`, no `sdi-parsing` in the dep tree.**
 - Language adapter crates (`sdi-lang-*`) depend only on `sdi-parsing` and `tree-sitter` grammars.
-- No cycles between crates. CI fails on a cycle introduced by `cargo metadata` graph inspection.
+- No cycles between crates. CI fails on a cycle introduced by `cargo metadata` graph inspection. CI also runs `cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features` and asserts zero entries for `tree-sitter*`, `walkdir`, `ignore`, `rayon`, `tempfile`.
 
 ## Repository Layout
 
+Workspace shape (file-level detail for the M08+ frontier; established crates summarised):
+
 ```
 sdi-rust/
-├── Cargo.toml                           # workspace manifest, pinned deps with .workspace = true
-├── Cargo.lock                           # checked in; required for binary crates
-├── rust-toolchain.toml                  # MSRV pin (stable latest minus 2)
-├── rustfmt.toml                         # empty / defaults; no project overrides
-├── clippy.toml                          # warnings-as-errors config
-├── deny.toml                            # cargo-deny / cargo-audit policy
-├── README.md                            # quick start, install paths, what is SDI; <200 lines
-├── CHANGELOG.md                         # hand-maintained, conventional sections
-├── MIGRATION_NOTES.md                   # entries for breaking 0.x → 0.(x+1) bumps
-├── DRIFT_LOG.md                         # vendoring / patch decisions, design drift notes
-├── LICENSE                              # Apache 2.0 (KDD-8)
-├── NOTICE                               # Apache 2.0 attribution notice
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                       # lint+build+test matrix on push/PR
-│       ├── release.yml                  # tag-driven; manual approval for crates.io
-│       ├── audit.yml                    # weekly cargo audit
-│       └── verify-leiden.yml            # gated KD11 verification job (Python+leidenalg)
-├── .tekhton/
-│   └── DESIGN.md                        # this initiative's design doc
+├── Cargo.toml, Cargo.lock, rust-toolchain.toml, rustfmt.toml, clippy.toml, deny.toml
+├── README.md, CHANGELOG.md, MIGRATION_NOTES.md, DRIFT_LOG.md, LICENSE, NOTICE
+├── .github/workflows/   ci.yml · release.yml · audit.yml · verify-leiden.yml · wasm.yml (M12)
+├── .tekhton/DESIGN.md
 ├── crates/
-│   ├── sdi-core/
-│   │   ├── Cargo.toml                   # public, stable per KD12
-│   │   ├── src/
-│   │   │   ├── lib.rs                   # re-exports + #![deny(missing_docs)]
-│   │   │   ├── pipeline.rs              # Pipeline::{new,snapshot,delta}
-│   │   │   ├── exit_code.rs             # closed enum, i32 discriminants
-│   │   │   ├── error.rs                 # AnalysisError, IoError aggregator
-│   │   │   └── prelude.rs               # commonly-imported items
-│   │   └── tests/
-│   │       ├── pipeline_smoke.rs
-│   │       └── exit_code_contract.rs
-│   ├── sdi-cli/
-│   │   ├── Cargo.toml                   # binary crate; produces `sdi`
-│   │   ├── src/
-│   │   │   ├── main.rs                  # composition root; anyhow allowed here
-│   │   │   ├── commands/
-│   │   │   │   ├── mod.rs
-│   │   │   │   ├── init.rs
-│   │   │   │   ├── snapshot.rs
-│   │   │   │   ├── diff.rs
-│   │   │   │   ├── trend.rs
-│   │   │   │   ├── check.rs             # exit 10 on threshold breach
-│   │   │   │   ├── show.rs
-│   │   │   │   ├── boundaries.rs        # infer / ratify / show subcommands
-│   │   │   │   └── catalog.rs
-│   │   │   ├── output/
-│   │   │   │   ├── mod.rs
-│   │   │   │   ├── json.rs
-│   │   │   │   └── text.rs              # ratatui tables + owo-colors
-│   │   │   └── logging.rs               # tracing-subscriber → stderr
-│   │   └── tests/
-│   │       ├── exit_codes.rs            # assert_cmd + predicates
-│   │       ├── stdout_stderr_split.rs
-│   │       └── atomic_writes.rs
-│   ├── sdi-parsing/
-│   │   ├── Cargo.toml
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── walker.rs                # walkdir + ignore + globset
-│   │   │   ├── adapter.rs               # LanguageAdapter trait
-│   │   │   ├── feature_record.rs        # FeatureRecord struct
-│   │   │   └── parse.rs                 # parse_repository(); CST dropped per-file
-│   │   └── tests/
-│   │       ├── memory_invariant.rs      # asserts CST not held across files
-│   │       └── walk_ordering.rs         # deterministic stable-sorted output
-│   ├── sdi-graph/
-│   │   ├── Cargo.toml
+│   ├── sdi-core/                        # M08 reshape: pure-compute facade, WASM-compatible (KDD-12)
 │   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── dependency_graph.rs
-│   │       ├── metrics.rs               # density, cycles, hubs, components
-│   │       └── csr_view.rs              # optional cache-friendly view (open Q #2)
-│   ├── sdi-detection/
-│   │   ├── Cargo.toml
+│   │       ├── lib.rs                   # re-exports + #![deny(missing_docs)]
+│   │       ├── input.rs                 # DependencyGraphInput, PatternInstanceInput, …
+│   │       ├── compute/{coupling,boundaries,patterns,thresholds,normalize}.rs
+│   │       ├── facade.rs                # re-exports compute_delta, assemble_snapshot, compute_trend, infer_boundaries
+│   │       ├── exit_code.rs, error.rs, prelude.rs
+│   ├── sdi-pipeline/                    # NEW in M08: orchestration crate — owns FS, clock, atomic writes
 │   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── leiden/
-│   │       │   ├── mod.rs               # KD11 native port, ~1500-2500 LOC
-│   │       │   ├── modularity.rs
-│   │       │   ├── cpm.rs
-│   │       │   ├── refine.rs
-│   │       │   └── aggregate.rs
-│   │       ├── partition.rs             # LeidenPartition struct
-│   │       └── warm_start.rs            # load .sdi/cache/partition.json
-│   ├── sdi-patterns/
-│   │   ├── Cargo.toml
+│   │       ├── lib.rs, pipeline.rs      # Pipeline::{new, snapshot}; calls sdi-core for compute
+│   │       ├── cache.rs                 # warm-start partition load/save (.sdi/cache/)
+│   │       ├── store.rs                 # snapshot atomic write + retention; YAML boundary write
+│   │       └── error.rs
+│   ├── sdi-cli/                         # M09 fills out trend/check/show/boundaries; today: init/snapshot/diff/catalog
 │   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── catalog.rs               # PatternCatalog (BTreeMap-keyed)
-│   │       ├── fingerprint.rs           # blake3 with fixed seed
-│   │       ├── entropy.rs
-│   │       └── queries/                 # per-category tree-sitter query strings
-│   │           ├── error_handling.rs
-│   │           ├── async_patterns.rs
-│   │           └── ...
-│   ├── sdi-snapshot/
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── snapshot.rs              # snapshot_version: "1.0"
-│   │       ├── delta.rs                 # compute_delta; null when no prev
-│   │       ├── trend.rs
-│   │       ├── store.rs                 # atomic tempfile + rename writes
-│   │       └── retention.rs             # synchronous post-write enforcement
-│   ├── sdi-config/
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── config.rs                # Config struct + Default
-│   │       ├── load.rs                  # 5-level precedence resolver
-│   │       ├── boundary.rs              # BoundarySpec read from YAML
-│   │       ├── thresholds.rs            # per-category overrides w/ expires
-│   │       └── error.rs                 # ConfigError variants
-│   ├── sdi-lang-python/
-│   │   ├── Cargo.toml                   # feature `lang-python`
-│   │   ├── build.rs                     # links tree-sitter-python
-│   │   └── src/lib.rs                   # impl LanguageAdapter
-│   ├── sdi-lang-typescript/
-│   ├── sdi-lang-javascript/
-│   ├── sdi-lang-go/
-│   ├── sdi-lang-java/
-│   └── sdi-lang-rust/
-├── bindings/                            # post-MVP — empty placeholders during MVP
-│   ├── sdi-py/                          # PyO3 wheel
-│   └── sdi-node/                        # napi-rs prebuilt
-├── examples/
-│   ├── embed_pipeline.rs                # minimal embedder
-│   ├── custom_config.rs                 # programmatic Config building
-│   └── binding_python.py                # post-MVP usage of sdi-py
-├── tests/                               # workspace-level cross-crate scenarios
-│   ├── full_pipeline.rs
-│   ├── snapshot_diff_trend.rs
-│   ├── boundary_lifecycle.rs
-│   └── fixtures/
-│       ├── simple-rust/                 # 5-10 file Rust crate, known imports
-│       ├── simple-python/               # cross-language; verifies vs sdi-py outputs
-│       ├── multi-language/              # Python + TypeScript adapter exercise
-│       ├── high-entropy/                # deliberate pattern variance
-│       └── evolving/                    # built by setup script under target/test-fixtures
+│   │       ├── main.rs                  # composition root; anyhow allowed here only
+│   │       ├── commands/{init,snapshot,diff,catalog,trend,check,show,boundaries}.rs
+│   │       ├── output/{json,text}.rs    # ratatui tables + owo-colors
+│   │       └── logging.rs
+│   ├── sdi-parsing/                     # walkdir+ignore+rayon+tree-sitter; LanguageAdapter trait; CST drop invariant
+│   ├── sdi-graph/                       # feature `pipeline-records` (default ON; OFF in sdi-core's WASM build)
+│   ├── sdi-detection/                   # feature `pipeline-records`; native Leiden + LeidenPartition + stability.rs
+│   ├── sdi-patterns/                    # feature `pipeline-records`; fingerprint.rs (PUBLIC), normalize.rs, from_inputs.rs
+│   ├── sdi-snapshot/                    # pure: snapshot.rs, delta.rs, trend.rs (M08), boundary_inference.rs (M08)
+│   ├── sdi-config/                      # feature `loader` (default ON); types-only when off (sdi-core's WASM build)
+│   └── sdi-lang-{rust,python,typescript,javascript,go,java}/   # one per language adapter
+├── bindings/
+│   ├── sdi-wasm/                        # M12: @geoffgodwin/sdi-wasm; depends on sdi-core only
+│   ├── sdi-py/                          # post-MVP / v1: PyO3 wheel
+│   └── sdi-node/                        # post-MVP / v1: napi-rs prebuilt
+├── examples/                            # embed_pipeline.rs · embed_compute.rs · custom_config.rs · binding_node.ts
+├── tests/                               # cross-crate: full_pipeline · snapshot_diff_trend · boundary_lifecycle + fixtures/
 ├── benches/                             # criterion, gated behind `bench` feature
-│   ├── parsing.rs
-│   ├── leiden.rs
-│   └── full_pipeline.rs
-└── docs/
-    ├── cli-integration.md               # cargo install sdi && sdi check, GHA snippet
-    ├── library-embedding.md             # embed sdi-core in an agent runtime
-    ├── migrating-from-sdi-py.md         # what carries vs what changes
-    └── determinism.md                   # BTreeMap, seed, FMA notes
+└── docs/                                # cli-integration · library-embedding · migrating-from-sdi-py · determinism
 ```
 
 ## Key Design Decisions
 
 ### KDD-1: Snapshot schema is a clean break from sdi-py
 
-**Decision:** sdi-rust ships `snapshot_version: "1.0"` and refuses to read sdi-py snapshot JSON. `.sdi/cache/*` is also a clean break.
-
-**Alternatives considered:** A read-side compat shim that translates sdi-py snapshot JSON. Rejected: burdens every release with a frozen translator, and the only benefit is preserving trend continuity for the small population that ran the Python POC against the same repo.
-
-**Rationale (KD13):** Trend continuity for migrators is explicitly accepted as lost. `.sdi/config.toml` and `.sdi/boundaries.yaml` remain read-compatible — those are user-edited and worth migrating. Snapshots are tool-generated and trivially regeneratable.
+**Decision:** sdi-rust ships `snapshot_version: "1.0"` and refuses to read sdi-py snapshot JSON; `.sdi/cache/*` is also a clean break. Trend continuity for migrators is explicitly accepted as lost. `.sdi/config.toml` and `.sdi/boundaries.yaml` remain read-compatible — those are user-edited and worth migrating; snapshots are tool-generated and trivially regeneratable.
 
 ### KDD-2: Native Leiden port, no FFI to C++
 
-**Decision:** Implement Leiden (Traag et al. 2019, Modularity + CPM) natively in `sdi-detection`, ~1500–2500 LOC.
+**Decision (ratified M05):** Native Rust port of Leiden (Traag et al. 2019, Modularity + CPM) in `sdi-detection`. Verification is partition quality (modularity within 1%, community count within ±10%) — not bit-identity. FFI to C++ `leidenalg` rejected: non-Rust toolchain, complicates single-binary distribution, breaks determinism across platforms.
 
-**Alternatives considered:** FFI bindings to the C++ `leidenalg` underlying library. Rejected: introduces a non-Rust toolchain dependency, complicates single-binary distribution, and undermines the determinism story (different platforms link different builds).
+### KDD-3: Library surface is canonical (reshaped by KDD-12)
 
-**Rationale (KD11):** The native port preserves the ownership/determinism guarantees and keeps the binary single-file. Verification is by partition quality (modularity within 1%, community count within ±10%) on a fixture suite cross-checked against `leidenalg`, **not bit-identity**.
+**Decision:** Every CLI feature is a library feature first. `sdi-cli` cannot add analysis code paths unreachable through `sdi-core` or `sdi-pipeline`. SemVer commitment begins at `0.1.0`; adding `pub` is deliberate, removing `pub` is breaking. See KDD-12 for the layered structure.
 
-### KDD-3: `sdi-core` library is the canonical surface
+### KDD-4: Tree-sitter grammars linked at compile time
 
-**Decision:** Every CLI feature is a library feature first. `sdi-cli` cannot add code paths that aren't reachable through `sdi-core`.
+**Decision:** Each grammar is a build dependency gated by `lang-<name>` Cargo feature. Default feature set matches sdi-py's supported languages. Compile-time over runtime dynamic loading: simpler, matches ecosystem norms, lets binary-size-sensitive consumers strip languages they don't need.
 
-**Rationale (KD12):** This is the entire reason for the rewrite. Bindings (PyO3, napi-rs) and embedders depend on a stable library surface. SemVer commitment begins at `0.1.0`; adding `pub` is deliberate, removing `pub` is breaking.
+### KDD-5: `petgraph` is the default — no CSR view
 
-### KDD-4: Tree-sitter grammars linked at compile time, gated per-language by Cargo features
-
-**Decision:** Each grammar is a build dependency gated by `lang-<name>`. Default feature set matches sdi-py's supported languages.
-
-**Alternatives considered:** Runtime dynamic loading. Rejected for MVP: more complex, deviates from Rust ecosystem norms, and adds a runtime failure mode for what is effectively a static set of grammars per release.
-
-**Rationale (Open Q #3):** Compile-time is simpler and matches ecosystem norms. The feature-flag knob lets binary-size-sensitive consumers strip languages they don't need.
-
-### KDD-5: `petgraph` is the default; CSR view **RATIFIED: NO CSR VIEW**
-
-**Decision (ratified Milestone 5):** Use `petgraph::Graph<NodeId, EdgeWeight>` everywhere in `sdi-graph`. The Leiden algorithm builds its own internal `LeidenGraph` (`Vec<Vec<usize>>` adjacency list) at the start of each run; a separate CSR module in `sdi-graph::csr_view` would duplicate that conversion without benefit. Decided during Milestone 5 profiling; recorded in `DRIFT_LOG.md`.
-
-**Rationale:** The Leiden hot path already converts the petgraph to an internal adjacency list. Adding a CSR module would cost an additional copy of the same data. `petgraph` is fast enough for the 5000-node benchmark graphs. Revisit only if a measured bottleneck demands it.
+**Decision (ratified M05):** Use `petgraph::Graph` everywhere in `sdi-graph`. The Leiden algorithm builds its own internal `Vec<Vec<usize>>` adjacency list at the start of each run; a separate CSR module would duplicate that conversion without benefit. Revisit only if a measured bottleneck demands it.
 
 ### KDD-6: YAML write — accept comment loss for MVP
 
-**Decision:** `serde_yaml` for read; programmatic write of `.sdi/boundaries.yaml` may regress comment preservation. Document the limitation; revisit only if users complain.
-
-**Alternatives considered:** A comment-preserving Rust YAML crate (maturity unverified) or a hand-written minimal YAML emitter. Both rejected for MVP scope.
-
-**Rationale (Open Q #1):** Boundary specs are mostly user-edited; programmatic writes happen on `sdi boundaries ratify`. Accepting comment loss on that path is a small UX regression versus shipping a brittle custom emitter.
+**Decision:** `serde_yaml` for read; programmatic writes via `sdi boundaries ratify` regress comment preservation. Comment-preserving alternatives (immature crates or hand-written emitter) rejected for MVP scope. Revisit only on user complaint.
 
 ### KDD-7: MSRV is "stable latest minus 2"
 
-**Decision:** Pin in `rust-toolchain.toml`; verify in CI matrix.
-
-**Rationale (Open Q #4):** Generous enough for distros, conservative enough to use modern features. Bump deliberately, not opportunistically.
+**Decision:** Pinned in `rust-toolchain.toml`; verified in CI matrix. Generous enough for distros, conservative enough to use modern features. Bump deliberately, not opportunistically.
 
 ### KDD-8: License is Apache 2.0
 
-**Decision:** Apache 2.0 across the workspace. Replaced the initial MIT `LICENSE` (GitHub auto-init) on 2026-04-28; `NOTICE` file added per Apache 2.0 conventions.
-
-**Rationale (Open Q #6 → ratified):** Goal is broad adoption including paid/enterprise use, with attribution preserved. Apache 2.0 is permissive enough for corporate compliance teams to accept by default, includes an explicit contributor patent grant (which MIT lacks), and requires preservation of copyright and the `NOTICE` file. Every published crate's `Cargo.toml` sets `license = "Apache-2.0"`.
+**Decision (ratified 2026-04-28):** Apache 2.0 across the workspace. Permissive enough for enterprise compliance, explicit contributor patent grant (which MIT lacks), `NOTICE` file preserves attribution. Every published crate's `Cargo.toml` sets `license = "Apache-2.0"`.
 
 ### KDD-9: Deltas are `null` on first snapshot, not zero
 
-**Decision:** `compute_delta(prev: &Snapshot, curr: &Snapshot)` requires both arguments. The "first snapshot" path returns a `DivergenceSummary` with all per-dimension fields `null`. Identical consecutive snapshots yield `0`, distinguishing "no comparison possible" from "no change."
-
-**Rationale:** Carries from sdi-py rule 14. Mixing the two is a semantic bug masquerading as a numeric one.
+**Decision:** `compute_delta(prev: &Snapshot, curr: &Snapshot)` requires both arguments. The "first snapshot" path returns a `DivergenceSummary` with all per-dimension fields `null`. Identical consecutive snapshots yield `0`, distinguishing "no comparison possible" from "no change." Mixing the two is a semantic bug masquerading as a numeric one.
 
 ### KDD-10: `BTreeMap` over `IndexMap` for catalogs
 
-**Decision:** Use `BTreeMap` everywhere output ordering matters.
-
-**Rationale (Open Q #9):** `BTreeMap` orders by key (deterministic without relying on insertion order). Revisit only if profiling shows comparison cost dominates a hot path.
+**Decision:** `BTreeMap` everywhere output ordering matters — orders by key without relying on insertion order. Revisit only if profiling shows comparison cost dominates a hot path.
 
 ### KDD-11: Bindings live in-repo until they earn their own repos
 
-**Decision:** `bindings/sdi-py` and `bindings/sdi-node` ship in this workspace.
+**Decision:** `bindings/sdi-wasm`, `bindings/sdi-py`, and `bindings/sdi-node` ship in this workspace. `sdi-wasm` is in v0; the other two remain post-MVP / v1 era. Cross-repo CI complexity outweighs the workspace benefit only after non-trivial consumer-side surface area.
 
-**Rationale (Open Q #7):** Cross-repo CI complexity outweighs the workspace benefit only after non-trivial consumer-side surface area. Split out then, not before.
+### KDD-12: Two-layer library shape — `sdi-core` (pure compute) + `sdi-pipeline` (orchestration)
 
-### Unresolved Open Questions and Default Posture
+**Decision (ratified 2026-04-29):** Split today's monolithic `sdi-core` into:
+- **`sdi-core`** — pure-compute facade. No I/O, no clock, no tree-sitter, WASM-compatible. Public surface: `compute_*` functions over `*Input` serde structs (`DependencyGraphInput`, `PatternInstanceInput`, `LeidenConfigInput`, `BoundarySpecInput`, `ThresholdsInput`, `PriorPartition`, `NormalizeNode`); `compute_delta`, `assemble_snapshot`, `compute_trend`, `infer_boundaries` re-exported from `sdi-snapshot`; `normalize_and_hash` for foreign extractors (the consumer app).
+- **`sdi-pipeline`** (new crate) — orchestration. Owns `Pipeline::snapshot(&Path)` + warm-start cache I/O + atomic snapshot writes. Depends on `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-config`, and `sdi-core`. CLI consumers and FS-based Rust embedders use this.
 
-- **Open Q #5 (crate name reservation on crates.io):** verify and reserve `sdi`, `sdi-core`, `sdi-cli` before Milestone 1 closes. Default posture if a name is taken: prefix with `sdi-rs-` and document.
-- **Open Q #10 (FMA bit determinism across platforms):** document in `docs/determinism.md`. Aggregate equality only across platforms. Revisit via a build flag if a real adopter needs bit-identity.
-- **Open Q #8 (snapshot file naming):** carry forward `snapshot_<timestamp>_<sha>.json`.
+`sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot` get a default Cargo feature `pipeline-records` that pulls `sdi-parsing` and exposes the `*_from_records` paths. `sdi-core` declares them with `default-features = false` so the WASM build pulls only the pure-compute paths taking `*Input` structs.
+
+**Alternatives considered:** (a) Keep monolithic `sdi-core` and feature-gate everything inside it. Rejected — the dep tree still pulls `walkdir`/`rayon`/`tree-sitter` at the workspace level; verifying WASM-cleanliness becomes brittle. (b) Create a separate `sdi-types` leaf crate for shared serde structs. Rejected — `FeatureRecord` is logically a parsing concern; feature-gating sdi-parsing in the four compute crates is simpler than introducing a fifth leaf crate.
+
+**Rationale:** The consumer app (a strict-mode TS tool at the user's workplace) is the first concrete consumer (mid-June review deadline drove the decision date). It needs to import sdi-rust as a WASM library and feed pre-parsed graph + pattern data from its own AST extractors. Today's `sdi-core` transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, and `std::fs::*` — none WASM-compatible. Rule 18 says public API stability begins at 0.1.0, so the reshape must land before the M11 release tag — hence inserting it as the new M08 (was: Trend/Check/Show CLI). See `m08-sdi-core-pure-compute-reshape.md`.
+
+### KDD-13: WASM moves into v0 (the consumer app is the concrete consumer)
+
+**Decision (ratified 2026-04-29):** Add `bindings/sdi-wasm` to the v0 manifest. Build `wasm-bindgen` exports of every `sdi-core::compute_*` function plus `normalize_and_hash`. Use `tsify` for derived `.d.ts` so the consumer app gets accurate strict-TS types without manual sync. Ship as `@geoffgodwin/sdi-wasm@0.1.0` to npm in the same release workflow as the crates.io publish, behind the same manual approval gate.
+
+**Alternatives considered:** Defer WASM to v1 era with its own design doc. Rejected — the consumer app's June review deadline is the calendar driver, and shipping WASM after the 0.1.0 SemVer commitment risks breaking changes to `sdi-core`'s public surface to accommodate WASM-specific ergonomics (e.g. `BTreeMap` serialization). Doing it now means `sdi-core` is shaped right the first time.
+
+**Rationale (overrides KD14 from sdi-py-era thinking):** KD14 said "WASM lands when a concrete consumer exists." That condition now holds. The implementation is bounded: `sdi-wasm` depends on `sdi-core` only, no `sdi-pipeline` (no FS in WASM). PyO3/napi-rs bindings remain post-MVP / v1 era — they don't have a concrete consumer demanding them. See `m12-wasm-crate-and-consumer-app-integration.md`.
+
+### Unresolved Open Questions
+
+- **Crate name reservation on crates.io:** verify `sdi`, `sdi-core`, `sdi-cli`, `sdi-pipeline` are available before M13. Fallback: prefix with `sdi-rs-` and document.
+- **FMA bit determinism across platforms:** documented in `docs/determinism.md` (M11). Aggregate equality only across platforms; revisit via build flag if a real adopter needs bit-identity.
 
 ## Config Architecture
 
@@ -346,57 +252,21 @@ Config is loaded via TOML files plus environment variables, resolved through a 5
 4. Global `$XDG_CONFIG_HOME/sdi/config.toml` (fallback `~/.config/sdi/config.toml`)
 5. Built-in defaults compiled into `sdi-core`
 
-### Complete Default Configuration
+### Default Configuration Summary
 
-```toml
-[core]
-languages = "auto"
-exclude = [
-  "**/vendor/**",
-  "**/node_modules/**",
-  "**/__pycache__/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/target/**",
-  "**/.git/**",
-]
-random_seed = 42
+`Config::default()` in `sdi-config/src/config.rs` is the source of truth. Sections and the load-bearing defaults:
 
-[snapshots]
-dir = ".sdi/snapshots"
-retention = 100        # 0 = unlimited
-
-[boundaries]
-spec_file = ".sdi/boundaries.yaml"
-leiden_gamma = 1.0     # manual override only — KD5: no auto-tuning
-stability_threshold = 3
-weighted_edges = false # KD4
-
-[patterns]
-categories = "auto"
-min_pattern_nodes = 5
-scope_exclude = []     # excludes from catalog only — files remain in graph
-
-[thresholds]
-pattern_entropy_rate = 2.0
-convention_drift_rate = 3.0
-coupling_delta_rate = 0.15
-boundary_violation_rate = 2.0
-
-[change_coupling]
-min_frequency = 0.6
-history_depth = 500
-
-[output]
-format = "text"        # "text" | "json"
-color = "auto"         # "auto" | "always" | "never"
-
-[determinism]
-enforce_btree_order = true   # sdi-rust-only; reserved for FMA toggles
-
-[bindings]
-# Reserved for future binding-specific knobs.
-```
+| Section | Key defaults |
+|---|---|
+| `[core]` | `languages = "auto"`; standard exclude globs (vendor, node_modules, __pycache__, dist, build, target, .git); `random_seed = 42` |
+| `[snapshots]` | `dir = ".sdi/snapshots"`, `retention = 100` (`0` = unlimited) |
+| `[boundaries]` | `spec_file = ".sdi/boundaries.yaml"`, `leiden_gamma = 1.0`, `stability_threshold = 3`, `weighted_edges = false` |
+| `[patterns]` | `categories = "auto"`, `min_pattern_nodes = 5`, `scope_exclude = []` (excludes from catalog only — files remain in graph) |
+| `[thresholds]` | `pattern_entropy_rate = 2.0`, `convention_drift_rate = 3.0`, `coupling_delta_rate = 0.15`, `boundary_violation_rate = 2.0` |
+| `[change_coupling]` | `min_frequency = 0.6`, `history_depth = 500` |
+| `[output]` | `format = "text" \| "json"`, `color = "auto" \| "always" \| "never"` |
+| `[determinism]` | `enforce_btree_order = true` (sdi-rust-only; reserved for FMA toggles) |
+| `[bindings]` | reserved for future binding-specific knobs |
 
 ### Per-Category Threshold Overrides
 
@@ -455,8 +325,8 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 
 ## Implementation Milestones
 
-<!-- Milestones are managed as individual files in .claude/milestones/.
-     See MANIFEST.cfg for ordering and dependencies. -->
+Managed as individual files in `.claude/milestones/`; see `MANIFEST.cfg` for ordering and status.
+M01–M07 done. M08 reshape (sdi-core pure-compute / new sdi-pipeline crate) → M09 CLI fill-out (trend/check/show) → M10 boundaries → M11 docs + bifl-tracker validation → M12 sdi-wasm + consumer-app integration → M13 release pipeline. M11 and M12 run in parallel after M10; M13 depends on both.
 
 ## Code Conventions
 
@@ -497,31 +367,34 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 
 ## Critical System Rules
 
-1. A `Pipeline::snapshot` call against the same repo state with the same `Config` (including the same `random_seed`) produces a **bit-identical** `Snapshot` JSON. Any divergence is a bug.
+1. A `sdi_pipeline::Pipeline::snapshot` call against the same repo state with the same `Config` (including the same `random_seed`) produces a **bit-identical** `Snapshot` JSON. Any divergence is a bug.
 2. The parsing stage never holds two `tree_sitter::Tree` values in scope simultaneously across the same execution unit — the per-file `parse_file` API drops its `Tree` before returning.
-3. `compute_delta(prev, curr)` is referentially transparent: same inputs → same `DivergenceSummary`. It performs no I/O, reads no globals, and uses no clock.
-4. `sdi check` is the only command that exits with code `10`. Every other command's success path must exit `0`.
+3. `sdi_core::compute_delta(prev, curr)` is referentially transparent: same inputs → same `DivergenceSummary`. It performs no I/O, reads no globals, and uses no clock. The same applies to every other `sdi_core::compute_*` function.
+4. `sdi check` is the only command that exits with code `10`. Every other command's success path must exit `0`. Exit-10 logic delegates to `sdi_core::compute_thresholds_check`.
 5. A first-snapshot `DivergenceSummary` has `null` per-dimension fields. `0` is reserved for "compared and unchanged."
 6. Threshold overrides without `expires` are a `ConfigError::MissingExpiresOnOverride { category }` with exit `2`. After expiry, the override is silently ignored — defaults resume.
 7. `sdi snapshot` exits `3` only if **all** detected languages lack tree-sitter grammars. A single missing grammar logs to stderr and skips files.
 8. A missing `.sdi/boundaries.yaml` is **normal operation**. No warning is emitted. Intent divergence fields are simply absent from the snapshot.
-9. Snapshot files are written atomically (tempfile in target dir + rename). A killed process never leaves a half-written `.json` in `.sdi/snapshots/`.
+9. Snapshot files are written atomically (tempfile in target dir + rename). A killed process never leaves a half-written `.json` in `.sdi/snapshots/`. The atomic write lives in `sdi-pipeline::store`, not `sdi-core` (Rule 22).
 10. Retention is enforced **synchronously after** the rename. A failed write does not remove an old snapshot.
 11. Logs, progress, warnings → **stderr**. Snapshot JSON, summaries, table output → **stdout**. `sdi show --format json | jq '.'` must always work.
-12. `Config` is consumed at `Pipeline::new`. The pipeline mutates no config field during a run. There is no global mutable config.
+12. `Config` is consumed at `sdi_pipeline::Pipeline::new`. The pipeline mutates no config field during a run. There is no global mutable config.
 13. The pipeline performs **zero network calls**. Tests assert this by running with network disabled when supported by the CI runner.
 14. `sdi-patterns` does not import or depend on `sdi-graph` or `sdi-detection`. Violation is a `cargo metadata` graph cycle and must be CI-blocked.
-15. `sdi-cli` adds no analysis code paths unreachable through `sdi-core`. Every CLI feature is callable from the library.
+15. `sdi-cli` adds no analysis code paths unreachable through `sdi-core` or `sdi-pipeline`. Every CLI feature is callable from the library; pure-compute features are callable from `sdi-core` directly (and therefore from WASM / the consumer app).
 16. `snapshot_version` is the literal string `"1.0"` for all sdi-rust output. Bumping it is a breaking change requiring a major version bump and a `MIGRATION_NOTES.md` entry.
 17. Reading a `Snapshot` JSON with an incompatible `snapshot_version` produces a stderr warning and baseline treatment (no delta) — never a crash.
-18. RNG is `StdRng` seeded from `Config::random_seed`. No `thread_rng`, no `SystemTime`-derived seeds, no implicit RNG anywhere in the analysis pipeline.
-19. Pattern fingerprints use `blake3` with a single fixed key constant defined once in `sdi-patterns::fingerprint`. Changing the constant invalidates all existing snapshot fingerprints and requires a snapshot version bump.
+18. RNG is `StdRng` seeded from `Config::random_seed` (or `LeidenConfigInput::seed`). No `thread_rng`, no `SystemTime`-derived seeds, no implicit RNG anywhere in the analysis pipeline.
+19. Pattern fingerprints use `blake3` with a single fixed key constant. The constant lives in `sdi-patterns::fingerprint` and is re-exposed via `sdi_core::normalize_and_hash` for foreign extractors. Changing the constant invalidates all existing snapshot fingerprints and requires a snapshot version bump.
 20. Adding a new variant to `ExitCode` is a breaking change. Reusing or repurposing an existing exit code is a breaking change.
+21. **`sdi-core` is WASM-compatible.** No `std::fs::*`, no `std::time::SystemTime`, no `walkdir`, no `ignore`, no `rayon`, no `tree-sitter` in its dependency tree. CI verifies via `cargo build -p sdi-core --target wasm32-unknown-unknown --no-default-features` and `cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features` (asserting zero entries for the forbidden crates). Any code path that needs the clock takes the time as input (e.g. `compute_thresholds_check` takes `today: NaiveDate`).
+22. **All FS, clock, and atomic-write I/O lives in `sdi-pipeline` or `sdi-cli`, never in `sdi-core` or the compute crates with the `pipeline-records` feature disabled.** When extracting code from the compute crates during M08 (warm-start cache, snapshot store, retention), the pure (de)serialization stays in the original crate; the FS calls move to `sdi-pipeline`.
+23. **`normalize_and_hash` produces the same `blake3` digest in WASM as in native sdi-core for the same `NormalizeNode` input.** Cross-platform determinism is asserted in CI.
 
 ## What Not to Build Yet
 
 - **GitHub Actions reusable action** — easier with a single binary, but still post-MVP polish. Document manual `cargo install sdi && sdi check` for m01–m03; revisit after a stable schema.
-- **WASM bindings** — KD14: not MVP. Lands when a concrete consumer exists.
+- **PyO3 / napi-rs bindings (`sdi-py`, `sdi-node`)** — post-MVP / v1 era. KDD-13 brings WASM into v0 because the consumer app is a concrete consumer; PyO3/napi-rs do not have one yet. Revisit when one appears.
 - **IDE / editor plugin** — requires a stable API and snapshot schema. Post-1.0.
 - **SaaS dashboard or web UI** — sdi-rust is a measurement instrument, not a platform. Output is JSON; existing dashboards (Grafana, Datadog) consume it.
 - **Auto-remediation / gardener agent** — sdi-rust detects and measures drift; it never fixes it. A companion tool generating consolidation PRs is a separate project.
