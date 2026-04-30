@@ -3,71 +3,65 @@
 
 ## What Was Implemented
 
-### From Prior Runs (1 and 2 — preserved context)
-- Workspace Cargo.toml: added `sdi-pipeline` member/dep, `chrono` workspace dep
-- `sdi-config`: added `loader` feature gate; `validate_overrides_format` (pure, no clock); `today_iso8601()` (clock, loader-gated); override pruning retained in `validate_and_prune_overrides`
-- `sdi-graph`: added `pipeline-records` feature; `build_dependency_graph_from_edges` constructor
-- `sdi-detection`: added `pipeline-records` feature; removed `tempfile` from runtime deps; `warm_start.rs` retains pure mapping logic only (FS moved to sdi-pipeline::cache); Leiden community-ID offset fix (subtraction overflow bug from M05)
-- `sdi-patterns`: added `pipeline-records` feature; `normalize.rs` with `normalize_and_hash`; `fingerprint_node_kind` updated to thin wrapper
-- `sdi-snapshot`: `pipeline-records` feature; renamed `build_snapshot`→`assemble_snapshot`; added `PatternMetricsResult`, `convention_drift_delta`, `trend.rs`, `boundary_inference.rs`
-- `sdi-pipeline` (NEW crate): `Pipeline` orchestration with `cache.rs`, `store.rs`
-- `sdi-core`: reshaped to pure-compute facade with `input/`, `compute/` modules, `facade.rs`, `error.rs`
-- `sdi-cli`: updated to use `sdi_pipeline::Pipeline`
-- `CHANGELOG.md`: M08 entries
-- `sdi-detection/tests/leiden_id_collision.rs` (tester)
-- `sdi-config/src/thresholds.rs` boundary tests (tester)
+**Note 1 — `compute_thresholds_check` overrides/today not yet wired (M09):**
+Added `// TODO(M09)` comment at the top of `compute_thresholds_check` body
+explicitly naming the future wiring point. The docstring already described this
+correctly; the comment makes the gap visible in code review.
 
-### This Run (attempt 3 — completion pass)
-- Fixed `sdi-cli/tests/version.rs` version string 0.0.8→0.0.9
-- Split `sdi-core/src/input.rs` (373 lines) into `input/mod.rs` (84 lines) + `input/types.rs` (290 lines) to satisfy the 300-line ceiling
-- Deleted dead `sdi-core/src/pipeline.rs` (M07 leftover not exported from lib.rs)
-- Created all 10 missing test files from the milestone spec:
-  - `crates/sdi-core/tests/validate_node_id.rs` — 11 tests covering all rejection cases
-  - `crates/sdi-core/tests/normalize_and_hash.rs` — M07 equivalence regression + property tests
-  - `crates/sdi-core/tests/compute_topology.rs` — coupling topology across graph topologies
-  - `crates/sdi-core/tests/compute_pattern_metrics.rs` — entropy, convention_drift formula
-  - `crates/sdi-core/tests/compute_thresholds_check.rs` — null-summary path, breach detection, override expiry
-  - `crates/sdi-core/tests/leiden_disconnected.rs` — disconnected component detection
-  - `crates/sdi-core/tests/leiden_historical_stability.rs` — stability scoring with various prior histories
-  - `crates/sdi-core/tests/wasm_compat.rs` — smoke tests for all compute functions (verifies no I/O deps needed)
-  - `crates/sdi-snapshot/tests/compute_trend.rs` — trend slopes, last_n clamping, empty/single inputs
-  - `crates/sdi-snapshot/tests/infer_boundaries.rs` — stability gating, community-ID renaming, ordering
-- Created `crates/sdi-pipeline/tests/pipeline_smoke.rs` — Pipeline::new, snapshot, and delta smoke tests on simple-rust fixture
-- Updated `CHANGELOG.md` with detailed M08 change list
+**Note 2 — `ThresholdsInput::default().today` footgun:**
+Changed the sentinel from `2026-01-01` (which was in the past on first PR day and
+therefore mis-evaluates any override expiring 2026-01-02 through today) to
+`9999-12-31` (far future). With a far-future sentinel, all per-category overrides
+appear expired by default — the conservative, safe failure mode for a threshold
+gate. Callers that need override filtering must set `today` explicitly.
+Updated struct doc, field doc, and `Default` impl comment accordingly.
+
+**Note 3 / Note 6 — Security findings (TOCTOU + terminal injection):**
+Verified both are already resolved in the current code:
+- `load_toml_file` calls `read_to_string` directly (no TOCTOU).
+- Warning uses `{key:?}` debug format (control characters escaped).
+No code changes needed; marked COMPLETED.
+
+**Note 4 — Misleading comment in `leiden/mod.rs:167`:**
+Fixed comment from "best_comm is always >= n (offset community) so best_comm != node
+always" (which overstates the invariant) to "When best_gain > 1e-10, best_comm is
+always an offset community ID (>= n) and != node. best_comm defaults to `node` (< n)
+when no neighbour improves the gain; the best_gain threshold below prevents using
+that default." Logic was correct; only the comment was wrong.
+
+**Note 5 — `load_with_paths` calls `today_iso8601()` unconditionally:**
+Added a NOTE comment at the call site documenting the test limitation: integration
+tests cannot inject a specific date through `load_with_paths`; tests of expiry
+behaviour must call `validate_and_prune_overrides` directly.
+
+**Notes 7–10 — Merged doc comment on `load_or_default`/`project_config_path`:**
+Verified already fixed in current code. `project_config_path` is declared before
+`load_or_default`, each with its own doc block directly above it and a blank line
+between the functions. No code changes needed; marked COMPLETED.
 
 ## Root Cause (bugs only)
-1. `version.rs` test: crate bumped to 0.0.9 but test still checked 0.0.8
-2. `input.rs` at 373 lines exceeded the 300-line hard ceiling — split into submodule
-3. `leiden_historical_stability.rs` initial test: `community_sets_match` compares node-set membership not numeric IDs — singleton communities with swapped IDs still match. Fixed test to use non-singleton communities with actual membership changes.
+N/A — all items are tech-debt cleanup or stale reviewer notes.
 
 ## Files Modified
-- `crates/sdi-cli/tests/version.rs` — version string 0.0.8→0.0.9
-- `crates/sdi-core/src/input.rs` → DELETED (replaced by submodule)
-- `crates/sdi-core/src/input/mod.rs` (NEW) — validate_node_id + re-exports (84 lines)
-- `crates/sdi-core/src/input/types.rs` (NEW) — all input struct definitions (290 lines)
-- `crates/sdi-core/src/pipeline.rs` — DELETED (dead code, not exported from lib.rs)
-- `crates/sdi-core/tests/validate_node_id.rs` (NEW)
-- `crates/sdi-core/tests/normalize_and_hash.rs` (NEW)
-- `crates/sdi-core/tests/compute_topology.rs` (NEW)
-- `crates/sdi-core/tests/compute_pattern_metrics.rs` (NEW)
-- `crates/sdi-core/tests/compute_thresholds_check.rs` (NEW)
-- `crates/sdi-core/tests/leiden_disconnected.rs` (NEW)
-- `crates/sdi-core/tests/leiden_historical_stability.rs` (NEW)
-- `crates/sdi-core/tests/wasm_compat.rs` (NEW)
-- `crates/sdi-snapshot/tests/compute_trend.rs` (NEW)
-- `crates/sdi-snapshot/tests/infer_boundaries.rs` (NEW)
-- `crates/sdi-pipeline/tests/pipeline_smoke.rs` (NEW)
-- `CHANGELOG.md` — detailed M08 Added/Changed entries
+- `crates/sdi-detection/src/leiden/mod.rs` — fixed misleading comment at old line 167
+- `crates/sdi-core/src/input/types.rs` — changed `ThresholdsInput::default().today` from
+  2026-01-01 to 9999-12-31 sentinel; updated struct doc, field doc, and impl comment
+- `crates/sdi-core/src/compute/thresholds.rs` — added `// TODO(M09)` comment
+- `crates/sdi-config/src/load.rs` — added NOTE comment about `today_iso8601()` test limitation
+- `.tekhton/NON_BLOCKING_LOG.md` — marked all 10 items as resolved with resolution notes
 
 ## Docs Updated
-CHANGELOG.md — comprehensive M08 entries covering: sdi-pipeline new crate, sdi-core reshape, new compute modules, assemble_snapshot rename, Snapshot.pattern_metrics addition, DivergenceSummary.convention_drift_delta addition, normalize_and_hash extension, override-expiry single-source move.
+None — no public-surface changes (comment and sentinel-date changes only; `ThresholdsInput`
+struct shape is unchanged).
 
 ## Human Notes Status
-No Human Notes present in this task.
-
-## Observed Issues (out of scope)
-- `sdi-detection/src/leiden/mod.rs:168` — comment overstates invariant (noted in reviewer as non-blocking; not addressed per scope rules)
-- `sdi-config/src/thresholds.rs:46` — `validate_and_prune_overrides` shows dead_code warning; it IS called from `load.rs` but the compiler may not see it due to feature-gating. Out of scope to investigate further.
-- `sdi-patterns/src/catalog.rs` — multiple unused import warnings (`PatternsConfig`, `fingerprint_node_kind`, `crate::queries`). Pre-existing; out of scope.
-- `sdi-graph/src/dependency_graph.rs:9` — unused `tracing::debug` import. Pre-existing; out of scope.
-- MANIFEST.cfg and m08 milestone file could not be updated to `done` status (permission denied on sensitive files). Pipeline/human should mark M08 done.
+- Note 1 (compute_thresholds_check overrides/today not wired): COMPLETED — TODO(M09) comment added
+- Note 2 (ThresholdsInput::default() today footgun): COMPLETED — sentinel changed to 9999-12-31
+- Note 3 (security TOCTOU + terminal injection not addressed in M08): COMPLETED — already fixed, verified
+- Note 4 (leiden/mod.rs:168 misleading comment): COMPLETED — comment corrected
+- Note 5 (load_with_paths today_iso8601 unconditional): COMPLETED — NOTE comment added
+- Note 6 (security findings resolved): COMPLETED — verified already fixed
+- Note 7 (merged doc comment M07): COMPLETED — already fixed in current code, verified
+- Note 8 (merged doc comment M06): COMPLETED — already fixed in current code, verified
+- Note 9 (merged doc comment M05): COMPLETED — already fixed in current code, verified
+- Note 10 (merged doc comment M04): COMPLETED — already fixed in current code, verified

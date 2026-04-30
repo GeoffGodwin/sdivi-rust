@@ -17,5 +17,5 @@ fn version_flag_prints_crate_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(contains("0.0.9"));
+        .stdout(contains("0.0.10"));
 }

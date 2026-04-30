@@ -1,148 +1,97 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 4 files, 28 test functions
-(5 in `crates/sdi-detection/tests/leiden_id_collision.rs`;
- 6 in `crates/sdi-config/src/thresholds.rs` — 3 pre-existing, 3 new;
- 13 in `crates/sdi-core/tests/validate_node_id.rs`;
- 10 in `crates/sdi-core/tests/compute_thresholds_check.rs`)
+Tests audited: 4 files, 26 test functions
 Verdict: PASS
 
-No HIGH findings. One MEDIUM and three LOW findings logged for human attention.
+Files audited:
+- `crates/sdi-core/tests/thresholds_input_default_behavior.rs` (new, 5 tests)
+- `crates/sdi-config/tests/threshold_overrides.rs` (existing, 9 tests)
+- `crates/sdi-core/tests/compute_thresholds_check.rs` (modified, 10 tests)
+- `crates/sdi-cli/tests/version.rs` (modified, 2 tests)
+
+Implementation files cross-referenced:
+- `crates/sdi-core/src/input/types.rs` — `ThresholdsInput::default()` impl
+- `crates/sdi-core/src/compute/thresholds.rs` — `compute_thresholds_check`
+- `crates/sdi-config/src/thresholds.rs` — `validate_and_prune_overrides`
+- `crates/sdi-config/src/load.rs` — `load_with_paths`, `load_or_default`
+- `Cargo.toml` (workspace) — version `0.0.10`
+
+---
+
+### Prior-round findings: confirmed resolved
+
+The previous audit report (overwritten by this one) flagged two HIGH findings and two lower findings. All four have been addressed in the tester's audit-rework pass. Verified against current file content:
+
+1. **INTEGRITY HIGH (resolved)** — `far_future_sentinel_makes_all_overrides_appear_expired` was deleted from `thresholds_input_default_behavior.rs`. The test was `assertEqual(x, x)` (struct field equals value set in constructor) and never called `compute_thresholds_check`. The deletion is correct; the sentinel coverage is carried by `default_today_is_far_future_sentinel` (which asserts the Default value) and `override_expiry_ignored_when_expired` in `compute_thresholds_check.rs` (which calls the real function).
+
+2. **NAMING HIGH (resolved)** — `override_applied_when_not_expired` renamed to `override_not_wired_in_m08_base_rate_applies` at `compute_thresholds_check.rs:107`. New name accurately describes M08 behavior. `// TODO(M09)` comment added. Assertions unchanged and still valid.
+
+3. **NAMING MEDIUM (resolved)** — `expired_today_date_consistent` renamed to `base_rate_applies_regardless_of_override_state_m08` at `compute_thresholds_check.rs:125`. `// TODO(M09)` comment added explaining clock-independence verification must wait until overrides are wired.
+
+4. **COVERAGE LOW (resolved)** — `caller_can_supply_real_today_to_enable_overrides` renamed to `caller_can_set_explicit_today_on_thresholds_input` at `thresholds_input_default_behavior.rs:43`. New name matches actual behavior (struct field assignment, not override enabling).
 
 ---
 
 ### Findings
 
-#### COVERAGE: Test claims to verify clock-independence but cannot in M08
-- File: `crates/sdi-core/tests/compute_thresholds_check.rs:121`
-- Issue: `expired_today_date_consistent` carries the comment "the key invariant: the result is
-  deterministic on cfg.today with no wall-clock dependency." Reading the implementation
-  (`compute/thresholds.rs`), `compute_thresholds_check` ignores both `cfg.today` and
-  `cfg.overrides` entirely in M08 — it reads only the four base rates. You could inject a
-  hidden `SystemTime::now()` call into the implementation and this test would still pass, because
-  the assertion (breach at base rate 2.0) is satisfied regardless of any clock access. The test
-  cannot verify clock-independence through the override path until M09 wires per-category override
-  evaluation.
+#### INTEGRITY: Two tests assert only struct construction values
+- File: `crates/sdi-core/tests/thresholds_input_default_behavior.rs:43` (`caller_can_set_explicit_today_on_thresholds_input`)
+- File: `crates/sdi-core/tests/thresholds_input_default_behavior.rs:57` (`thresholds_input_with_active_override`)
+- Issue: Both tests construct a `ThresholdsInput` struct and then assert the values of the fields that were just set. `assert_eq!(input.today, today_real)` after `ThresholdsInput { today: today_real, .. }` is `assertEqual(x, x)` — it passes regardless of implementation behavior. `thresholds_input_with_active_override` asserts four struct fields, all of which were set in the constructor immediately above. No `compute_thresholds_check` call is made; no override filtering is exercised. The comment in `thresholds_input_with_active_override` acknowledges this ("Expiry evaluation ... happens in `compute_thresholds_check`, not in `ThresholdsInput` itself"), so the intent is documentation of API surface rather than behavior verification. This is acceptable as API-contract documentation, but neither test provides a safety net for implementation regressions.
 - Severity: MEDIUM
-- Action: Update the leading comment to accurately describe what is verified: "Documents that the
-  aggregate breach check uses base rates, not per-category overrides, in M08. Clock-independence of
-  the override expiry path should be tested in M09 once override wiring is complete."
+- Action: Either (a) accept these as API-contract documentation tests and add a comment to that effect in each, or (b) strengthen `thresholds_input_with_active_override` by calling `compute_thresholds_check` with the constructed input and a summary with `pattern_entropy_delta: Some(3.0)`, and asserting the result uses the BASE rate (2.0) rather than the override rate (5.0) — which is the correct M08 behavior and would exercise the real function. Option (b) is preferred; it turns a trivially-true assertion into a meaningful one with no additional complexity.
 
-#### NAMING: Test name contradicts its assertions
-- File: `crates/sdi-core/tests/compute_thresholds_check.rs:107`
-- Issue: `override_applied_when_not_expired` implies the unexpired override IS applied (i.e., the
-  raised limit of 50.0 would suppress the breach). The assertions prove the opposite: breach occurs
-  at the base rate 2.0, with the message "M08: base rate 2.0 applies; override not yet wired." The
-  test body is correct; the name is misleading to future readers.
+#### NAMING: Milestone-baked test names will become misleading after M09
+- File: `crates/sdi-core/tests/compute_thresholds_check.rs:107` (`override_not_wired_in_m08_base_rate_applies`)
+- File: `crates/sdi-core/tests/compute_thresholds_check.rs:125` (`base_rate_applies_regardless_of_override_state_m08`)
+- Issue: Both test names include `_m08` as a suffix, encoding the current implementation milestone. When M09 wires per-category overrides, these tests will break (correctly), but the `_m08` suffix will then identify tests that need to be updated or deleted. This is acceptable as a temporal marker, but it creates a "TODO by test name" pattern that is easy to overlook. The `// TODO(M09)` comments in both tests are the correct mechanism for this; the suffix is redundant with those comments.
 - Severity: LOW
-- Action: Rename to `unexpired_override_not_yet_wired_in_m08` or
-  `base_rate_applies_when_override_not_wired`.
-
-#### COVERAGE: Weak substring assertion for trailing-slash rejection
-- File: `crates/sdi-core/tests/validate_node_id.rs:33`
-- Issue: `rejects_trailing_slash` asserts `format!("{err}").contains("/")`. The actual error reason
-  is "must not end with '/'", which contains `/`, so the assertion passes. However, `/` appears in
-  many potential error messages (path echoes, other separator messages) and would pass even if the
-  wrong error variant were returned. All sibling rejection tests use more distinctive substrings
-  (`"empty"`, `"./"`, `"forward"`, `".."`, `"absolute"`).
-- Severity: LOW
-- Action: Tighten to `contains("end with")` or `contains("trailing")` to match the actual reason
-  string and guard against accidental false-positives on future refactors.
-
-#### COVERAGE: Worst-case Leiden test missing per-node range assertion
-- File: `crates/sdi-detection/tests/leiden_id_collision.rs:111`
-- Issue: `leiden_all_nodes_in_community_zero_no_underflow` (n=8) describes itself as the
-  "worst-case" trigger. The three other warm-start regression tests all include a loop asserting
-  `comm < k` for every node. This test stops at `assert!(partition.community_count() >= 1)` — it
-  would pass even if the algorithm silently produced out-of-range IDs instead of panicking.
-- Severity: LOW
-- Action: Add the per-node range check consistent with sibling tests:
-  ```rust
-  let k = partition.community_count();
-  for (&node, &comm) in &partition.assignments {
-      assert!(comm < k, "node {node}: community {comm} out of range [0, {k})");
-  }
-  ```
+- Action: Leave as-is if the team convention is to embed milestone markers in test names for temporary behavior. If not, remove the `_m08` suffix (the TODO(M09) comment carries the same signal more explicitly). No behavior change required.
 
 ---
 
-### Detailed Rubric Results
+### Clean findings (no issues)
 
-#### Assertion Honesty — PASS
-All assertions test real behavior derived from actual function calls. No hardcoded magic values
-disconnected from implementation logic.
+**`crates/sdi-core/tests/thresholds_input_default_behavior.rs`** tests
+`default_today_is_far_future_sentinel`, `default_global_rates`, and `default_overrides_empty`
+all call `ThresholdsInput::default()` and assert values derived from the implementation
+(`types.rs:258-267`). All three assertions would catch a regression in the Default impl.
+No issues.
 
-- Leiden: `partition.assignments.len() == N` is derived from the explicit node count. The
-  `comm < k` invariant (where `k = community_count()`) correctly captures the post-`renumber()`
-  denseness guarantee.
-- Thresholds (config): `override_present(&table)` traverses the real `toml::Table` instead of
-  asserting a literal. Date strings passed to `validate_and_prune_overrides` are the same strings
-  used as `today` — no hard-coded expected values.
-- `validate_node_id`: Each acceptance/rejection decision maps directly to a rule in the
-  implementation. Error message substrings are present in the actual reason strings (modulo the
-  trailing-slash case flagged above).
-- `compute_thresholds_check`: The base rate 2.0 used in `assert!((r.breaches[0].limit - 2.0).abs() < 1e-10)` matches `ThresholdsInput::default()::pattern_entropy_rate`. The at-limit test
-  (`entropy_at_limit_not_breached`, `Some(2.0)`) correctly exercises the strict `>` (not `>=`)
-  predicate in the implementation.
-
-#### Edge Case Coverage — PASS (with LOW note above)
-- Leiden: singletons with ID collision, three-node multi-member community (primary underflow
-  trigger), all-in-community-zero (8 nodes), multi-iteration with renumbered partitions, cold start.
-- Config thresholds: expires-today kept, expires-yesterday pruned, expires-tomorrow kept. Error
-  paths (missing `expires`, non-string `expires`) covered elsewhere.
-- `validate_node_id`: empty, leading `./`, trailing `/`, backslash, `..` components (leading and
-  embedded), absolute path, dot in filename, standalone `.`, embedded `.` component. The last two
-  explicitly document current permissive behavior as a stable contract.
-- `compute_thresholds_check`: null summary (first-snapshot), each dimension individually, exact
-  limit boundary, negative deltas, all four dimensions breaching simultaneously, expired override,
-  unexpired override (M08 base-rate behavior), and determinism w.r.t. `cfg.today` (see MEDIUM
-  finding above).
-
-#### Implementation Exercise — PASS
-All tests call real implementation entry points with real fixture data. No mock of any internal.
-- Leiden: `run_leiden` is called with real `DependencyGraph` values built via
-  `build_dependency_graph_from_edges`.
-- Config thresholds: `validate_and_prune_overrides` is called directly with `toml::Table` built
-  via `toml::from_str`.
-- `validate_node_id`: `sdi_core::input::validate_node_id` is called directly.
-- `compute_thresholds_check`: `sdi_core::compute::thresholds::compute_thresholds_check` is called
-  directly; `ThresholdsInput` and `DivergenceSummary` are constructed from real struct literals.
-
-#### Test Weakening — PASS (N/A for new tests)
-All four files under audit contain exclusively new test functions or new additions to pre-existing
-inline modules. No pre-existing assertion was broadened, removed, or replaced with a weaker form.
-The three pre-existing `validate_date_format_*` tests in `thresholds.rs` are unchanged.
-
-#### Test Naming — PASS (with LOW note above)
-All names except `override_applied_when_not_expired` encode scenario and expected outcome. See
-NAMING finding above.
-
-#### Scope Alignment — PASS
-All imports resolve to current public exports. No orphaned references.
-- `sdi_detection::leiden::run_leiden` — `pub` in `leiden/mod.rs`, confirmed present.
-- `sdi_detection::partition::{LeidenConfig, LeidenPartition}` — both `pub`, confirmed present.
-- `sdi_graph::dependency_graph::build_dependency_graph_from_edges` — `pub`, no feature gate.
-- `sdi_core::input::validate_node_id` — the deleted `input.rs` was replaced by `input/mod.rs`;
-  the public re-export is unchanged and the import remains valid.
-- `sdi_core::compute::thresholds::compute_thresholds_check` — confirmed present.
-- `sdi_snapshot::delta::{DivergenceSummary, null_summary}` — both confirmed present.
-- `chrono::NaiveDate` — `chrono` is a workspace dep; `sdi-core` uses it for `ThresholdsInput.today`.
-- Deleted files (`crates/sdi-core/src/input.rs`, `crates/sdi-core/src/pipeline.rs`,
-  `.tekhton/test_dedup.fingerprint`) are not referenced by any audited test.
-
-#### Test Isolation — PASS
-All audited tests construct fixtures entirely in memory or via `toml::from_str`. No test reads
-`.tekhton/` reports, CI logs, pipeline state files, build artifacts, or any file whose content
-could be mutated by a prior pipeline run. All tests are unconditionally reproducible.
-
----
-
-### Additional Note: Test Duplication (not a finding)
-Several happy-path tests in `crates/sdi-core/tests/compute_thresholds_check.rs`
-(`null_summary_never_breaches`, `entropy_breach_detected`, `coupling_breach_detected`,
+**`crates/sdi-core/tests/compute_thresholds_check.rs`** — `null_summary_never_breaches`,
+`entropy_breach_detected`, `entropy_at_limit_not_breached`, `coupling_breach_detected`,
 `boundary_violation_breach_detected`, `negative_delta_never_breaches`,
-`multiple_breaches_all_reported`) duplicate tests already present in the inline `#[cfg(test)]`
-block inside `compute/thresholds.rs`. The duplication provides no additional coverage but causes
-no integrity issue. It is likely a pre-existing artefact from M08 coder output rather than tester
-introduction. Not raised as a finding; flagged here for cleanup if desired.
+`multiple_breaches_all_reported`, and `override_expiry_ignored_when_expired` all call
+`compute_thresholds_check` with real inputs, vary the inputs meaningfully, and assert
+concrete values derived from implementation logic (`thresholds.rs:88-144`). Breach detection
+at-limit (`entropy=2.0`, no breach) and above-limit (`entropy=3.0`, breach) are both covered.
+`override_expiry_ignored_when_expired` is correct for both M08 (overrides not wired, base rate
+applies) and M09 (expired override means base rate applies anyway). No issues.
+
+**`crates/sdi-config/tests/threshold_overrides.rs`** — All 9 tests are properly isolated via
+`tempfile::NamedTempFile`. They call the real `load_with_paths` function and assert concrete
+`ConfigError` variants and `Config` field values derived from the implementation. The temporal
+dependency on `today_iso8601()` is neutralized by using extreme sentinel dates (`"2000-01-01"`,
+`"2099-12-31"`) that cannot be straddled by real test execution dates. The `integer_expires_returns_invalid_value`,
+`boolean_expires_returns_invalid_value`, and `non_string_expires_error_message_includes_actual_value`
+tests are legitimate gap-fillers for the `Some(other)` branch in `validate_and_prune_overrides`
+(`thresholds.rs:84-90`). `valid_override_is_applied` correctly accesses `ov.reason`, a real
+field on `sdi_config::ThresholdOverride` (`config.rs:186`). No issues.
+
+**`crates/sdi-cli/tests/version.rs`** — `version_flag_prints_crate_version` asserts `"0.0.10"`,
+matching the workspace `Cargo.toml` `version = "0.0.10"` and `sdi-cli/Cargo.toml`'s
+`version.workspace = true`. The update from `"0.0.9"` to `"0.0.10"` is correct. No issues.
+
+**Scope alignment** — `.tekhton/JR_CODER_SUMMARY.md` was deleted by the coder agent. No
+audited test file imports or references this path. No orphaned tests detected.
+
+**Test isolation** — All audited tests use either in-memory data structures or
+`tempfile::NamedTempFile`. None reads mutable project files (`.tekhton/`, `.claude/logs/`,
+build artifacts). Isolation is clean across all four files.
+
+**Audit context discrepancy (non-blocking)** — The audit context lists
+`crates/sdi-config/tests/threshold_overrides.rs` as "modified this run", but both the
+TESTER_REPORT and the git working-tree status show no modifications to this file. The file
+was audited anyway and passes all rubric criteria. The discrepancy is in the audit metadata
+only.

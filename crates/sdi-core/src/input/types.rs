@@ -222,12 +222,17 @@ pub struct ThresholdOverrideInput {
 ///
 /// The caller supplies `today` explicitly — no clock access in sdi-core.
 ///
-/// # Examples
+/// **IMPORTANT:** `ThresholdsInput::default()` sets `today` to a far-future
+/// sentinel (`9999-12-31`) so that all per-category overrides are treated as
+/// expired (i.e., the global rates apply).  Callers that use per-category
+/// overrides MUST supply the real current date:
 ///
 /// ```rust
+/// # use chrono::NaiveDate;
 /// use sdi_core::input::ThresholdsInput;
 ///
-/// let t = ThresholdsInput::default();
+/// let today = NaiveDate::from_ymd_opt(2026, 4, 30).unwrap();
+/// let t = ThresholdsInput { today, ..ThresholdsInput::default() };
 /// assert_eq!(t.pattern_entropy_rate, 2.0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -244,6 +249,7 @@ pub struct ThresholdsInput {
     #[serde(default)]
     pub overrides: BTreeMap<String, ThresholdOverrideInput>,
     /// Today's date for expiry evaluation.  Caller supplies this (no clock in sdi-core).
+    /// `Default` uses `9999-12-31`; override with the real date to enable per-category filtering.
     pub today: chrono::NaiveDate,
 }
 
@@ -255,7 +261,8 @@ impl Default for ThresholdsInput {
             coupling_delta_rate: 0.15,
             boundary_violation_rate: 2.0,
             overrides: BTreeMap::new(),
-            today: chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+            // Far-future sentinel — callers must supply the real `today` to enable override filtering.
+            today: chrono::NaiveDate::from_ymd_opt(9999, 12, 31).unwrap(),
         }
     }
 }

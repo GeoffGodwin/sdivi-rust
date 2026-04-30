@@ -89,6 +89,9 @@ pub fn compute_thresholds_check(
     summary: &DivergenceSummary,
     cfg: &ThresholdsInput,
 ) -> ThresholdCheckResult {
+    // TODO(M09): apply per-category override rates from cfg.overrides once
+    // per-category entropy/drift deltas are surfaced in DivergenceSummary.
+    // Until then, cfg.overrides and cfg.today are accepted but not read here.
     let mut breaches: Vec<ThresholdBreachInfo> = Vec::new();
 
     if let Some(delta) = summary.pattern_entropy_delta {

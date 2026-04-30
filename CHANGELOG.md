@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.0.11] - 2026-04-30
+
+### Added
+- **Note 1 — `compute_thresholds_check` overrides/today not yet wired (M09):**
 
 ## [0.0.10] - 2026-04-29
 
@@ -27,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DivergenceSummary` gains `convention_drift_delta: Option<f64>`; `compute_delta` now populates it.
 - `normalize_and_hash(kind, children)` is the canonical fingerprint entry point; `fingerprint_node_kind(kind)` is now a thin wrapper — M07 catalog output is byte-identical.
 - Override expiry moved from config-load-time to `compute_thresholds_check` via caller-supplied `ThresholdsInput::today: NaiveDate` — no more `SystemTime::now()` in `sdi-config`.
+- **sdi-core public-API change:** `ThresholdsInput::default().today` now uses far-future sentinel `9999-12-31` (was `2026-01-01`). This ensures all per-category threshold overrides are treated as expired by default — a conservative failure mode. Embedders using per-category overrides must supply the real current date explicitly.
 - `sdi-detection::warm_start` FS ops moved to `sdi-pipeline::cache`; pure mapping logic remains.
 - `sdi-snapshot::store` FS ops moved to `sdi-pipeline::store`.
 

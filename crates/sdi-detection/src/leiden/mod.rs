@@ -164,8 +164,9 @@ fn local_move_phase(
 
         let (best_comm, best_gain) = best;
 
-        // best_comm is always >= n (offset community) so best_comm != node always;
-        // the gain threshold is the only check needed here.
+        // When best_gain > 1e-10, best_comm is always an offset community ID (>= n) and != node.
+        // best_comm defaults to `node` (< n) when no neighbour improves the gain; the
+        // best_gain threshold below prevents using that default.
         if best_gain > 1e-10 {
             state.add_node(graph, node, best_comm);
             any_moved = true;

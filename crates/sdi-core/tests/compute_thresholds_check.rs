@@ -104,7 +104,11 @@ fn override_expiry_ignored_when_expired() {
 }
 
 #[test]
-fn override_applied_when_not_expired() {
+fn override_not_wired_in_m08_base_rate_applies() {
+    // TODO(M09): When per-category overrides are wired, update this test to assert
+    // that an active override raises the limit and prevents breach. Currently in M08,
+    // the override is accepted but not read; base rate always applies.
+    //
     // M08: per-category overrides do not affect the aggregate dimension check
     // (wired up in M09).  Even with an unexpired override raising the entropy
     // limit to 50.0, the base rate of 2.0 still applies, so entropy=3.0 breaches.
@@ -118,13 +122,14 @@ fn override_applied_when_not_expired() {
 }
 
 #[test]
-fn expired_today_date_consistent() {
-    // Verify that cfg.today drives expiry, not SystemTime::now().
-    // With today=2019-12-31 the override (expires=2020-01-01) is not yet
-    // expired.  In M08 it makes no difference to the aggregate check — the
-    // base rate 2.0 still applies and entropy=3.0 still breaches.  The key
-    // invariant: the result is deterministic on cfg.today with no wall-clock
-    // dependency.
+fn base_rate_applies_regardless_of_override_state_m08() {
+    // TODO(M09): Once overrides are wired, verify that cfg.today drives expiry and not
+    // SystemTime::now(). True clock-independence must wait until compute_thresholds_check
+    // reads cfg.today for override filtering.
+    //
+    // In M08, overrides are not read, so with today=2019-12-31 (override not yet expired)
+    // or today=2026-04-29 (override expired), the base rate 2.0 always applies and
+    // entropy=3.0 always breaches. This test documents M08 behavior only.
     let past = NaiveDate::from_ymd_opt(2019, 12, 31).unwrap();
     let cfg = cfg_with_override(50.0, "2020-01-01", past);
     let s = summary(Some(3.0), None, None, None);

@@ -93,6 +93,11 @@ pub fn load_with_paths(
     }
 
     // Validate expires format and prune overrides that have already expired.
+    // NOTE for test authors: `today_iso8601()` is called unconditionally here,
+    // so integration tests cannot inject a specific "today" through the public
+    // `load_with_paths` API.  To test expiry behaviour with a controlled date,
+    // call `thresholds::validate_and_prune_overrides` directly with an explicit
+    // date string instead of going through `load_with_paths`.
     thresholds::validate_and_prune_overrides(&mut base, &thresholds::today_iso8601())?;
 
     let merged =
