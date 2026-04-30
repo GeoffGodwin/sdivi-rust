@@ -6,10 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [0.0.9] - 2026-04-29
+
+## [0.0.10] - 2026-04-29
 
 ### Added
-- Adjusted the plan to better suit external consumers of SDI as an importable, less opinionated tool by offering an API to the sdi-core. (M08)
+- [MILESTONE 08 ✓] feat: M08 (M8)
+## [0.0.9] - 2026-04-29
+
+### Added (M08 — sdi-core Pure-Compute Reshape)
+- New crate `sdi-pipeline`: orchestration entry point owning `Pipeline::snapshot`, warm-start cache I/O, atomic snapshot writes, and retention enforcement.
+- `sdi-core` reshaped to pure-compute WASM-compatible facade. Exposes `compute_*` functions and `*Input` serde struct family (`DependencyGraphInput`, `PatternInstanceInput`, `LeidenConfigInput`, `ThresholdsInput`, `BoundarySpecInput`, `PriorPartition`, `NormalizeNode`, `validate_node_id`).
+- `sdi-core::compute`: `compute_coupling_topology`, `detect_boundaries`, `compute_boundary_violations`, `compute_pattern_metrics`, `compute_thresholds_check`, `normalize_and_hash`. All pure; all callable from WASM.
+- `sdi-snapshot`: new modules `trend.rs` (`compute_trend`, `TrendResult`) and `boundary_inference.rs` (`infer_boundaries`, `BoundaryInferenceResult`).
+- Cargo feature `pipeline-records` added to `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot` (default ON; OFF for WASM builds via sdi-core).
+- Cargo feature `loader` added to `sdi-config` (default ON; gates all FS/clock code).
+
+### Changed (M08)
+- **Breaking rename** (pre-1.0): `build_snapshot` → `assemble_snapshot`. Gains `pattern_metrics: PatternMetricsResult` argument.
+- `Snapshot` gains `pattern_metrics: PatternMetricsResult` field (`convention_drift: f64`, `entropy_per_category`).
+- `DivergenceSummary` gains `convention_drift_delta: Option<f64>`; `compute_delta` now populates it.
+- `normalize_and_hash(kind, children)` is the canonical fingerprint entry point; `fingerprint_node_kind(kind)` is now a thin wrapper — M07 catalog output is byte-identical.
+- Override expiry moved from config-load-time to `compute_thresholds_check` via caller-supplied `ThresholdsInput::today: NaiveDate` — no more `SystemTime::now()` in `sdi-config`.
+- `sdi-detection::warm_start` FS ops moved to `sdi-pipeline::cache`; pure mapping logic remains.
+- `sdi-snapshot::store` FS ops moved to `sdi-pipeline::store`.
 
 ## [0.0.8] - 2026-04-29
 

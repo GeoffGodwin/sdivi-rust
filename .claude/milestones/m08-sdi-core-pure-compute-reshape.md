@@ -1,4 +1,9 @@
 #### Milestone 8: `sdi-core` Pure-Compute Reshape and WASM-readiness
+<!-- milestone-meta
+id: "8"
+status: "done"
+-->
+
 
 **Scope:** Restructure the workspace so `sdi-core` is a pure-compute, WASM-compatible facade exposing concrete `compute_*` functions over plain serde input structs. Move today's `sdi-core` (Pipeline + I/O orchestration) into a new `sdi-pipeline` crate. Extract I/O sites from `sdi-detection::warm_start` and `sdi-snapshot::store`. Feature-gate `sdi-graph`/`sdi-detection`/`sdi-patterns`/`sdi-snapshot` so their `FeatureRecord`-taking paths are opt-in (off for WASM). This is the single largest architectural milestone post-MVP-shift; it precedes the CLI work because the public `sdi-core` API surface freezes at 0.1.0 and must be right *before* CLI/docs/release lock it in.
 

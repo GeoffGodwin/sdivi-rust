@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-04-29
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdi-rust ahead of mid-June reviews. Today's `sdi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -15,6 +15,9 @@
   - **Files updated this cycle:** `CLAUDE.md` (KDD-12, KDD-13, Module Boundaries, Repository Layout, Critical System Rules 21–23, "What Not to Build Yet"); `.claude/milestones/MANIFEST.cfg`; `.claude/milestones/m08-sdi-core-pure-compute-reshape.md` (new); `.claude/milestones/m09-trend-check-show-remaining-cli-commands.md` (rewritten from old m08); `.claude/milestones/m10-boundaries-infer-ratify-show.md` (rewritten from old m09); `.claude/milestones/m11-documentation-examples-determinism-bifl-tracker.md` (rewritten from old m10); `.claude/milestones/m12-wasm-crate-and-consumer-app-integration.md` (new); `.claude/milestones/m13-release-pipeline-and-distribution.md` (rewritten from old m11). Old `m12-bindings-pyo3-and-napi-rs-post-mvp.md` retained as v1-era post-MVP placeholder (already excluded from manifest).
 
 ## Unresolved Observations
+- [2026-04-29 | "Implement Milestone 8: `sdi-core` Pure-Compute Reshape and WASM-readiness"] `crates/sdi-core/tests/compute_thresholds_check.rs:96-104` — `override_expiry_ignored_when_expired` passes correctly, but because overrides are entirely unused in M08, not because expiry logic executed. A bug in M09's expiry path would not be caught by this test as written. Revisit when M09 adds override integration.
+- [2026-04-29 | "Implement Milestone 8: `sdi-core` Pure-Compute Reshape and WASM-readiness"] `crates/sdi-core/tests/compute_thresholds_check.rs:106-128` — two test functions whose bodies end in `let _ = r;` produce false-positive coverage statistics. Restructure when M09 adds behavioral assertions.
+- [2026-04-29 | "Implement Milestone 8: `sdi-core` Pure-Compute Reshape and WASM-readiness"] `.claude/milestones/MANIFEST.cfg` and the M08 milestone file could not be updated to `done` (permission denied, per coder note). Human operator should mark M08 done manually.
 - [2026-04-29 | "M08"] `leiden/mod.rs:173` — The singleton fallback `let target = if state.size[old_comm] == 0 { node } else { old_comm }` uses a raw node index (0..n) as a community ID. After the offset fix, real community IDs are n..n+k so a singleton at `node` < n is unambiguous — but this invariant (singleton ID == node index, always < n) is undocumented. A future caller that omits the offset guarantee reintroduces the collision silently.
 - [2026-04-29 | "M08"] `thresholds.rs:26` — `validate_date_format` accepts Feb 29 for any year (noted in fn doc comment). Intentional but inconsistent with strict calendar validation. No action required; logged for the audit accumulation.
 - [2026-04-29 | "architect audit"] Stays in DRIFT_LOG.md for next cycle (M11):

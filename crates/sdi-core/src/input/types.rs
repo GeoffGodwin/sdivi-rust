@@ -1,20 +1,14 @@
-//! Input structs for the pure-compute API.
-//!
-//! These are the types that WASM consumers and other embedders supply to the
-//! `compute_*` functions.  All are plain `serde` structs with no I/O, no
-//! tree-sitter, and no `std::time`.
+//! Input struct definitions for the pure-compute API.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::AnalysisError;
-
 // ── Graph inputs ─────────────────────────────────────────────────────────────
 
 /// A single node in a [`DependencyGraphInput`].
 ///
-/// `id` must satisfy the [`validate_node_id`] rules.
+/// `id` must satisfy the [`super::validate_node_id`] rules.
 ///
 /// # Examples
 ///
@@ -65,13 +59,8 @@ pub struct EdgeInput {
 /// ```rust
 /// use sdi_core::input::{DependencyGraphInput, NodeInput, EdgeInput};
 ///
-/// let g = DependencyGraphInput {
-///     nodes: vec![
-///         NodeInput { id: "src/lib.rs".to_string(), path: "src/lib.rs".to_string(), language: "rust".to_string() },
-///     ],
-///     edges: vec![],
-/// };
-/// assert_eq!(g.nodes.len(), 1);
+/// let g = DependencyGraphInput { nodes: vec![], edges: vec![] };
+/// assert_eq!(g.nodes.len(), 0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DependencyGraphInput {
@@ -189,6 +178,25 @@ pub struct PriorPartition {
     pub cluster_assignments: BTreeMap<String, u32>,
 }
 
+// ── Normalize input ───────────────────────────────────────────────────────────
+
+/// A node in the pattern AST subtree for [`crate::normalize_and_hash`].
+///
+/// # Examples
+///
+/// ```rust
+/// use sdi_core::input::NormalizeNode;
+///
+/// let leaf = NormalizeNode { kind: "try_expression".to_string(), children: vec![] };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NormalizeNode {
+    /// Tree-sitter node kind.
+    pub kind: String,
+    /// Ordered children.
+    pub children: Vec<NormalizeNode>,
+}
+
 // ── Threshold inputs ──────────────────────────────────────────────────────────
 
 /// Per-category threshold override for [`ThresholdsInput`].
@@ -218,7 +226,6 @@ pub struct ThresholdOverrideInput {
 ///
 /// ```rust
 /// use sdi_core::input::ThresholdsInput;
-/// use chrono::NaiveDate;
 ///
 /// let t = ThresholdsInput::default();
 /// assert_eq!(t.pattern_entropy_rate, 2.0);
@@ -253,25 +260,6 @@ impl Default for ThresholdsInput {
     }
 }
 
-// ── Normalize input ───────────────────────────────────────────────────────────
-
-/// A node in the pattern AST subtree for [`crate::normalize_and_hash`].
-///
-/// # Examples
-///
-/// ```rust
-/// use sdi_core::input::NormalizeNode;
-///
-/// let leaf = NormalizeNode { kind: "try_expression".to_string(), children: vec![] };
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct NormalizeNode {
-    /// Tree-sitter node kind.
-    pub kind: String,
-    /// Ordered children.
-    pub children: Vec<NormalizeNode>,
-}
-
 // ── Boundary inputs ───────────────────────────────────────────────────────────
 
 /// A single boundary definition for [`BoundarySpecInput`].
@@ -299,75 +287,4 @@ pub struct BoundaryDefInput {
 pub struct BoundarySpecInput {
     /// Declared boundaries.
     pub boundaries: Vec<BoundaryDefInput>,
-}
-
-// ── Validation ────────────────────────────────────────────────────────────────
-
-/// Validates a node ID according to canonical rules.
-///
-/// A valid node ID is:
-/// - non-empty
-/// - uses forward slashes only (no backslashes)
-/// - no leading `./`
-/// - no trailing `/`
-/// - no absolute path component (no leading `/`)
-/// - no `..` components
-///
-/// # Errors
-///
-/// Returns [`AnalysisError::InvalidNodeId`] with the offending string on failure.
-///
-/// # Examples
-///
-/// ```rust
-/// use sdi_core::input::validate_node_id;
-///
-/// assert!(validate_node_id("src/lib.rs").is_ok());
-/// assert!(validate_node_id("Cargo.toml").is_ok());
-/// assert!(validate_node_id("./foo").is_err());
-/// assert!(validate_node_id("foo/").is_err());
-/// assert!(validate_node_id("").is_err());
-/// assert!(validate_node_id("../foo").is_err());
-/// assert!(validate_node_id("/foo").is_err());
-/// ```
-pub fn validate_node_id(s: &str) -> Result<(), AnalysisError> {
-    if s.is_empty() {
-        return Err(AnalysisError::InvalidNodeId {
-            id: s.to_string(),
-            reason: "must not be empty".to_string(),
-        });
-    }
-    if s.contains('\\') {
-        return Err(AnalysisError::InvalidNodeId {
-            id: s.to_string(),
-            reason: "must use forward slashes only".to_string(),
-        });
-    }
-    if s.starts_with("./") {
-        return Err(AnalysisError::InvalidNodeId {
-            id: s.to_string(),
-            reason: "must not start with './'".to_string(),
-        });
-    }
-    if s.ends_with('/') {
-        return Err(AnalysisError::InvalidNodeId {
-            id: s.to_string(),
-            reason: "must not end with '/'".to_string(),
-        });
-    }
-    if s.starts_with('/') {
-        return Err(AnalysisError::InvalidNodeId {
-            id: s.to_string(),
-            reason: "must not be an absolute path".to_string(),
-        });
-    }
-    for component in s.split('/') {
-        if component == ".." {
-            return Err(AnalysisError::InvalidNodeId {
-                id: s.to_string(),
-                reason: "must not contain '..' components".to_string(),
-            });
-        }
-    }
-    Ok(())
 }

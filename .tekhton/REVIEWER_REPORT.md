@@ -1,4 +1,5 @@
-# Reviewer Report — M08 (Review Cycle 1 of 4)
+# Reviewer Report — M08 sdi-core Pure-Compute Reshape
+Review cycle: 1 of 4 (completion pass)
 
 ## Verdict
 APPROVED_WITH_NOTES
@@ -10,15 +11,16 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `leiden/mod.rs:168` — Comment "best_comm is always >= n (offset community) so best_comm != node always" overstates the invariant. `best_comm` defaults to `node` (< n) when the neighbour loop finds nothing; the `best_gain > 1e-10` guard is what prevents using that default. Logic is correct; comment should read "when best_gain > 1e-10, best_comm is always an offset community ID (>= n)" to avoid misleading future readers.
-- `leiden/mod.rs` — After `local_move_phase` writes back `state.assignment`, `partition` carries mixed IDs: node indices 0..n for singletons, n..n+k for merged communities. This is then passed to `refine_partition` and `aggregate_network` (not in review scope). Pre-fix, the same post-local_move_phase non-dense IDs were already passed; those functions presumably handle arbitrary ID ranges. However no doc comment confirms the invariant. The coder's own Observed Issues section flags a related precondition gap on `remove_node`; a companion note on `refine_partition`'s ID-range expectation would close the loop.
-- `sdi-config/src/load.rs:96` — `load_with_paths` calls `thresholds::today_iso8601()` unconditionally, making it impossible to inject a specific "today" for integration tests that exercise expiry behaviour through the public `load_with_paths` API. Tests of expiry must call `validate_and_prune_overrides` directly with an explicit date string. Workable but worth noting for future test authors.
-- Security findings (from security agent): both LOW items now resolved in this diff — TOCTOU eliminated (`load_toml_file` calls `read_to_string` directly and matches `ErrorKind::NotFound`); terminal injection fixed (`{key:?}` debug format escapes embedded control characters). The unmaintained `serde_yaml` item remains tracked for M10 as documented.
+- `compute_thresholds_check` accepts `ThresholdsInput.overrides` and `.today` but does not read them in the M08 implementation. This is intentional and documented in the docstring ("per-category rates do not affect the aggregate dimension check — that integration is added in M09"). No action required for this cycle; M09 must wire them in and revisit the coverage gap below.
+- `ThresholdsInput::default()` hardcodes `today = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()`. Any caller using `::default()` without overriding `.today` will silently mis-evaluate expiry for overrides that expired before 2026-01-01. The doc says callers must supply `today` explicitly, but a static past date default is a footgun worth flagging for M09.
+- Two override tests (`override_applied_when_not_expired`, `expired_today_date_consistent` in `compute_thresholds_check.rs`) assert only `let _ = r;`. They verify no panic but make no behavioral claim, while test names imply behavioral coverage they don't provide. A future reader may trust them incorrectly.
+- Security agent flagged two LOW/fixable items from prior cycles (`sdi-config/src/load.rs:98` TOCTOU, `sdi-config/src/load.rs:111` terminal injection). Neither is addressed in this M08 completion pass. Both should be resolved before M13 release prep.
 
 ## Coverage Gaps
-- No regression test for the Leiden underflow bug. A test that constructs a small graph, pre-loads a partition where community IDs collide with node indices (e.g. n=4, partition=[0,1,2,3] so community 0 == node 0), runs `local_move_phase`, and asserts no panic/overflow would guard the fix.
-- `validate_and_prune_overrides` boundary: `expires` equal to today's date. The predicate is `date_str < today` (strict less-than), so an override expiring today is kept. No test asserts this boundary; a future developer could reasonably misread the semantics.
+- Per-category threshold override → rate substitution path is untested (explicitly deferred to M09). M09 must add behavioral assertions before the override infrastructure can be considered tested.
+- `validate_node_id(".")` — a single-dot path component is neither `..` nor a leading `./`, so it passes the current validation. Untested; low risk but worth covering.
 
 ## Drift Observations
-- `leiden/mod.rs:173` — The singleton fallback `let target = if state.size[old_comm] == 0 { node } else { old_comm }` uses a raw node index (0..n) as a community ID. After the offset fix, real community IDs are n..n+k so a singleton at `node` < n is unambiguous — but this invariant (singleton ID == node index, always < n) is undocumented. A future caller that omits the offset guarantee reintroduces the collision silently.
-- `thresholds.rs:26` — `validate_date_format` accepts Feb 29 for any year (noted in fn doc comment). Intentional but inconsistent with strict calendar validation. No action required; logged for the audit accumulation.
+- `crates/sdi-core/tests/compute_thresholds_check.rs:96-104` — `override_expiry_ignored_when_expired` passes correctly, but because overrides are entirely unused in M08, not because expiry logic executed. A bug in M09's expiry path would not be caught by this test as written. Revisit when M09 adds override integration.
+- `crates/sdi-core/tests/compute_thresholds_check.rs:106-128` — two test functions whose bodies end in `let _ = r;` produce false-positive coverage statistics. Restructure when M09 adds behavioral assertions.
+- `.claude/milestones/MANIFEST.cfg` and the M08 milestone file could not be updated to `done` (permission denied, per coder note). Human operator should mark M08 done manually.
