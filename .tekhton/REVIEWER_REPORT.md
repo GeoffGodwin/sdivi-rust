@@ -1,14 +1,7 @@
-# Reviewer Report — M15: Change-Coupling Analyzer
-_Cycle 2 of 4 | Branch: milestones/v0_
+# Reviewer Report — M16: Snapshot at Historical Commit
 
 ## Verdict
 APPROVED_WITH_NOTES
-
-## Prior Blocker Resolution
-
-**Simple Blocker (Cycle 1): `bindings/sdi-wasm/src/exports.rs:174` — `as usize` cast on `violation_count`**
-- Status: **FIXED**
-- Evidence: Line 174 now reads `violation_count: input.violation_count.unwrap_or(0),` — the `as usize` cast is gone; `unwrap_or(0)` on `Option<u32>` produces `u32` matching the field type exactly.
 
 ## Complex Blockers (senior coder)
 - None
@@ -17,19 +10,15 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `crates/sdi-core/src/compute/change_coupling.rs:96-100` — the `if a < b { (a, b) } else { (b, a) }` branch is dead code; `sorted_files` is already sorted so `i < j` guarantees `sorted_files[i] < sorted_files[j]`; the else arm never executes. Write `(a.clone(), b.clone())` directly.
-- `crates/sdi-pipeline/src/change_coupling.rs:101-103,123` — double empty-SHA guard: the inner `if !sha.is_empty()` at line 123 is always true when reached because line 101 already continues past empty SHAs.
-- `bindings/sdi-wasm/src/exports.rs:168` — WASM `assemble_snapshot` hardcodes `change_coupling: None`; WASM consumers who call `compute_change_coupling` cannot include the result in an assembled snapshot. Track for a follow-up field addition to `WasmAssembleSnapshotInput`.
-- `bindings/sdi-wasm/src/types.rs:53-58` — `WasmLeidenConfigInput` has no `edge_weights` field; WASM consumers calling `detect_boundaries` always get unweighted Leiden. Intentional for MVP but untracked.
-- `crates/sdi-core/src/input/types.rs:145` — `LeidenConfigInput::edge_weights` is `Option<BTreeMap<(String, String), f64>>`; `serde_json` cannot serialize tuple-keyed maps; Rust embedders that call `serde_json::to_value` on a populated `edge_weights` will get a runtime serialization error. Consider a `"source\x1ftarget"` delimited string key via a newtype or `serde_as`.
-- `crates/sdi-core/src/compute/change_coupling.rs:83` — `all_files: HashSet<String>` used only for `.len()`; mildly inconsistent with the project's `BTreeSet` convention.
+- `commit_extract.rs:81` — `commit_date_iso` returns `CommitExtractError::RefResolutionFailed` when the date string cannot be parsed. That variant name is misleading (ref resolution succeeded; the failure is date-format parsing). A `CommitDateParseFailed { sha, raw }` variant would be clearer, though the error message is descriptive enough to diagnose.
+- `CODER_SUMMARY.md` lists `docs/library-embedding.md` in the `## Docs Updated` section but does NOT list it under `## Files Modified`. Either the file was updated (and should appear in the modified list) or the Docs Updated entry is erroneous. The omission is harmless but creates an audit gap.
+- `commit_extract.rs:94-113` — `git archive` is spawned before the `tar --version` availability check. If `tar` is absent, `git archive` is already running; it will exit cleanly once its stdout pipe is closed on early return, but spawning a process that will be immediately abandoned is sub-optimal. The check should precede the spawn.
+- Security findings MEDIUM/LOW (rev-parse `--` separator, tar `--no-absolute-filenames`, stderr truncation) are handled by the security pipeline and noted here for completeness only.
 
 ## Coverage Gaps
-- `compute_change_coupling`: no test for the window-truncation path when `events.len() > history_depth` with a non-zero `history_depth`.
-- No test that round-trips `LeidenConfigInput` with a populated `edge_weights` through `serde_json::to_value` — would surface the tuple-key serialization error noted above.
-- No WASM integration test for `assemble_snapshot` with `violation_count` set.
+- `change_coupling_ends_at_commit_not_head` (`commit_snapshot.rs:185`) validates that `snap_hist.commit` equals `sha_head1` but does not verify that the change-coupling data actually differs between HEAD and HEAD~1. With only 3 single-file commits and the default `min_frequency = 0.6`, both snapshots likely have empty coupling, so the window-clamping logic is not exercised. A fixture with co-changing files would give this test meaningful coverage.
+- No test exercises `normalize_to_utc` edge cases for timezone offsets that cross a day boundary (e.g., `2026-04-30T23:30:00+01:00` → `2026-04-30T22:30:00Z` vs. `2026-05-01T00:30:00+01:00` → day rollover). The existing unit tests cover the happy path; DST/rollover is unexercised.
 
 ## Drift Observations
-- `[bindings/sdi-wasm/src/types.rs vs crates/sdi-core/src/input/types.rs]` — `WasmLeidenConfigInput` silently diverged from `LeidenConfigInput` in M15 (core gained `edge_weights`; WASM wrapper did not). The `to_core` deserialization silently defaults to `None`, so no crash, but the divergence will widen as fields are added without mirrored updates to the WASM wrapper.
-- `[crates/sdi-pipeline/src/change_coupling.rs:86-90]` — `parse_git_log_output` doc comment describes newline-separated filenames but the actual format is NUL-terminated (`-z` flag). The parsing logic is correct; the prose is wrong.
-- `[crates/sdi-detection/src/leiden/quality.rs:1]` — all other rewritten `leiden/` submodules have a `//!` module-level doc comment; `quality.rs` does not. Minor consistency gap.
+- `commit_extract.rs:158-209` — `normalize_to_utc`, `calendar_to_epoch`, and `epoch_to_iso8601` are hand-rolled ISO 8601 + Proleptic Gregorian arithmetic. `sdi-pipeline` already depends on `chrono` (via `sdi-config`) with `default-features = false`; using `chrono::DateTime::parse_from_rfc3339` would eliminate ~50 lines of custom arithmetic with no WASM impact (pipeline is FS-bearing and not WASM-compatible). This is a simplification opportunity for a future cleanup pass, not a bug.
+- `tests/historical_commit_lifecycle.rs` — workspace-level `tests/` placeholder is a comment-only file that explains why the real test lives under `crates/sdi-cli/`. The comment is accurate but the file itself adds no value and will accumulate as noise if the pattern is repeated for future milestones.

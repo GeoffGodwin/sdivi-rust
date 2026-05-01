@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::commit_extract::CommitExtractError;
+
 /// Errors produced by the sdi-pipeline orchestration layer.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -20,4 +22,8 @@ pub enum PipelineError {
     /// I/O error while writing a snapshot file or persisting the partition cache.
     #[error("snapshot write error: {0}")]
     SnapshotIo(std::io::Error),
+
+    /// Failure during historical-commit ref resolution or tree extraction.
+    #[error("commit extract error: {0}")]
+    CommitExtract(#[from] CommitExtractError),
 }

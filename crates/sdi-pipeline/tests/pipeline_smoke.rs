@@ -25,21 +25,21 @@ fn pipeline_new_is_cheap() {
 
 #[test]
 fn snapshot_on_simple_rust_fixture() {
+    // M16 changed commit=Some(ref) to trigger real git rev-parse resolution,
+    // so passing a bare label no longer works. Use None (no-commit path) to
+    // verify the pipeline works on the simple-rust fixture.
     let root = fixture_root();
     let adapters: Vec<Box<dyn sdi_parsing::adapter::LanguageAdapter>> =
         vec![Box::new(RustAdapter)];
     let pipeline = Pipeline::new(Config::default(), adapters);
 
     let snap = pipeline
-        .snapshot(
-            root,
-            Some("test-commit"),
-            "2026-04-29T00:00:00Z",
-        )
+        .snapshot(root, None, "2026-04-29T00:00:00Z")
         .expect("snapshot must succeed on simple-rust fixture");
 
     assert_eq!(snap.snapshot_version, SNAPSHOT_VERSION, "must emit schema version 1.0");
-    assert_eq!(snap.commit.as_deref(), Some("test-commit"));
+    // No commit ref supplied → commit field is absent.
+    assert!(snap.commit.is_none(), "commit must be None when no ref is supplied");
     assert_eq!(snap.timestamp, "2026-04-29T00:00:00Z");
     // Five .rs files in simple-rust → at least one node.
     assert!(snap.graph.node_count > 0, "graph must have nodes");

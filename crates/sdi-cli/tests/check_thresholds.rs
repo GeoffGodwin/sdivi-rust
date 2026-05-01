@@ -43,7 +43,6 @@ fn check_with_prior_below_thresholds_exits_zero() {
     sdi()
         .arg("--repo").arg(repo.path())
         .arg("snapshot")
-        .arg("--commit").arg("aaa0000000000000000000000000000000000001")
         .assert()
         .success();
     sdi()

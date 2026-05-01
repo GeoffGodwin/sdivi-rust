@@ -1,12 +1,38 @@
-use assert_cmd::Command;
+use std::process::Command;
+
+use assert_cmd::Command as CargoBin;
 use tempfile::TempDir;
 
-fn sdi() -> Command {
-    Command::cargo_bin("sdi").expect("sdi binary must be built")
+fn sdi() -> CargoBin {
+    CargoBin::cargo_bin("sdi").expect("sdi binary must be built")
 }
 
 fn empty_repo() -> TempDir {
     tempfile::tempdir().unwrap()
+}
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .status()
+        .expect("git must be available");
+    assert!(status.success(), "git {args:?} failed");
+}
+
+fn setup_two_commit_repo() -> TempDir {
+    let tmp = TempDir::new().unwrap();
+    let d = tmp.path();
+    git(d, &["init"]);
+    git(d, &["config", "user.email", "t@t.com"]);
+    git(d, &["config", "user.name", "T"]);
+    std::fs::write(d.join("a.rs"), "fn a() {}").unwrap();
+    git(d, &["add", "a.rs"]);
+    git(d, &["commit", "-m", "add a"]);
+    std::fs::write(d.join("b.rs"), "fn b() {}").unwrap();
+    git(d, &["add", "b.rs"]);
+    git(d, &["commit", "-m", "add b"]);
+    tmp
 }
 
 fn snapshot_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
@@ -78,7 +104,6 @@ fn check_json_stdout_is_valid_json() {
         .output()
         .unwrap();
 
-    // First-run check is always exit 0.
     assert!(
         out.status.success(),
         "first-run check must exit 0; got {:?}", out.status.code()
@@ -91,33 +116,32 @@ fn check_json_stdout_is_valid_json() {
         parsed.get("exit_code").is_some(),
         "check JSON must contain 'exit_code'; got: {parsed}"
     );
-    assert_eq!(
-        parsed["exit_code"].as_i64().unwrap(),
-        0,
-        "first-run exit_code must be 0"
-    );
+    assert_eq!(parsed["exit_code"].as_i64().unwrap(), 0);
 }
 
 // ── trend --format json ────────────────────────────────────────────────────
 
 #[test]
 fn trend_json_with_two_snapshots_is_valid_json() {
-    let repo = empty_repo();
+    let repo = setup_two_commit_repo();
+    let d = repo.path();
+
+    // Two real commits → two distinct snapshot files (unique SHA → unique JSON → unique hash).
     sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit").arg("aaa0000000000000000000000000000000000001")
+        .arg("--commit").arg("HEAD~1")
         .assert()
         .success();
     sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit").arg("bbb0000000000000000000000000000000000002")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
     let out = sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("trend")
         .arg("--format").arg("json")
         .output()
@@ -138,25 +162,27 @@ fn trend_json_with_two_snapshots_is_valid_json() {
 
 #[test]
 fn diff_json_stdout_is_valid_json() {
-    let repo = empty_repo();
+    let repo = setup_two_commit_repo();
+    let d = repo.path();
+
     sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit").arg("ccc0000000000000000000000000000000000003")
+        .arg("--commit").arg("HEAD~1")
         .assert()
         .success();
     sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit").arg("ddd0000000000000000000000000000000000004")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
-    let files = snapshot_files(repo.path());
+    let files = snapshot_files(d);
     assert!(files.len() >= 2);
 
     let out = sdi()
-        .arg("--repo").arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("diff")
         .arg(&files[0])
         .arg(&files[1])

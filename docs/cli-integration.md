@@ -119,7 +119,7 @@ expiry the override is silently ignored and defaults resume — no manual reset.
 
 | Flag | Description |
 |---|---|
-| `--commit <sha>` | Git commit SHA to record in the snapshot |
+| `--commit <ref>` | Analyze the tree at `<ref>` (branch, tag, or SHA); labels the snapshot with the resolved SHA and the commit's commit-date |
 
 ### `sdi check` flags
 
@@ -176,6 +176,62 @@ retention = 50   # 0 = unlimited
 
 Retention is enforced synchronously after each successful snapshot write. A
 failed write never removes an existing snapshot.
+
+## Analyzing a historical commit
+
+`sdi snapshot --commit REF` analyzes the **actual source tree** at `REF`, not
+the working directory.
+
+```bash
+sdi snapshot --commit v1.2.0          # analyze a release tag
+sdi snapshot --commit HEAD~10         # analyze 10 commits ago
+sdi snapshot --commit abc123def456    # analyze a specific SHA
+```
+
+What happens internally:
+
+1. `REF` is resolved to a full 40-char SHA via `git rev-parse --verify`.
+2. The tree at that SHA is extracted to a temporary directory via
+   `git archive --format=tar <sha> | tar -xC <tmpdir>`.
+3. All five pipeline stages run against the extracted tree.
+4. The snapshot's `commit` field is set to the **resolved SHA** (not the ref
+   name you supplied).
+5. The snapshot's `timestamp` is the **commit's commit-date** (normalised to
+   UTC), not the wall-clock time of the invocation. This ensures that
+   lexicographic file ordering matches chronological order across mixed
+   historical and current snapshots.
+6. Change-coupling history is collected ending at the resolved SHA, so the
+   coupling section reflects commits up to that point in history.
+7. The Leiden partition cache (`.sdi/cache/partition.json`) and the snapshot
+   output directory (`.sdi/snapshots/`) are located relative to the **original
+   `repo_root`**, not the temporary extraction directory.
+8. The temporary directory is removed before `sdi snapshot` returns.
+
+### Caveats
+
+- **`.gitattributes export-ignore`**: `git archive` honours this directive.
+  Files marked `export-ignore` are excluded from the extracted tree and will
+  not appear in the snapshot graph. This differs from `git checkout` semantics.
+- **Shallow clones**: if `REF` is below the shallow boundary, `git rev-parse`
+  succeeds but `git archive` may fail. Use `fetch-depth: 0` in CI checkouts
+  that require historical analysis.
+- **Submodules**: `git archive` does not recurse into submodules. Submodule
+  contents are not included in the snapshot.
+- **`tar` on PATH**: `tar` must be available. On Linux and macOS this is
+  always the case. Windows ships `tar.exe` in `System32` since Windows 10 1803.
+
+### Historical backfill
+
+To produce snapshots for a range of commits, script the CLI:
+
+```bash
+for sha in $(git rev-list v1.0.0..v2.0.0 --reverse); do
+  sdi snapshot --commit "$sha"
+done
+sdi trend
+```
+
+Batch backfill (`sdi backfill`) is not provided in v0.
 
 ## Change-coupling and weighted community detection
 

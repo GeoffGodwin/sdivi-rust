@@ -2,20 +2,43 @@
 //! `sdi snapshot` × N → `sdi boundaries infer` → `sdi boundaries ratify`
 //! → `sdi boundaries show`.
 
-use assert_cmd::Command;
+use std::process::Command;
+
+use assert_cmd::Command as CargoBin;
 use tempfile::TempDir;
 
-fn sdi() -> Command {
-    Command::cargo_bin("sdi").expect("sdi binary must be built")
+fn sdi() -> CargoBin {
+    CargoBin::cargo_bin("sdi").expect("sdi binary must be built")
 }
 
-/// Captures `n` snapshots of the given repo using `sdi snapshot`.
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .status()
+        .expect("git must be available");
+    assert!(status.success(), "git {args:?} failed");
+}
+
+/// Creates `n` snapshots by committing a new file per iteration and running
+/// `sdi snapshot --commit HEAD`. This produces a distinct resolved SHA per
+/// snapshot (→ unique filename), and a genuinely different tree at each point.
 fn capture_snapshots(repo: &TempDir, n: usize) {
+    let d = repo.path();
+    git(d, &["init"]);
+    git(d, &["config", "user.email", "test@test.com"]);
+    git(d, &["config", "user.name", "Test"]);
+
     for i in 0..n {
+        let fname = format!("file{i}.rs");
+        std::fs::write(d.join(&fname), format!("fn f{i}() {{}}")).unwrap();
+        git(d, &["add", &fname]);
+        git(d, &["commit", "-m", &format!("add file{i}")]);
+
         sdi()
-            .arg("--repo").arg(repo.path())
+            .arg("--repo").arg(d)
             .arg("snapshot")
-            .arg("--commit").arg(format!("commit{i:04}"))
+            .arg("--commit").arg("HEAD")
             .assert()
             .success();
     }
@@ -44,8 +67,6 @@ fn infer_after_snapshots_exits_zero() {
 #[test]
 fn ratify_writes_valid_yaml() {
     let repo = tempfile::tempdir().unwrap();
-    // The simple-rust fixture has a few files; 4 snapshots should be enough
-    // for the default stability_threshold=3.
     capture_snapshots(&repo, 4);
 
     sdi()

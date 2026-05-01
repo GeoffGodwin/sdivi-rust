@@ -42,6 +42,3 @@ pub fn run(repo_root: &Path, config: &Config, commit: Option<&str>, format: &str
 
     Ok(())
 }
-
-
-

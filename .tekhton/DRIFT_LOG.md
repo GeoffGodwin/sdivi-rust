@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-01
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdi-rust ahead of mid-June reviews. Today's `sdi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -20,6 +20,8 @@
 - [2026-05-01 | "M12"] **`sdi-core` now re-exports inner-crate types** (`GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint`). These were previously only reachable via internal crate paths. The re-exports are additive (backward-compatible) but widen the public surface of sdi-core. Document in the "Module Boundaries" section of CLAUDE.md during M13 review.
 
 ## Unresolved Observations
+- [2026-05-01 | "M16"] `commit_extract.rs:158-209` — `normalize_to_utc`, `calendar_to_epoch`, and `epoch_to_iso8601` are hand-rolled ISO 8601 + Proleptic Gregorian arithmetic. `sdi-pipeline` already depends on `chrono` (via `sdi-config`) with `default-features = false`; using `chrono::DateTime::parse_from_rfc3339` would eliminate ~50 lines of custom arithmetic with no WASM impact (pipeline is FS-bearing and not WASM-compatible). This is a simplification opportunity for a future cleanup pass, not a bug.
+- [2026-05-01 | "M16"] `tests/historical_commit_lifecycle.rs` — workspace-level `tests/` placeholder is a comment-only file that explains why the real test lives under `crates/sdi-cli/`. The comment is accurate but the file itself adds no value and will accumulate as noise if the pattern is repeated for future milestones.
 - [2026-05-01 | "M15"] `[bindings/sdi-wasm/src/types.rs vs crates/sdi-core/src/input/types.rs]` — `WasmLeidenConfigInput` silently diverged from `LeidenConfigInput` in M15 (core gained `edge_weights`; WASM wrapper did not). The `to_core` deserialization silently defaults to `None`, so no crash, but the divergence will widen as fields are added without mirrored updates to the WASM wrapper.
 - [2026-05-01 | "M15"] `[crates/sdi-pipeline/src/change_coupling.rs:86-90]` — `parse_git_log_output` doc comment describes newline-separated filenames but the actual format is NUL-terminated (`-z` flag). The parsing logic is correct; the prose is wrong.
 - [2026-05-01 | "M15"] `[crates/sdi-detection/src/leiden/quality.rs:1]` — all other rewritten `leiden/` submodules have a `//!` module-level doc comment; `quality.rs` does not. Minor consistency gap.
@@ -28,13 +30,3 @@
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
-- [RESOLVED 2026-05-01] `pipeline.rs:221-257` (`compute_pattern_metrics_from_catalog`) duplicates the entropy + convention-drift logic from `sdi-core/src/compute/patterns.rs:35-82`. A parity test was added, which mitigates the risk, but the two implementations can drift silently if either is updated. Consider exposing `compute_pattern_metrics` from sdi-core with a catalog-consuming adapter, or a shared helper — this is not urgent given the parity test.
-- [RESOLVED 2026-05-01] `bindings/sdi-wasm/src/lib.rs:58-62` — The TypeScript custom section references `PatternMetricsResult` in the `Snapshot` interface, but tsify generates this type as `WasmPatternMetricsResult`. This name mismatch predates M14 and is not worsened by it, but TypeScript consumers may need a manual cast. A follow-up to align the custom-section type name with the tsify-generated name would eliminate the silent type gap.
-- [RESOLVED 2026-05-01] `crates/sdi-pipeline/src/time.rs:22-38` — The hand-rolled Julian Day Number → Gregorian calendar conversion is a non-trivial algorithm with no test coverage for edge cases (leap years, year-end, etc.). The existing doc test only checks `ends_with('Z')` and `len() == 20`. A round-trip property test or at least spot-check against known UTC timestamps would give confidence in the algorithm. This predates M14 (extracted, not introduced) so not a new concern.
-- [RESOLVED 2026-05-01] [release.yml] The prior-cycle drift observation about the comment block (lines 13–16) showing wrong publish order has been **resolved** — the comment now accurately reflects the corrected order.
-- [RESOLVED 2026-05-01] [CHANGELOG.md] Entries for `[0.0.1]`–`[0.0.16]` still contain internal development tracking noise (e.g. "Managed the human_action_required", "[MILESTONE 10 ✓]"). The coder noted this as out of scope. Flagged again so the user can clean it up before the public `0.1.0` tag.
-- [RESOLVED 2026-05-01] `exports.rs:187-190` — `build_graph_metrics` converts string node IDs to `PathBuf::from(id)` to satisfy `GraphMetrics.top_hubs: Vec<(PathBuf, usize)>`; couples the WASM binding layer to an internal `sdi-graph` field type. If that field changes to `String` the mapping becomes dead code without a compile error at the binding layer.
-- [RESOLVED 2026-05-01] `exports.rs:127-134` vs `exports.rs:55-61` — `WasmPriorPartition` is silently reused for two distinct Rust types (`sdi_core::PriorPartition` via serde round-trip in `detect_boundaries`, and `sdi_core::SnapshotPriorPartition` via manual struct construction in `infer_boundaries`). Safe today because both share identical serde field layouts; a future field change to either type will produce a silent runtime serialization failure, not a compile error.
-- [RESOLVED 2026-05-01] `lib.rs:51-57` (SNAPSHOT_TS constant) — TypeScript interface declares `LeidenPartition.seed: number`, but the Rust field is `u64`; JavaScript `number` (IEEE-754 f64) cannot exactly represent seeds above 2^53. Default seed 42 is safe; the README or the TypeScript interface should document the limit.
-- [RESOLVED 2026-05-01] Stays in `DRIFT_LOG.md` for next cycle (pending human decision).
-- [RESOLVED 2026-05-01] `[2026-04-30 | "architect audit"] crates/sdi-core/tests/compute_thresholds_check.rs:96-104 — override_expiry_ignored_when_expired passes for wrong reason` — The companion test and override wiring remain blocked on a human decision about whether per-category override logic ships before v0 (see Design Doc Observations above). No coder action until the decision is recorded.

@@ -1,12 +1,30 @@
-use assert_cmd::Command;
+use std::process::Command;
+
+use assert_cmd::Command as CargoBin;
 use tempfile::TempDir;
 
-fn sdi() -> Command {
-    Command::cargo_bin("sdi").expect("sdi binary must be built")
+fn sdi() -> CargoBin {
+    CargoBin::cargo_bin("sdi").expect("sdi binary must be built")
 }
 
 fn empty_repo() -> TempDir {
     tempfile::tempdir().unwrap()
+}
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .status()
+        .expect("git must be available");
+    assert!(status.success(), "git {args:?} failed");
+}
+
+fn setup_git_repo(tmp: &TempDir) {
+    let d = tmp.path();
+    git(d, &["init"]);
+    git(d, &["config", "user.email", "t@t.com"]);
+    git(d, &["config", "user.name", "T"]);
 }
 
 fn snap_dir(repo: &TempDir) -> std::path::PathBuf {
@@ -50,28 +68,32 @@ fn snapshot_on_empty_repo_exits_zero() {
     assert_eq!(files.len(), 1, "expected exactly one snapshot file, got: {files:?}");
 }
 
-/// Running `sdi snapshot` twice with distinct commit SHAs creates two snapshot files.
+/// Running `sdi snapshot --commit HEAD` at two distinct commits creates two snapshot files.
+///
+/// Each commit produces a unique SHA → unique `commit` field → unique JSON → unique filename hash.
 #[test]
 fn snapshot_twice_creates_two_files() {
-    let repo = empty_repo();
+    let repo = TempDir::new().unwrap();
+    setup_git_repo(&repo);
+    let d = repo.path();
 
+    std::fs::write(d.join("a.rs"), "fn a() {}").unwrap();
+    git(d, &["add", "a.rs"]);
+    git(d, &["commit", "-m", "add a"]);
     sdi()
-        .arg("--repo")
-        .arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit")
-        .arg("aaa0000000000000000000000000000000000001")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
-    // Pass a different commit SHA so the JSON content (and thus the blake3
-    // filename hash) differs even when both runs happen in the same second.
+    std::fs::write(d.join("b.rs"), "fn b() {}").unwrap();
+    git(d, &["add", "b.rs"]);
+    git(d, &["commit", "-m", "add b"]);
     sdi()
-        .arg("--repo")
-        .arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit")
-        .arg("bbb0000000000000000000000000000000000002")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
@@ -135,24 +157,27 @@ fn diff_of_two_identical_snapshots_exits_zero() {
 /// `sdi diff --format json` of two snapshots produces valid JSON with a `coupling_delta` field.
 #[test]
 fn diff_outputs_json_format() {
-    let repo = empty_repo();
+    let repo = TempDir::new().unwrap();
+    setup_git_repo(&repo);
+    let d = repo.path();
 
+    std::fs::write(d.join("x.rs"), "fn x() {}").unwrap();
+    git(d, &["add", "x.rs"]);
+    git(d, &["commit", "-m", "add x"]);
     sdi()
-        .arg("--repo")
-        .arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit")
-        .arg("ccc0000000000000000000000000000000000003")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
-    // Pass a different commit SHA so the two snapshots have distinct filenames.
+    std::fs::write(d.join("y.rs"), "fn y() {}").unwrap();
+    git(d, &["add", "y.rs"]);
+    git(d, &["commit", "-m", "add y"]);
     sdi()
-        .arg("--repo")
-        .arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("snapshot")
-        .arg("--commit")
-        .arg("ddd0000000000000000000000000000000000004")
+        .arg("--commit").arg("HEAD")
         .assert()
         .success();
 
@@ -162,8 +187,7 @@ fn diff_outputs_json_format() {
     let curr = &files[1];
 
     let output = sdi()
-        .arg("--repo")
-        .arg(repo.path())
+        .arg("--repo").arg(d)
         .arg("diff")
         .arg(prev)
         .arg(curr)

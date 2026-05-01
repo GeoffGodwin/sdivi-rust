@@ -1,7 +1,7 @@
 #### Milestone 16: Snapshot at Historical Commit (`--commit REF`)
 <!-- milestone-meta
 id: "16"
-status: "pending"
+status: "done"
 -->
 
 

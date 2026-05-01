@@ -1,60 +1,117 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 3 files, 29 test functions (19 unit + 5 property + 5 integration)
+Tests audited: 3 files, 18 test functions
 Verdict: PASS
 
-Implementation files cross-referenced: `crates/sdi-core/src/compute/thresholds.rs`,
-`crates/sdi-snapshot/src/delta.rs`, `crates/sdi-snapshot/src/snapshot.rs`,
-`crates/sdi-core/src/compute/patterns.rs`.
+Files:
+- `crates/sdi-pipeline/tests/commit_snapshot.rs` — 9 integration tests
+- `crates/sdi-pipeline/src/commit_extract.rs` (unit test block, `#[cfg(test)]`) — 6 unit tests
+- `crates/sdi-pipeline/tests/pipeline_smoke.rs` — 3 integration tests
+
+Implementation files cross-referenced: `crates/sdi-pipeline/src/commit_extract.rs`,
+`crates/sdi-pipeline/src/pipeline.rs`, `crates/sdi-pipeline/src/error.rs`,
+`crates/sdi-pipeline/src/helpers.rs`.
 
 ---
 
 ### Findings
 
-#### COVERAGE: `prop_thresholds_with_overrides_pure` never exercises overrides and per-category deltas together
-- File: `crates/sdi-core/tests/prop_thresholds.rs:116`
-- Issue: `arb_summary()` always generates `None` for both `pattern_entropy_per_category_delta` and `convention_drift_per_category_delta`. Consequently `prop_thresholds_with_overrides_pure` only exercises `resolve_overrides` and the aggregate dimension checks — never the combination of "active override for category X + non-None delta for category X." The separate `prop_per_category_delta_pure` tests use `arb_thresholds_with_overrides()` but generate category strings independently; the probability of a randomly-generated category name in the delta map matching one in the override map is negligible (~0.02% per case at 500 runs), so the "override applies to exactly this category" path is almost never exercised by any property test. Unit tests cover this specific path (`active_override_raises_per_category_limit`, `active_override_blocks_per_category_breach`), but no property test verifies the combined behavior is referentially transparent.
+#### NAMING: `change_coupling_ends_at_commit_not_head` name does not match its assertions
+- File: `crates/sdi-pipeline/tests/commit_snapshot.rs:185`
+- Issue: The test name implies that the change-coupling analysis window is verified to
+  stop at the named commit rather than at HEAD. The two assertions (lines 203–204) only
+  confirm that `snap_hist.commit` equals `sha_head1` and that the two commit fields
+  differ — both are SHA-labeling checks, not coupling-window checks. The actual
+  windowing behavior promised by the name is covered by the separate
+  `change_coupling_window_clamped_to_commit_not_head` test. Additionally, the SHA-label
+  assertions are redundant with the stronger `commit_field_is_resolved_sha_not_ref_name`
+  and `different_commits_produce_distinct_snapshots` tests.
 - Severity: MEDIUM
-- Action: Create an `arb_summary_with_categories(cats: Vec<String>)` helper that uses the supplied category names when building per-category delta maps, then pair it with `arb_thresholds_with_overrides()` using the same category pool so override-category collisions occur at usable frequency. Alternatively, add a dedicated property test that explicitly injects one known category into both the override map and the per-category delta map and asserts referential transparency.
+- Action: Either (a) rename the test to `historical_commit_sha_label_matches_expected`
+  to accurately describe what it asserts, or (b) remove it entirely as a redundant test.
+  Do NOT add coupling-window assertions here to justify the current name;
+  `change_coupling_window_clamped_to_commit_not_head` already covers that path
+  more thoroughly.
 
----
+#### ISOLATION: `pipeline_smoke.rs` writes snapshot files to a checked-in fixture directory
+- File: `crates/sdi-pipeline/tests/pipeline_smoke.rs:27` (`snapshot_on_simple_rust_fixture`)
+  and `crates/sdi-pipeline/tests/pipeline_smoke.rs:48` (`delta_of_same_snapshot_is_all_zero`)
+- Issue: Both tests call `pipeline.snapshot(root, None, …)` where `root` resolves to
+  `tests/fixtures/simple-rust/` (a checked-in directory). `Pipeline::snapshot` defaults
+  to `WriteMode::Persist`, so each invocation writes to
+  `tests/fixtures/simple-rust/.sdi/snapshots/` and runs `enforce_retention` against that
+  directory. This violates the project's explicit testing strategy (CLAUDE.md: "Use real
+  filesystem via `tempfile` for any test that touches `.sdi/`"). Consequences: (1) snapshot
+  files accumulate in the source tree on every `cargo test` run, leaving the working tree
+  dirty; (2) parallel test execution creates a race between the two tests on the shared
+  `enforce_retention` path; (3) if any future test reads from `tests/fixtures/simple-rust/
+  .sdi/`, it will observe run-dependent state. This issue predates M16 and was inherited
+  by the tester, who only changed the `commit` argument.
+- Severity: MEDIUM
+- Action: Either (a) copy the `simple-rust` fixture into a fresh `TempDir` before
+  calling `pipeline.snapshot` so writes are isolated and cleaned up on drop, or (b)
+  replace the `Pipeline::snapshot` calls with `pipeline.snapshot_with_mode(root, None,
+  …, WriteMode::EphemeralForCheck)` — these smoke tests do not require persistence and
+  `EphemeralForCheck` avoids all `.sdi/` writes.
 
-#### NAMING: Two test names describe `compute_delta` behavior but exercise only `compute_thresholds_check`
-- File: `crates/sdi-core/tests/compute_thresholds_check.rs:253` (`category_present_in_curr_only_surfaces_positive_delta`)
-- File: `crates/sdi-core/tests/compute_thresholds_check.rs:269` (`category_present_in_prev_only_surfaces_negative_delta`)
-- Issue: Both names use framing ("category present in curr only", "category present in prev only") that describes `compute_delta`'s union-of-keys semantics (`delta.rs:189-201`). A reader expects an end-to-end test that builds two snapshots with differing category sets and verifies the delta values produced. Instead, both tests manually construct a `DivergenceSummary` with a pre-set delta and only call `compute_thresholds_check`. The assertions are correct for what the tests actually do (positive delta > global rate breaches; negative delta never breaches), but the names mislead about coverage scope.
+#### COVERAGE: `timestamp_is_commit_date_not_wall_clock` uses only a negative assertion for the date value
+- File: `crates/sdi-pipeline/tests/commit_snapshot.rs:121`
+- Issue: The test passes `"2099-12-31T23:59:59Z"` as the wall-clock argument and asserts
+  `!snap.timestamp.starts_with("2099")`. This confirms the timestamp is not the supplied
+  wall-clock value but does not verify it is the actual commit date. The assertion would
+  pass for any malformed non-2099 timestamp. A complementary positive assertion — that
+  the timestamp equals the value produced by `commit_date_iso` for the same SHA — would
+  close the gap.
 - Severity: LOW
-- Action: Rename to `positive_per_category_delta_breaches_when_above_global_rate` and `negative_per_category_delta_never_breaches`. If end-to-end coverage of `compute_delta`'s curr-only / prev-only category semantics is also desired, add separate tests in `null_vs_zero.rs` that build two snapshots with differing category sets.
-
----
-
-#### COVERAGE: `identical_snapshots_have_zero_deltas` omits `convention_drift_delta` assertion
-- File: `crates/sdi-snapshot/tests/null_vs_zero.rs:50`
-- Issue: The test asserts `coupling_delta`, `community_count_delta`, and `pattern_entropy_delta` are `Some(0.0)` / `Some(0)` for identical snapshots, but does not assert `convention_drift_delta`. `compute_delta` sets `convention_drift_delta = Some(curr.pattern_metrics.convention_drift - prev.pattern_metrics.convention_drift)`, which is `Some(0.0)` for identical snapshots. The omission leaves a gap in the null-vs-zero semantic contract for this field.
-- Severity: LOW
-- Action: Add `assert_eq!(delta.convention_drift_delta, Some(0.0), "convention_drift_delta must be Some(0.0) for identical snapshots");` after the existing assertions in `identical_snapshots_have_zero_deltas`.
-
----
-
-#### COVERAGE: `prop_per_category_delta_pure` "at most one breach" assertion is trivially satisfied
-- File: `crates/sdi-core/tests/prop_thresholds.rs:154`
-- Issue: The assertion `cat_breaches.len() <= 1` ("at most one breach per category per dimension") is trivially true because exactly one category is inserted into `pattern_entropy_per_category_delta`. The implementation iterates each category once in a `for (cat, &delta) in per_cat` loop, so duplicate breaches are structurally impossible for any input. The assertion therefore does not distinguish a correct implementation from a buggy one that emits zero breaches. The referential-transparency check immediately above it (JSON equality across two calls) is the test's real value; the `<= 1` assertion adds no additional signal.
-- Severity: LOW
-- Action: Replace `cat_breaches.len() <= 1` with a condition that verifies the expected breach count based on the delta and effective limit: breach occurs if and only if `delta > effective_rate` (where `effective_rate` is the per-category override rate if active, else the global rate). Alternatively, drop the redundant assertion and add a comment explaining that uniqueness is guaranteed by construction.
+- Action: Add a positive assertion. Resolve the expected timestamp independently via
+  `get_sha(repo.path(), "HEAD")` followed by `commit_date_iso(repo.path(), &sha)`, then
+  assert `snap.timestamp == expected_utc_ts`. This converts the negative sanity check
+  into a precise behavioral assertion.
 
 ---
 
 ### Passing Items
 
-**INTEGRITY — PASS.** All assertions derive expected values from test inputs and documented implementation behavior. The `2.0` and `3.0` limit checks in `expired_override_falls_back_to_global_rate` and `convention_drift_expired_override_falls_back_to_global_rate` match the actual `ThresholdsInput::default()` global rates used in `thresholds.rs`. No hard-coded magic values, no tautological assertions, no always-passing assertions outside the trivially-true `<= 1` case noted above.
+**INTEGRITY — PASS.** All assertions derive expected values from fixture construction or
+documented implementation behavior. Node counts (1/2/3) match the number of `.rs` files
+committed at each revision. Co-change counts and frequencies in
+`change_coupling_window_clamped_to_commit_not_head` are derived from the explicit
+`setup_cochange_repo()` fixture design (2/3 commits where both a.rs and b.rs appear →
+frequency ≈ 0.67 ≥ 0.6). SHA length check (40 hex chars) matches the invariant enforced
+by `resolve_ref_to_sha`. No hard-coded magic values; no tautological assertions.
 
-**WEAKENING — PASS.** The renamed stub tests (`override_not_wired_in_m08_base_rate_applies` → `active_override_raises_per_category_limit`; `base_rate_applies_regardless_of_override_state_m08` → `expired_override_falls_back_to_global_rate`) carry materially stronger assertions than the stubs they replaced. No existing assertion was removed or broadened.
+**WEAKENING — PASS.** The sole modification to an existing test (`pipeline_smoke.rs`)
+changed `commit=Some("some-label")` to `commit=None`. This is a correct adaptation to the
+M16 API change (where `Some(ref)` now triggers real git resolution), not a weakening: the
+test still exercises the same five-stage pipeline and the `snap.commit.is_none()` assertion
+is a new, honest behavioral claim about the no-commit path.
 
-**EXERCISE — PASS.** All three files call real implementation functions (`compute_thresholds_check`, `compute_delta`, `null_summary`, `assemble_snapshot`, `compute_pattern_metrics` via `PatternMetricsResult::default()`). No internal dependencies are mocked.
+**EXERCISE — PASS.** All tests call real `Pipeline::snapshot` (integration) or real
+`normalize_to_utc` (unit). No internal dependencies are mocked. The commit-extract unit
+tests access `normalize_to_utc` via `use super::*` in the same file, calling the actual
+private implementation directly.
 
-**SCOPE — PASS.** All imports and symbols (`DivergenceSummary`, `ThresholdsInput`, `ThresholdOverrideInput`, `null_summary`, `compute_delta`, `assemble_snapshot`, `PatternMetricsResult`) exist in the current implementation. No orphaned references to deleted or renamed symbols.
+**SCOPE — PASS.** All imports (`sdi_pipeline::Pipeline`, `sdi_config::Config`,
+`sdi_lang_rust::RustAdapter`, `sdi_snapshot::snapshot::SNAPSHOT_VERSION`) match symbols
+present in the current codebase. No orphaned references to deleted or renamed symbols.
+The `PipelineError::CommitExtract` variant referenced in
+`crates/sdi-cli/tests/exit_codes.rs` (coder-added, not tester-modified) is confirmed
+present in `crates/sdi-pipeline/src/error.rs:28`.
 
-**ISOLATION — PASS.** All three test files build their own fixture data via helper functions. No test reads mutable project files (`.tekhton/`, `.claude/`, build artifacts, config state).
+**ISOLATION — PASS (for `commit_snapshot.rs` and `commit_extract.rs`).** All nine tests
+in `commit_snapshot.rs` create their own `TempDir` git repos via factory functions. The
+six unit tests in `commit_extract.rs` operate on string literals with no filesystem
+access. The fixture-write issue is confined to `pipeline_smoke.rs` and noted above.
 
-**NAMING — PASS (with LOW exceptions noted above).** All other test function names encode the scenario and expected outcome clearly.
+**COVERAGE — PASS (for `commit_extract.rs`).** The six `normalize_to_utc` unit tests
+cover: UTC passthrough, negative-offset forward shift, positive-offset backward shift,
+malformed-input `None` return, positive-offset crossing midnight backward, and
+negative-offset crossing midnight forward. Both day-boundary directions are exercised,
+directly satisfying reviewer gap 2 from the TESTER_REPORT.
+
+**COVERAGE — PASS (for windowing, reviewer gap 1).** `change_coupling_window_clamped_
+to_commit_not_head` uses a purpose-built `setup_cochange_repo()` fixture and asserts
+exact `commits_analyzed` counts, pair counts, `cochange_count`, `frequency`, and
+lexicographic source/target ordering at both HEAD~1 and HEAD. This is the strongest test
+in the suite and directly satisfies reviewer gap 1.

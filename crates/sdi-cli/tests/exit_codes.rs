@@ -94,7 +94,6 @@ fn check_exits_ten_when_threshold_breached() {
     sdi()
         .arg("--repo").arg(repo.path())
         .arg("snapshot")
-        .arg("--commit").arg("aaa0000000000000000000000000000000000001")
         .assert()
         .success();
 
@@ -203,6 +202,49 @@ fn diff_nonexistent_file_exits_one() {
         .arg("diff")
         .arg("/nonexistent/prev.json")
         .arg("/nonexistent/curr.json")
+        .assert()
+        .code(1);
+}
+
+// ── snapshot --commit error paths ────────────────────────────────────────────
+
+#[test]
+fn snapshot_commit_nonexistent_exits_one() {
+    let repo = empty_repo();
+    // Make it a git repo so rev-parse can run (and fail on the unknown ref).
+    std::process::Command::new("git")
+        .current_dir(repo.path())
+        .args(["init"])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .current_dir(repo.path())
+        .args(["config", "user.email", "t@t.com"])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .current_dir(repo.path())
+        .args(["config", "user.name", "T"])
+        .status()
+        .unwrap();
+
+    sdi()
+        .arg("--repo").arg(repo.path())
+        .arg("snapshot")
+        .arg("--commit").arg("refs/heads/no-such-branch-xyz-99999")
+        .assert()
+        .code(1);
+}
+
+#[test]
+fn snapshot_commit_non_git_dir_exits_one() {
+    // A plain directory with no .git/ — git rev-parse will error.
+    let dir = empty_repo();
+
+    sdi()
+        .arg("--repo").arg(dir.path())
+        .arg("snapshot")
+        .arg("--commit").arg("HEAD")
         .assert()
         .code(1);
 }

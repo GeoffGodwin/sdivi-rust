@@ -1,12 +1,47 @@
-use assert_cmd::Command;
+use std::process::Command;
+
+use assert_cmd::Command as CargoBin;
 use tempfile::TempDir;
 
-fn sdi() -> Command {
-    Command::cargo_bin("sdi").expect("sdi binary must be built")
+fn sdi() -> CargoBin {
+    CargoBin::cargo_bin("sdi").expect("sdi binary must be built")
 }
 
 fn empty_repo() -> TempDir {
     tempfile::tempdir().unwrap()
+}
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .status()
+        .expect("git must be available");
+    assert!(status.success(), "git {args:?} failed");
+}
+
+/// Creates a git repo in `tmp` with `n` commits (each adding one .rs file)
+/// and one `sdi snapshot --commit HEAD` per commit. Returns the tempdir.
+fn setup_repo_with_n_snapshots(n: usize) -> TempDir {
+    let tmp = TempDir::new().unwrap();
+    let d = tmp.path();
+    git(d, &["init"]);
+    git(d, &["config", "user.email", "t@t.com"]);
+    git(d, &["config", "user.name", "T"]);
+
+    for i in 0..n {
+        let fname = format!("f{i}.rs");
+        std::fs::write(d.join(&fname), format!("fn f{i}() {{}}")).unwrap();
+        git(d, &["add", &fname]);
+        git(d, &["commit", "-m", &format!("add f{i}")]);
+        sdi()
+            .arg("--repo").arg(d)
+            .arg("snapshot")
+            .arg("--commit").arg("HEAD")
+            .assert()
+            .success();
+    }
+    tmp
 }
 
 /// `sdi trend` with 0 snapshots prints friendly message to stderr and exits 0.
@@ -54,19 +89,7 @@ fn trend_one_snapshot_prints_friendly_message() {
 /// `sdi trend --format json` with 2 snapshots emits valid JSON with `snapshot_count`.
 #[test]
 fn trend_json_two_snapshots_valid() {
-    let repo = empty_repo();
-    sdi()
-        .arg("--repo").arg(repo.path())
-        .arg("snapshot")
-        .arg("--commit").arg("aaa0000000000000000000000000000000000001")
-        .assert()
-        .success();
-    sdi()
-        .arg("--repo").arg(repo.path())
-        .arg("snapshot")
-        .arg("--commit").arg("bbb0000000000000000000000000000000000002")
-        .assert()
-        .success();
+    let repo = setup_repo_with_n_snapshots(2);
 
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -94,15 +117,7 @@ fn trend_json_two_snapshots_valid() {
 /// `sdi trend --last 9999` with 3 snapshots silently uses all 3 (no error).
 #[test]
 fn trend_last_n_larger_than_available_silently_clamps() {
-    let repo = empty_repo();
-    for sha in ["aaa", "bbb", "ccc"] {
-        sdi()
-            .arg("--repo").arg(repo.path())
-            .arg("snapshot")
-            .arg("--commit").arg(format!("{sha}0000000000000000000000000000000000001"))
-            .assert()
-            .success();
-    }
+    let repo = setup_repo_with_n_snapshots(3);
 
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -125,15 +140,7 @@ fn trend_last_n_larger_than_available_silently_clamps() {
 /// `sdi trend --last 2` with 3 snapshots uses only the 2 most recent.
 #[test]
 fn trend_last_n_selects_tail() {
-    let repo = empty_repo();
-    for sha in ["aaa", "bbb", "ccc"] {
-        sdi()
-            .arg("--repo").arg(repo.path())
-            .arg("snapshot")
-            .arg("--commit").arg(format!("{sha}0000000000000000000000000000000000001"))
-            .assert()
-            .success();
-    }
+    let repo = setup_repo_with_n_snapshots(3);
 
     let out = sdi()
         .arg("--repo").arg(repo.path())

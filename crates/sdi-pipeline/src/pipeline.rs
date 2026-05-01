@@ -21,8 +21,10 @@ use sdi_snapshot::{
 };
 use crate::cache::{load_cached_partition, save_cached_partition};
 pub use crate::time::current_timestamp;
+use crate::commit_extract::{commit_date_iso, extract_commit_tree, resolve_ref_to_sha};
 use crate::error::PipelineError;
-use crate::store::{write_snapshot, enforce_retention};
+use crate::helpers::{build_edge_weight_map, compute_path_partition};
+use crate::store::{enforce_retention, write_snapshot};
 
 /// Controls whether a snapshot is written to `.sdi/snapshots/` after capture.
 ///
@@ -77,11 +79,20 @@ impl Pipeline {
 
     /// Runs all five pipeline stages against `repo_root` and writes a snapshot.
     ///
+    /// When `commit` is `Some(reference)`:
+    /// - The reference is resolved to a full SHA via `git rev-parse`.
+    /// - The tree at that SHA is extracted to a tempdir for parsing.
+    /// - The snapshot's `timestamp` is the commit's commit-date (UTC), not the
+    ///   wall-clock time of the invocation. The supplied `timestamp` argument is
+    ///   **overridden** when `commit` is `Some`.
+    /// - Change-coupling history is collected ending at the resolved SHA.
+    /// - The tempdir is dropped before this function returns.
+    ///
     /// A missing `.sdi/boundaries.yaml` is **normal operation** (Rule 16).
     ///
     /// ## Errors
     ///
-    /// Returns [`PipelineError`] on I/O failure or config errors.
+    /// Returns [`PipelineError`] on I/O failure, config errors, or git errors.
     ///
     /// # Examples
     ///
@@ -110,6 +121,8 @@ impl Pipeline {
     /// (identical to [`Pipeline::snapshot`]).  [`WriteMode::EphemeralForCheck`]
     /// computes the snapshot in memory only — used by `sdi check --no-write`.
     ///
+    /// See [`Pipeline::snapshot`] for the `--commit REF` semantics.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -130,20 +143,35 @@ impl Pipeline {
         timestamp: &str,
         mode: WriteMode,
     ) -> Result<Snapshot, PipelineError> {
+        // ── Resolve commit reference (if supplied) ───────────────────────
+        // `_tempdir` is held here so the extracted tree lives for the full run.
+        let (parse_root_buf, effective_sha, effective_ts, _tempdir) =
+            if let Some(reference) = commit {
+                let sha = resolve_ref_to_sha(repo_root, reference)?;
+                let ts = commit_date_iso(repo_root, &sha)?;
+                let td = extract_commit_tree(repo_root, &sha)?;
+                let root = td.path().to_path_buf();
+                (root, Some(sha), ts, Some(td))
+            } else {
+                (repo_root.to_path_buf(), None, timestamp.to_string(), None)
+            };
+        let parse_root = parse_root_buf.as_path();
+
+        // ending_at drives the change-coupling window: None = HEAD, Some = REF.
+        let ending_at = effective_sha.as_deref();
+
         // ── Stage 1: Parsing ─────────────────────────────────────────────
-        let records = parse_repository(&self.config, repo_root, &self.adapters);
+        let records = parse_repository(&self.config, parse_root, &self.adapters);
         tracing::info!(count = records.len(), "parsed {} files", records.len());
 
         // System Rule 7: exit 3 when all detected languages lack grammars.
-        // An empty repo (no files) is normal; a repo with extensioned files
-        // outside the .sdi/ meta-directory that no adapter matches means we
-        // found source-like files we cannot parse.
         if records.is_empty() {
-            let sdi_dir = repo_root.join(".sdi");
-            let candidate_files = sdi_parsing::walker::collect_files(&self.config, repo_root);
-            let has_source_candidate = candidate_files.iter().any(|p| {
-                p.extension().is_some() && !p.starts_with(&sdi_dir)
-            });
+            let sdi_dir = parse_root.join(".sdi");
+            let candidate_files =
+                sdi_parsing::walker::collect_files(&self.config, parse_root);
+            let has_source_candidate = candidate_files
+                .iter()
+                .any(|p| p.extension().is_some() && !p.starts_with(&sdi_dir));
             if has_source_candidate {
                 return Err(PipelineError::NoGrammarsAvailable);
             }
@@ -158,16 +186,16 @@ impl Pipeline {
             min_frequency: self.config.change_coupling.min_frequency,
             history_depth: self.config.change_coupling.history_depth,
         };
+        // Always run against repo_root (has .git/); tempdir has no git history.
         let cc_events = crate::change_coupling::collect_cochange_events(
             repo_root,
             self.config.change_coupling.history_depth,
-            None,
-        ).unwrap_or_else(|e| {
+            ending_at,
+        )
+        .unwrap_or_else(|e| {
             tracing::warn!("change-coupling collection failed: {e}");
             vec![]
         });
-        // Only compute and store when there are actual commit events to analyze.
-        // None means "no git history" (not "analyzed but found nothing").
         let change_coupling_result = if cc_events.is_empty() {
             None
         } else {
@@ -202,14 +230,15 @@ impl Pipeline {
         let boundary_spec: Option<BoundarySpec> = BoundarySpec::load(&boundary_path)
             .unwrap_or(None);
 
+        let commit_label = effective_sha.as_deref();
         let mut snapshot = assemble_snapshot(
             metrics,
             partition,
             catalog,
             pattern_metrics,
             boundary_spec.as_ref(),
-            timestamp,
-            commit,
+            &effective_ts,
+            commit_label,
             change_coupling_result,
         );
         snapshot.path_partition = compute_path_partition(&dg, &snapshot.partition);
@@ -245,42 +274,3 @@ impl Pipeline {
         }
     }
 }
-
-/// Builds a `(min_idx, max_idx) → weight` map for weighted Leiden from
-/// change-coupling pairs. Weight = `1.0 + frequency` (multiplicative).
-/// Only pairs whose both endpoints exist in `dg` produce entries.
-fn build_edge_weight_map(
-    dg: &sdi_graph::dependency_graph::DependencyGraph,
-    ccr: &sdi_snapshot::change_coupling::ChangeCouplingResult,
-) -> std::collections::BTreeMap<(usize, usize), f64> {
-    let mut map = std::collections::BTreeMap::new();
-    for pair in &ccr.pairs {
-        let sp = std::path::Path::new(&pair.source);
-        let tp = std::path::Path::new(&pair.target);
-        if let (Some(si), Some(ti)) = (dg.node_for_path(sp), dg.node_for_path(tp)) {
-            let key = if si < ti { (si, ti) } else { (ti, si) };
-            map.insert(key, 1.0 + pair.frequency);
-        }
-    }
-    map
-}
-
-/// Builds a path→community mapping from a `DependencyGraph` and `LeidenPartition`.
-///
-/// The partition's numeric node indices are resolved to repo-relative path strings
-/// via the graph. Nodes with no valid UTF-8 path are silently dropped.
-fn compute_path_partition(
-    dg: &sdi_graph::dependency_graph::DependencyGraph,
-    partition: &sdi_detection::partition::LeidenPartition,
-) -> std::collections::BTreeMap<String, u32> {
-    let mut map = std::collections::BTreeMap::new();
-    for (&node_idx, &comm_id) in &partition.assignments {
-        if let Some(path) = dg.node_path(node_idx) {
-            if let Some(s) = path.to_str() {
-                map.insert(s.to_string(), comm_id as u32);
-            }
-        }
-    }
-    map
-}
-

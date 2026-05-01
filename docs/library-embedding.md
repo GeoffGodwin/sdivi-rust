@@ -250,6 +250,20 @@ See the `bindings/sdi-wasm/README.md` for the npm package setup and full API.
 | Snapshot writes | Yes | No |
 | Use when | Rust CLI / CI tooling | WASM, agent runtimes, custom extractors |
 
+## Historical commits and the pure-compute path
+
+`sdi snapshot --commit REF` is an `sdi-pipeline` / CLI convenience. It shells
+out to `git` to resolve the ref, extracts the tree, and feeds it through
+`sdi-pipeline::Pipeline::snapshot`. Embedders using the **pure-compute path**
+(`sdi-core`) do not need any of this machinery: they supply whatever source
+tree they have in hand directly to `compute_*` functions via `*Input` structs.
+
+For example, Meridian and other agent runtimes that maintain their own AST
+extractor simply call `sdi_core::detect_boundaries`, `compute_pattern_metrics`,
+etc. with pre-extracted data. They own the tree-at-commit extraction
+themselves (e.g. via the VSCode git index or their own `git archive` wrapper)
+and never call `Pipeline::snapshot` at all.
+
 ## Computing change-coupling from a foreign extractor
 
 If you have your own commit-history source (e.g., the VSCode git index in
