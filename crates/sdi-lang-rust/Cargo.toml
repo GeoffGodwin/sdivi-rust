@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Rust language adapter for sdi-rust"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "tree-sitter", "parsing", "rust"]
+categories = ["development-tools", "parser-implementations"]
 
 [features]
 lang-rust = []

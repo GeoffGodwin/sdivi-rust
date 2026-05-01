@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Pattern fingerprinting and catalog for sdi-rust"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "patterns", "fingerprint", "catalog"]
+categories = ["development-tools", "algorithms"]
 
 [features]
 # Enables the sdi-parsing dep and build_catalog(records) path.

@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "File discovery and AST parsing stage for sdi-rust"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "parsing", "tree-sitter", "ast"]
+categories = ["development-tools", "parser-implementations"]
 
 [features]
 # Enables ACTIVE_TREES counter for CST-drop invariant tests.

@@ -20,8 +20,14 @@ members = [
 ]
 resolver = "2"
 
+# Native binary release profile — thin LTO, stripped symbols, abort on panic.
+[profile.release]
+lto = "thin"
+strip = true
+panic = "abort"
+
 # Custom WASM release profile — smaller output at cost of longer link time.
-# wasm-pack build --release uses this profile when invoked with --profile release-wasm.
+# wasm-pack build --profile release-wasm uses this profile (wasm-pack 0.12+).
 [profile.release-wasm]
 inherits = "release"
 opt-level = "z"
@@ -29,7 +35,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.package]
-version = "0.0.16"
+version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -38,6 +44,7 @@ repository = "https://github.com/geoffgodwin/sdi-rust"
 [workspace.dependencies]
 # ── internal crates ──────────────────────────────────────────────────────────
 sdi-core     = { path = "crates/sdi-core" }
+sdi-cli      = { path = "crates/sdi-cli" }
 sdi-pipeline = { path = "crates/sdi-pipeline" }
 # default-features = false so crates can opt into features explicitly.
 # sdi-config: loader feature gates load_or_default / BoundarySpec::load.

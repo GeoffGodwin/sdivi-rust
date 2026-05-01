@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Dependency graph construction for sdi-rust"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "graph", "dependency", "coupling"]
+categories = ["development-tools", "algorithms", "data-structures"]
 
 [features]
 # Enables the sdi-parsing dep and build_dependency_graph(records) path.

@@ -1,4 +1,9 @@
 #### Milestone 13: Release Pipeline and Distribution
+<!-- milestone-meta
+id: "13"
+status: "done"
+-->
+
 
 **Scope:** Ship the v0 release. Tag-driven workflow publishes affected crates to crates.io and the WASM bundle to npm, both behind a manual approval gate. Matrix-built binaries attached to GitHub Releases. `cargo audit` weekly. Cut `0.1.0`.
 

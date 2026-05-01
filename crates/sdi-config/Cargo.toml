@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Configuration loading and validation for sdi-rust"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "config", "configuration", "metrics"]
+categories = ["development-tools"]
 
 [features]
 # Gates FS-touching code (Config::load_or_default, BoundarySpec::load, env

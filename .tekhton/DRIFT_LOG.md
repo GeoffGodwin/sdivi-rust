@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-01
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdi-rust ahead of mid-June reviews. Today's `sdi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -20,6 +20,8 @@
 - [2026-05-01 | "M12"] **`sdi-core` now re-exports inner-crate types** (`GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint`). These were previously only reachable via internal crate paths. The re-exports are additive (backward-compatible) but widen the public surface of sdi-core. Document in the "Module Boundaries" section of CLAUDE.md during M13 review.
 
 ## Unresolved Observations
+- [2026-05-01 | "Implement Milestone 13: Release Pipeline and Distribution"] [release.yml] The prior-cycle drift observation about the comment block (lines 13–16) showing wrong publish order has been **resolved** — the comment now accurately reflects the corrected order.
+- [2026-05-01 | "Implement Milestone 13: Release Pipeline and Distribution"] [CHANGELOG.md] Entries for `[0.0.1]`–`[0.0.16]` still contain internal development tracking noise (e.g. "Managed the human_action_required", "[MILESTONE 10 ✓]"). The coder noted this as out of scope. Flagged again so the user can clean it up before the public `0.1.0` tag.
 - [2026-05-01 | "M12"] `exports.rs:187-190` — `build_graph_metrics` converts string node IDs to `PathBuf::from(id)` to satisfy `GraphMetrics.top_hubs: Vec<(PathBuf, usize)>`; couples the WASM binding layer to an internal `sdi-graph` field type. If that field changes to `String` the mapping becomes dead code without a compile error at the binding layer.
 - [2026-05-01 | "M12"] `exports.rs:127-134` vs `exports.rs:55-61` — `WasmPriorPartition` is silently reused for two distinct Rust types (`sdi_core::PriorPartition` via serde round-trip in `detect_boundaries`, and `sdi_core::SnapshotPriorPartition` via manual struct construction in `infer_boundaries`). Safe today because both share identical serde field layouts; a future field change to either type will produce a silent runtime serialization failure, not a compile error.
 - [2026-05-01 | "M12"] `lib.rs:51-57` (SNAPSHOT_TS constant) — TypeScript interface declares `LeidenPartition.seed: number`, but the Rust field is `u64`; JavaScript `number` (IEEE-754 f64) cannot exactly represent seeds above 2^53. Default seed 42 is safe; the README or the TypeScript interface should document the limit.

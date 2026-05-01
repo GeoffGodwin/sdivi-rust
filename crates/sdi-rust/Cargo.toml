@@ -6,6 +6,14 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Structural Divergence Indexer — install-discovery meta-crate (see sdi-cli for the binary)"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "metrics", "code-analysis", "drift"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "sdi"
+path = "src/main.rs"
 
 [dependencies]
 sdi-core = { workspace = true }
+sdi-cli  = { workspace = true }

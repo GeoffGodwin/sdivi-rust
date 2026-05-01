@@ -28,3 +28,8 @@ Each entry captures why a structural change was made, preventing future develope
 - **Date**: 2026-05-01
 - **Rationale**: - ACP: wasm-pack --profile syntax (wasm-pack 0.12+) — ACCEPT. Correct fix for the `--release` + `--profile` Cargo flag conflict; documented in build.sh and wasm.yml.
 - **Source**: Accepted ACP from pipeline run
+
+## ADL-6: `sdi-cli` exposed as library target to enable `cargo install sdi-rust` (Task: "Implement Milestone 13: Release Pipeline and Distribution")
+- **Date**: 2026-05-01
+- **Rationale**: - ACP: `sdi-cli` exposed as library target to enable `cargo install sdi-rust` — **ACCEPT** (confirmed from cycle 1; no rework changed this decision).
+- **Source**: Accepted ACP from pipeline run

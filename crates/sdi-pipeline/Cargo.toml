@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Orchestration pipeline for the Structural Divergence Indexer — owns FS, clock, and atomic writes"
+readme = "README.md"
+keywords = ["sdi", "structural-divergence", "pipeline", "metrics", "analysis"]
+categories = ["development-tools"]
 
 [dependencies]
 sdi-core      = { workspace = true }
