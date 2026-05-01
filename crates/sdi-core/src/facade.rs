@@ -5,7 +5,7 @@
 //! call `crate::compute::*` directly; embedders that need to assemble or
 //! diff snapshots use these re-exports.
 
-/// Assemble a [`Snapshot`] from pipeline stage outputs.
+/// Assemble a [`crate::Snapshot`] from pipeline stage outputs.
 ///
 /// See [`sdi_snapshot::snapshot::assemble_snapshot`] for full documentation.
 pub use sdi_snapshot::snapshot::assemble_snapshot;
@@ -15,7 +15,7 @@ pub use sdi_snapshot::snapshot::assemble_snapshot;
 /// See [`sdi_snapshot::delta::compute_delta`] for full documentation.
 pub use sdi_snapshot::delta::compute_delta;
 
-/// Return a [`DivergenceSummary`] with all fields `None` (first-snapshot path).
+/// Return a [`crate::DivergenceSummary`] with all fields `None` (first-snapshot path).
 ///
 /// See [`sdi_snapshot::delta::null_summary`] for full documentation.
 pub use sdi_snapshot::delta::null_summary;

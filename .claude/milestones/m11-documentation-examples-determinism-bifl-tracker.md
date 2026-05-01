@@ -1,4 +1,9 @@
 #### Milestone 11: Documentation, Examples, Determinism Polish, bifl-tracker Validation
+<!-- milestone-meta
+id: "11"
+status: "done"
+-->
+
 
 **Scope:** Stand up the documentation surfaces (`README.md`, `docs/*.md`, rustdoc with `#![deny(missing_docs)]` on `sdi-core`). Doc tests in CI. Runnable examples covering both the orchestration path (`sdi-pipeline`) and the pure-compute path (`sdi-core`). Tighten determinism with `proptest` regression suite and FMA documentation. **Run sdi-rust end-to-end against bifl-tracker as the v0 validation gate** — this is the user-facing acceptance for "the rewrite produces the same answers." Failures here block 0.1.0 release.
 

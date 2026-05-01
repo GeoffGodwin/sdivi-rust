@@ -144,11 +144,16 @@ fn main() {
 /// Maps an `anyhow::Error` to the appropriate [`ExitCode`].
 ///
 /// `ConfigError` sources → [`ExitCode::ConfigError`] (2).
+/// `PipelineError::NoGrammarsAvailable` → [`ExitCode::AnalysisError`] (3).
 /// All other errors → [`ExitCode::RuntimeError`] (1).
 fn error_exit_code(e: &anyhow::Error) -> ExitCode {
     if e.downcast_ref::<sdi_config::ConfigError>().is_some() {
-        ExitCode::ConfigError
-    } else {
-        ExitCode::RuntimeError
+        return ExitCode::ConfigError;
     }
+    if let Some(pe) = e.downcast_ref::<sdi_pipeline::PipelineError>() {
+        if matches!(pe, sdi_pipeline::PipelineError::NoGrammarsAvailable) {
+            return ExitCode::AnalysisError;
+        }
+    }
+    ExitCode::RuntimeError
 }

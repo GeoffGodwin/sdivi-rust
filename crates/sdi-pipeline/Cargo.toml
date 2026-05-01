@@ -26,3 +26,4 @@ tempfile      = { workspace = true }
 tempfile      = { workspace = true }
 sdi-config    = { workspace = true }
 sdi-lang-rust = { workspace = true }
+proptest      = { workspace = true }

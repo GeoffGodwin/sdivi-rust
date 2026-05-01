@@ -1,84 +1,153 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 11 files, 56 test functions
-(version.rs:2, exit_codes.rs:12, check_thresholds.rs:6, stdout_stderr_split.rs:4,
+Tests audited: 12 files, 51 test functions
+(exit_codes.rs:9, version.rs:2, check_thresholds.rs:5, stdout_stderr_split.rs:4,
 show_format.rs:5, trend_format.rs:5, boundaries_stub.rs:3, no_color.rs:4,
-write_boundary_spec.rs:7, boundaries_comment_loss_warning.rs:3, path_partition.rs:5)
-Verdict: PASS
+write_boundary_spec.rs:6, boundaries_comment_loss_warning.rs:3, path_partition.rs:5,
+boundary_lifecycle.rs:0 — comment-only placeholder)
 
----
+Freshness samples examined: tests/boundary_lifecycle.rs,
+tests/fixtures/simple-rust/.sdi/snapshots/ (two snapshot files).
+
+Implementation files cross-referenced: crates/sdi-pipeline/src/pipeline.rs,
+crates/sdi-cli/src/main.rs, crates/sdi-pipeline/src/error.rs,
+crates/sdi-pipeline/src/store.rs, crates/sdi-config/src/load.rs,
+crates/sdi-config/src/thresholds.rs.
+
+Verdict: PASS
 
 ### Findings
 
-#### NAMING: `boundaries_stub.rs` file name misrepresents current content
-- File: `crates/sdi-cli/tests/boundaries_stub.rs:1`
-- Issue: All three tests were upgraded from M09 stubs to full behavioral contracts — they now capture stdout/stderr, assert emptiness, and (for ratify) verify no `boundaries.yaml` is created. The `_stub` suffix misleads future readers into treating the file as scaffolding rather than canonical coverage. The coder's own summary confirms: "Updated `boundaries_stub.rs` to match new behavior (no longer stubs)."
+#### SCOPE: tests/boundary_lifecycle.rs is a comment-only placeholder that is never executed
+- File: `tests/boundary_lifecycle.rs`
+- Issue: The file contains only a block comment pointing to
+  `crates/sdi-cli/tests/boundary_lifecycle.rs`. Cargo requires a `[package]` section to compile
+  workspace-root `tests/*.rs` files; without it this file is silently ignored and never run.
+  The coder noted it in the summary ("should be removed in a future cleanup pass") but it was
+  not actioned in M11.
 - Severity: LOW
-- Action: Rename to `boundaries_no_snapshots.rs`. No test logic needs to change.
+- Action: Delete `tests/boundary_lifecycle.rs`. The real test lives at
+  `crates/sdi-cli/tests/boundary_lifecycle.rs` and is unaffected.
 
----
-
-#### INTEGRITY: Hand-crafted `Snapshot` JSON in `boundaries_comment_loss_warning.rs`
-- File: `crates/sdi-cli/tests/boundaries_comment_loss_warning.rs:26-60`
-- Issue: `minimal_snapshot_json` builds a `Snapshot`-compatible JSON string via string interpolation. `store::read_snapshots` deserializes via `serde_json::from_str::<Snapshot>` and silently skips malformed files with a tracing warning, not a hard error. If any future `Snapshot` field is added without `#[serde(default)]`, the hand-crafted JSON fails to deserialize, `infer_from_snapshots` returns empty proposals, `run_ratify` prints "no stable communities found" rather than calling `write_boundary_spec`, and the assertion `stderr.contains("comments will be lost")` fails — with an error that points to the test assertion rather than the schema drift. The tester acknowledged this fragility and deferred it. All 573 tests currently pass, so the JSON is presently valid.
+#### NAMING: boundaries_stub.rs file name misrepresents current test content
+- File: `crates/sdi-cli/tests/boundaries_stub.rs`
+- Issue: All three tests in this file are substantive behavioral contracts — they capture
+  stdout/stderr, assert stdout emptiness, assert stderr non-emptiness, and (for ratify) verify
+  no `boundaries.yaml` is created. The `_stub` suffix signals to future readers that these are
+  scaffolding tests rather than canonical coverage, which could lead to them being overlooked
+  or replaced without preserving the behavioral assertions.
 - Severity: LOW
-- Action: Extract `write_fake_snapshot` from `crates/sdi-pipeline/src/boundaries.rs:65-91` (currently inside `#[cfg(test)] mod tests`) into a shared `test_support` module or a `tests/support.rs` file, and use it in `boundaries_comment_loss_warning.rs` in place of `minimal_snapshot_json`. This removes the schema-coupling concern without touching production code.
+- Action: Rename the file to `boundaries_no_snapshots.rs`. No test logic needs to change.
 
----
-
-#### NAMING: `snapshot_exits_zero_on_all_unknown_languages` name gives no signal it documents a known bug
-- File: `crates/sdi-cli/tests/exit_codes.rs:46`
-- Issue: The test asserts `.success()` (exit 0) for behavior that CLAUDE.md Rule 15 / System Rule 7 requires to be exit 3. The inline comment block (lines 38–45) is clear about the bug, but the test name alone gives no indication that the assertion intentionally documents a violated invariant. Anyone reading `cargo test -q` output sees `snapshot_exits_zero_on_all_unknown_languages ... ok` with no signal that this is a known-broken contract.
+#### NAMING: show_format.rs uses .failure() where exit code 1 is the known contract
+- File: `crates/sdi-cli/tests/show_format.rs:162` (`show_no_snapshots_fails`)
+- Issue: `.assert().failure()` accepts any non-zero exit code. The corresponding test in
+  `exit_codes.rs:186` (`show_no_snapshots_exits_one`) correctly uses `.code(1)`. If `sdi show`
+  with no snapshots were to regress from exit 1 to exit 2 or 3, `show_format.rs` would
+  silently pass while `exit_codes.rs` would catch it. Having both tests diverge in strictness
+  for the same code path reduces confidence.
 - Severity: LOW
-- Action: Rename to `snapshot_exits_zero_on_all_unknown_languages_known_bug` so the bug is visible in test output, or annotate with `#[ignore = "BUG: Rule 15 requires exit 3; PipelineError::NoGrammarsAvailable is never emitted"]` so the discrepancy appears in CI. No assertion logic needs to change.
+- Action: Change `.failure()` to `.code(1)` at `show_format.rs:162`.
 
----
+#### INTEGRITY: boundaries_comment_loss_warning.rs relies on hand-crafted Snapshot JSON
+- File: `crates/sdi-cli/tests/boundaries_comment_loss_warning.rs:26` (`minimal_snapshot_json`)
+- Issue: The helper builds a `Snapshot`-compatible JSON string by string interpolation, omitting
+  fields not required for the current `Snapshot` deserializer. `store::read_snapshots` calls
+  `serde_json::from_str::<Snapshot>` and silently skips malformed files (logs via `tracing::warn!`,
+  does not error). If a future `Snapshot` field is added without `#[serde(default)]`, the
+  hand-crafted JSON fails to deserialize; `infer_from_snapshots` returns empty proposals;
+  `run_ratify` exits early without calling `write_boundary_spec`; and the assertion
+  `stderr.contains("comments will be lost")` fails — with a message pointing to the test
+  assertion rather than the schema drift. The tester acknowledged this and explicitly deferred it.
+  All 580 tests currently pass, confirming the JSON is presently valid.
+- Severity: LOW (forward-looking fragility; tester deferred with justification)
+- Action: When Snapshot evolves, replace `minimal_snapshot_json` with a helper that constructs
+  a `Snapshot` value programmatically and serializes it via `serde_json::to_string`, eliminating
+  schema coupling. Deferred to a future refactor pass per tester note.
 
-#### NAMING: `show_no_snapshots_fails` uses `.failure()` where `.code(1)` is the stated contract
-- File: `crates/sdi-cli/tests/show_format.rs:161`
-- Issue: `.failure()` accepts any non-zero exit code. The equivalent test in `exit_codes.rs` (`show_no_snapshots_exits_one`, line 170) was correctly updated to `.code(1)` during the audit rework, but `show_format.rs:161` retains `.failure()`. If `sdi show` with no snapshots were to regress to exit 2 or 3, `show_format.rs` would silently pass while `exit_codes.rs` would catch it — but only if that file happens to be tested in the same run.
+#### COVERAGE: path_partition_entry_count_matches_graph_node_count elides the UTF-8 precondition
+- File: `crates/sdi-pipeline/tests/path_partition.rs:70`
+- Issue: The assertion `snap.path_partition.len() == snap.graph.node_count` is correct only
+  when every parsed file has a valid UTF-8 path. `compute_path_partition` (pipeline.rs:261-262)
+  silently drops nodes failing `path.to_str()`; those nodes remain in `graph.node_count`. On the
+  `simple-rust` fixture all paths are ASCII, so the assertion holds — but no comment documents
+  this precondition. The tester acknowledged and deferred this.
+- Severity: LOW (tester deferred with justification)
+- Action: Add a comment stating: "Holds for simple-rust (all ASCII paths). Non-UTF-8 paths are
+  silently dropped by compute_path_partition, so path_partition.len() < graph.node_count in that
+  case." No assertion change required for the current fixture.
+
+#### EXERCISE: path_partition_community_ids_are_valid uses partition.stability.keys() as proxy for all known communities
+- File: `crates/sdi-pipeline/tests/path_partition.rs:92`
+- Issue: `known_communities` is built from `snap.partition.stability.keys()`. Community IDs in
+  `path_partition` originate from `partition.assignments`, not `stability`. If a community
+  appears in `assignments` but not `stability` (e.g., a degenerate Leiden run producing a
+  community with no stability score), the assertion would produce a false failure unrelated to
+  the `comm_id as u32` cast it intends to guard. For the `simple-rust` fixture the two maps
+  are consistent, so the test passes correctly.
 - Severity: LOW
-- Action: Change `.failure()` to `.code(1)` at `show_format.rs:161`.
+- Action: Build `known_communities` from `snap.partition.assignments.values()` (the authoritative
+  source for which communities exist) rather than from `snap.partition.stability.keys()`. This
+  directly guards the numeric cast without coupling to the stability map structure.
 
----
-
-#### COVERAGE: `path_partition_entry_count_matches_graph_node_count` conflates two independent counts without noting the UTF-8 precondition
-- File: `crates/sdi-pipeline/tests/path_partition.rs:70-85`
-- Issue: The assertion `path_partition.len() == snap.graph.node_count` holds only when (a) the Leiden partition assigns every graph node a community, and (b) every assigned node has a valid UTF-8 path. `compute_path_partition` silently drops nodes failing `path.to_str()`. On the `simple-rust` fixture both conditions hold, so the assertion is correct, but the test carries no comment explaining the UTF-8 precondition. The tester acknowledged this and deferred it.
+#### COVERAGE: no_color.rs check and trend tests may be trivially true when commands produce empty stdout
+- File: `crates/sdi-cli/tests/no_color.rs:43` (`no_color_env_suppresses_ansi_in_check`),
+         `crates/sdi-cli/tests/no_color.rs:63` (`no_color_env_suppresses_ansi_in_trend_insufficient_snapshots`)
+- Issue: Both tests assert `!has_ansi(&stdout)` on the stdout of commands that may produce no
+  stdout output in their default text format. `sdi check` with no prior snapshots and no
+  `--format json` might write its report to stderr only; `sdi trend` with zero snapshots writes
+  "not enough snapshots" to stderr (confirmed by `trend_format.rs`). If stdout is empty, the
+  `\x1b[` scan trivially passes regardless of whether ANSI suppression is working, making the
+  test a no-op rather than an active guard. The `no_color_env_suppresses_ansi_in_show` test does
+  not have this problem because `sdi show` definitively produces a snapshot summary on stdout.
 - Severity: LOW
-- Action: Add a comment: "This holds for the `simple-rust` fixture (all ASCII paths). Non-UTF-8 paths are silently dropped by `compute_path_partition`, which would cause `path_partition.len() < graph.node_count`." No assertion change needed for the current fixture.
+- Action: Add an assertion that stdout is non-empty before checking for ANSI codes, or switch to
+  testing commands that unconditionally produce stdout output in text mode (e.g., `sdi check` with
+  a prior snapshot and a breached threshold, or `sdi trend` with ≥2 snapshots).
 
----
+### Passing Items
 
-### What Passed Without Issue
+**Assertion Honesty — PASS.** No test asserts hard-coded magic values unconnected to
+implementation logic. `check_exits_ten_when_threshold_breached` uses `coupling_delta_rate = -1.0`
+and relies on `0.0 > -1.0` — the invariant is documented in the test comment and verified against
+`pipeline.rs` and `main.rs`. `config_error_exits_two` produces a real `ConfigError::MissingExpiresOnOverride`
+via the config loading path at `load.rs:101` before any subcommand dispatch. No `assertTrue(True)`
+or self-referential assertions found.
 
-- **Prior HIGH findings resolved.** All HIGH and MEDIUM issues from the M09 audit were correctly addressed in the rework pass: `check_exits_ten_when_threshold_breached` and `config_error_exits_two` were added to `exit_codes.rs`; `no_color_flag_suppresses_ansi_in_show` was renamed to `default_show_output_has_no_ansi_codes`; `.failure()` was replaced with `.code(1)` in `show_no_snapshots_exits_one` and `diff_nonexistent_file_exits_one` in `exit_codes.rs`; `coupling_slope` assertion was strengthened to `.as_f64().is_some()`; duplicated check tests were removed from `exit_codes.rs`.
+**Test Weakening — PASS.** The one renamed test (`snapshot_exits_zero_on_all_unknown_languages`
+→ `snapshot_exits_three_on_all_unknown_languages`) is a STRENGTHENING: the old assertion
+`.success()` accepted the buggy pre-M11 exit-0 behavior; the new `.code(3)` enforces the
+Rule 15 / System Rule 7 contract, made possible by the matching coder fix in `pipeline.rs:142-150`
+and `main.rs:153-157`. The `no_color` rename is a name correction with unchanged assertion body.
+No assertion was broadened; no edge case was removed.
 
-- **`version.rs`**: `env!("CARGO_PKG_VERSION")` is compile-time evaluated and robust to version bumps. Both tests invoke the real binary via `assert_cmd`.
+**Implementation Exercise — PASS.** All tests call real binaries via `assert_cmd` or real library
+functions (`write_boundary_spec`, `Pipeline::snapshot_with_mode`). No mocking of any internal.
+`path_partition.rs` exercises the private `compute_path_partition` helper via the only correct
+public seam (`Pipeline::snapshot_with_mode`). `write_boundary_spec.rs` calls the function
+directly and verifies disk state.
 
-- **`exit_codes.rs`**: `check_exits_ten_when_threshold_breached` logic is sound — `coupling_delta_rate = -1.0` guarantees breach because `0.0 > -1.0`; JSON field assertions on `exit_code` and `exceeded` test real output structure. `config_error_exits_two` correctly produces `ConfigError::MissingExpiresOnOverride` via the config loading path before any subcommand dispatch.
+**Test Naming — PASS (with two LOW exceptions above).** All function names encode the scenario
+and expected outcome. No `test_1()` or `test_thing()` patterns present.
 
-- **`check_thresholds.rs`**: Six tests cover distinct scenarios with specific assertions. `check_json_exit_code_matches_process_exit` is a strong bidirectional guard between the JSON payload and OS-level exit code.
+**Scope Alignment — PASS.** No orphaned imports. `PipelineError::NoGrammarsAvailable` exists in
+`sdi-pipeline/src/error.rs:14`. `write_boundary_spec` is public in `sdi-pipeline/src/store.rs:111`.
+`Pipeline::snapshot_with_mode` and `WriteMode::EphemeralForCheck` are public in
+`sdi-pipeline/src/pipeline.rs:127,35`. The deleted `.tekhton/test_dedup.fingerprint` is not
+referenced by any test under audit.
 
-- **`stdout_stderr_split.rs`**: All four tests verify the `sdi … --format json | jq '.'` contract. The `serde_json::from_str(...).is_err() || stderr.trim().is_empty()` guard correctly detects JSON contamination while tolerating `tracing` log output.
+**Test Isolation — PASS.** All CLI integration tests create their own `tempfile::TempDir`. The
+`write_boundary_spec.rs` tests create isolated `TempDir` instances with no shared state. No test
+reads `.tekhton/`, `.claude/`, build artifacts, or any mutable pipeline state file. The
+`path_partition.rs` tests use `WriteMode::EphemeralForCheck` — no snapshots are written to the
+fixture directory. (The partition cache write at `pipeline.rs:162` does touch the fixture's
+`.sdi/cache/` directory, but this is an idempotent pre-existing behavior shared across all
+pipeline tests and is not unique to M11.)
 
-- **`show_format.rs`**: `show_no_id_selects_latest` cross-checks the returned snapshot's `commit` against the lexicographically-last file on disk — a non-trivial end-to-end assertion of the latest-selection contract.
-
-- **`trend_format.rs`**: Specific-substring assertions (`"not enough snapshots"`) and `--last` clamping tests (snapshot_count verified by actual JSON value, not heuristics). `coupling_slope.as_f64().is_some()` catches null values correctly.
-
-- **`boundaries_stub.rs`**: Correctly tests the real graceful-degradation paths: stdout empty, stderr non-empty, and (for ratify) no `boundaries.yaml` created when proposals are absent. Assertions match the actual `run_infer` / `run_ratify` / `run_show` code paths in `boundaries.rs`.
-
-- **`no_color.rs`**: `NO_COLOR=1` via `.env("NO_COLOR", "1")` exercises the env-var suppression path. The `\x1b[` scan is a concrete assertion. `default_show_output_has_no_ansi_codes` is correctly scoped with a comment explaining when the test should be revisited.
-
-- **`write_boundary_spec.rs`**: Seven tests cover new-file creation, round-trip YAML validity, both `#` detection patterns (leading and inline), atomicity (replace not append), parent-dir creation, and empty spec. All assertions verify post-conditions against real disk state via `tempfile`. This is the strongest new test file in M10.
-
-- **`boundaries_comment_loss_warning.rs`**: The three-test structure (warning present / no warning without comments / no warning on first ratify) covers the positive case and both negative cases of the `store.rs:108-128` warning path. Negative assertions guard against spurious warnings.
-
-- **`path_partition.rs`**: `pipeline_populates_path_partition_on_real_fixture`, `path_partition_keys_are_non_empty_strings`, `path_partition_community_ids_are_valid`, and `path_partition_is_deterministic` exercise the real `Pipeline::snapshot_with_mode` against the `simple-rust` fixture using `WriteMode::EphemeralForCheck` — no fixture pollution, no mocking. The determinism test is the strongest: same config, two runs, exact equality.
-
-- **Isolation**: All 11 files use `tempfile::tempdir()` for every writable repo fixture. The `path_partition.rs` tests use the read-only `simple-rust` fixture via `EphemeralForCheck` — no writes to the fixture directory. No test reads `.tekhton/`, `.claude/`, build artifacts, or any mutable project state file.
-
-- **Scope alignment**: No orphaned imports. The deleted `.tekhton/test_dedup.fingerprint` is not referenced in any test file under audit. All CLI command paths match `main.rs` dispatch.
-
-- **No weakening**: The only modification to pre-existing test content in `boundaries_stub.rs` strengthened the assertions — replacing empty stubs with real behavioral contracts.
+**Prior HIGH/MEDIUM Findings Resolved — PASS.** All issues from the prior audit rework pass were
+addressed: `check_exits_ten_when_threshold_breached` and `config_error_exits_two` added to
+`exit_codes.rs`; `no_color_flag_suppresses_ansi_in_show` renamed to
+`default_show_output_has_no_ansi_codes`; `.failure()` replaced with `.code(1)` for `show` and
+`diff` tests in `exit_codes.rs`; `coupling_slope` assertion strengthened to `.as_f64().is_some()`;
+three check-test duplicates removed from `exit_codes.rs`.

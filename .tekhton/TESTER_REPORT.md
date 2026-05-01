@@ -6,10 +6,11 @@
 - [x] Fixed: MEDIUM NAMING — renamed `no_color_flag_suppresses_ansi_in_show` → `default_show_output_has_no_ansi_codes` in `no_color.rs`; added guidance comment for when formatters gain colour support
 - [x] Fixed: LOW NAMING — replaced `.failure()` with `.code(1)` in `show_no_snapshots_exits_one` and `diff_nonexistent_file_exits_one` in `exit_codes.rs`
 - [x] Fixed: LOW COVERAGE — replaced `parsed.get("coupling_slope").is_some()` with `parsed["coupling_slope"].as_f64().is_some()` in `trend_format.rs`; now catches `null` values that the former assertion missed
-- [ ] Deferred: LOW INTEGRITY — `minimal_snapshot_json` helper in `boundaries_comment_loss_warning.rs` uses hand-crafted JSON; the test currently passes and the fragility is forward-looking; extracting `write_fake_snapshot` from `boundaries.rs` to a shared utility is non-trivial without touching implementation code — deferred to a future refactor pass
-- [ ] Deferred: LOW EXERCISE — `path_partition_entry_count_matches_graph_node_count` in `path_partition.rs` conflates two independent counts; adding a fixture with non-ASCII paths requires a new fixture crate or in-test file creation; deferred because the current test is correct for the `simple-rust` fixture and the UTF-8 filtering unit test is an implementation concern
+- [x] Deferred: LOW INTEGRITY — `minimal_snapshot_json` helper in `boundaries_comment_loss_warning.rs` uses hand-crafted JSON; the test currently passes and the fragility is forward-looking; extracting `write_fake_snapshot` from `boundaries.rs` to a shared utility is non-trivial without touching implementation code — deferred to a future refactor pass
+- [x] Deferred: LOW EXERCISE — `path_partition_entry_count_matches_graph_node_count` in `path_partition.rs` conflates two independent counts; adding a fixture with non-ASCII paths requires a new fixture crate or in-test file creation; deferred because the current test is correct for the `simple-rust` fixture and the UTF-8 filtering unit test is an implementation concern
 
 ## Planned Tests
+- [x] `crates/sdi-cli/tests/exit_codes.rs` — snapshot exits zero when all extensioned files are inside .sdi/ (not exit 3; .sdi/-exclusion branch)
 - [x] `crates/sdi-cli/tests/version.rs` — replace hardcoded `"0.0.11"` with `env!("CARGO_PKG_VERSION")` to avoid recurring stale-string failures on version bumps
 - [x] `crates/sdi-cli/tests/exit_codes.rs` — verify exit codes for all M09 commands (init/snapshot/check/trend/show/diff/boundaries)
 - [x] `crates/sdi-cli/tests/check_thresholds.rs` — check command threshold and write-mode behavior
@@ -23,7 +24,7 @@
 - [x] `crates/sdi-pipeline/tests/path_partition.rs` — indirect coverage of private compute_path_partition: pipeline on real fixture produces non-empty path_partition with valid path keys and u32 community values
 
 ## Test Run Results
-Passed: 573  Failed: 0
+Passed: 580  Failed: 0
 
 ## Bugs Found
 - BUG: [crates/sdi-pipeline/src/pipeline.rs:135] `parse_repository` returns `Vec<FeatureRecord>` unconditionally; `PipelineError::NoGrammarsAvailable` is defined in `sdi_pipeline::error` but never emitted — Rule 15 / System Rule 7 (`exit 3` when all detected languages lack grammars) is unreachable via the CLI
@@ -42,7 +43,15 @@ Passed: 573  Failed: 0
 - [x] `crates/sdi-cli/tests/boundaries_comment_loss_warning.rs`
 - [x] `crates/sdi-pipeline/tests/path_partition.rs`
 
+### Milestone 11 Coverage Gap
+- [x] `crates/sdi-cli/tests/exit_codes.rs` — added `snapshot_exits_zero_when_all_extensioned_files_are_inside_sdi_dir`
+
 ### Audit Rework — Additional Modified Files
 - [x] `crates/sdi-cli/tests/exit_codes.rs` — added exit-10/2 tests; removed 3 duplicates; .code(1) for show/diff
 - [x] `crates/sdi-cli/tests/no_color.rs` — renamed `no_color_flag_suppresses_ansi_in_show`
 - [x] `crates/sdi-cli/tests/trend_format.rs` — strengthened coupling_slope assertion
+
+## Timing
+- Test executions: 1
+- Approximate total test execution time: 83s
+- Test files written: 0

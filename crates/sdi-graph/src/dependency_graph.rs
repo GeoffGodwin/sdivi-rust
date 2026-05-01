@@ -1,4 +1,4 @@
-//! [`DependencyGraph`] construction from raw edges or [`FeatureRecord`] slices.
+//! [`DependencyGraph`] construction from raw edges or `FeatureRecord` slices.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -125,7 +125,7 @@ pub fn build_dependency_graph_from_edges(
     DependencyGraph { graph, path_to_node }
 }
 
-/// Builds a [`DependencyGraph`] from a slice of [`FeatureRecord`]s.
+/// Builds a [`DependencyGraph`] from a slice of `FeatureRecord`s.
 ///
 /// Each record becomes one node. Import strings are resolved against the set
 /// of known file paths; unresolvable imports are dropped at `DEBUG` level.

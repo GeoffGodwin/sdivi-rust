@@ -135,6 +135,21 @@ impl Pipeline {
         let records = parse_repository(&self.config, repo_root, &self.adapters);
         tracing::info!(count = records.len(), "parsed {} files", records.len());
 
+        // System Rule 7: exit 3 when all detected languages lack grammars.
+        // An empty repo (no files) is normal; a repo with extensioned files
+        // outside the .sdi/ meta-directory that no adapter matches means we
+        // found source-like files we cannot parse.
+        if records.is_empty() {
+            let sdi_dir = repo_root.join(".sdi");
+            let candidate_files = sdi_parsing::walker::collect_files(&self.config, repo_root);
+            let has_source_candidate = candidate_files.iter().any(|p| {
+                p.extension().is_some() && !p.starts_with(&sdi_dir)
+            });
+            if has_source_candidate {
+                return Err(PipelineError::NoGrammarsAvailable);
+            }
+        }
+
         // ── Stage 2: Graph ───────────────────────────────────────────────
         let dg = build_dependency_graph(&records);
         let metrics = compute_metrics(&dg);

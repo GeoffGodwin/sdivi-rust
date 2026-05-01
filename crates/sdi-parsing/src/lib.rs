@@ -4,7 +4,7 @@
 //! [`feature_record::FeatureRecord`] output type, and the
 //! [`parse::parse_repository`] entry point.
 //!
-//! When compiled with the `test-tree-counter` Cargo feature, [`ACTIVE_TREES`]
+//! When compiled with the `test-tree-counter` Cargo feature, `ACTIVE_TREES`
 //! is exposed so language adapters can track live CST objects in tests.
 
 pub mod adapter;

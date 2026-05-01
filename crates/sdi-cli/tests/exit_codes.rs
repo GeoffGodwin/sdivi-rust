@@ -33,17 +33,34 @@ fn snapshot_exits_zero_on_empty_repo() {
         .success();
 }
 
+// ── snapshot — .sdi/-only extensioned files ──────────────────────────────
+
+#[test]
+fn snapshot_exits_zero_when_all_extensioned_files_are_inside_sdi_dir() {
+    // Regression for the .sdi/-exclusion branch of the NoGrammarsAvailable
+    // check.  A repo where every extensioned file lives inside .sdi/ (e.g.
+    // cached snapshot JSON) is a normal empty-source repo and must NOT exit 3.
+    let repo = empty_repo();
+    let sdi_dir = repo.path().join(".sdi");
+    std::fs::create_dir_all(sdi_dir.join("snapshots")).unwrap();
+    // Place an extensioned file exclusively inside .sdi/ — no source files outside.
+    std::fs::write(
+        sdi_dir.join("snapshots").join("snapshot_20260101T000000_abcdef01.json"),
+        r#"{"snapshot_version":"1.0"}"#,
+    )
+    .unwrap();
+
+    sdi()
+        .arg("--repo").arg(repo.path())
+        .arg("snapshot")
+        .assert()
+        .success();
+}
+
 // ── snapshot — all-unknown-language repo ──────────────────────────────────
 
-// BUG: Rule 15 / CLAUDE.md System Rule 7 require exit 3 when all detected
-// languages lack tree-sitter grammars.  The current implementation never
-// produces PipelineError::NoGrammarsAvailable (parse_repository returns
-// Vec<FeatureRecord> and simply skips unrecognised extensions), so the
-// pipeline exits 0 with an empty snapshot instead of 3.
-// Tracking: PipelineError::NoGrammarsAvailable is defined but never emitted;
-// error_exit_code() in main.rs has no downcast for it either.
 #[test]
-fn snapshot_exits_zero_on_all_unknown_languages() {
+fn snapshot_exits_three_on_all_unknown_languages() {
     let repo = empty_repo();
     // Create a file with an extension that no built-in adapter handles.
     std::fs::write(repo.path().join("code.xyzunknown"), "not a real language\n").unwrap();
@@ -52,8 +69,7 @@ fn snapshot_exits_zero_on_all_unknown_languages() {
         .arg("--repo").arg(repo.path())
         .arg("snapshot")
         .assert()
-        // Per Rule 15 this should be .code(3); current implementation exits 0.
-        .success();
+        .code(3);
 }
 
 // ── check — exit 10 when a threshold is breached ─────────────────────────
