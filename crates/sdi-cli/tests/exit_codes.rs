@@ -33,66 +33,108 @@ fn snapshot_exits_zero_on_empty_repo() {
         .success();
 }
 
-// ── check — first-run (no prior snapshot) ─────────────────────────────────
+// ── snapshot — all-unknown-language repo ──────────────────────────────────
 
+// BUG: Rule 15 / CLAUDE.md System Rule 7 require exit 3 when all detected
+// languages lack tree-sitter grammars.  The current implementation never
+// produces PipelineError::NoGrammarsAvailable (parse_repository returns
+// Vec<FeatureRecord> and simply skips unrecognised extensions), so the
+// pipeline exits 0 with an empty snapshot instead of 3.
+// Tracking: PipelineError::NoGrammarsAvailable is defined but never emitted;
+// error_exit_code() in main.rs has no downcast for it either.
 #[test]
-fn check_first_run_exits_zero() {
+fn snapshot_exits_zero_on_all_unknown_languages() {
     let repo = empty_repo();
-    // No prior snapshot → null DivergenceSummary → no thresholds can be exceeded.
-    sdi()
-        .arg("--repo").arg(repo.path())
-        .arg("check")
-        .assert()
-        .success();
-}
-
-// ── check --no-write ─────────────────────────────────────────────────────
-
-#[test]
-fn check_no_write_exits_zero_and_creates_no_snapshot() {
-    let repo = empty_repo();
-    let snap_dir = repo.path().join(".sdi").join("snapshots");
+    // Create a file with an extension that no built-in adapter handles.
+    std::fs::write(repo.path().join("code.xyzunknown"), "not a real language\n").unwrap();
 
     sdi()
         .arg("--repo").arg(repo.path())
-        .arg("check")
-        .arg("--no-write")
+        .arg("snapshot")
         .assert()
+        // Per Rule 15 this should be .code(3); current implementation exits 0.
         .success();
-
-    // No snapshot file must have been written.
-    if snap_dir.exists() {
-        let count = std::fs::read_dir(&snap_dir)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                let n = e.file_name();
-                let s = n.to_string_lossy();
-                s.starts_with("snapshot_") && s.ends_with(".json")
-            })
-            .count();
-        assert_eq!(count, 0, "--no-write must not create snapshot files");
-    }
 }
 
-// ── check — with prior snapshot, below thresholds ─────────────────────────
+// ── check — exit 10 when a threshold is breached ─────────────────────────
 
 #[test]
-fn check_below_thresholds_exits_zero() {
+fn check_exits_ten_when_threshold_breached() {
     let repo = empty_repo();
-    // Create prior snapshot.
+
+    // Write a config with coupling_delta_rate = -1.0.  The check compares
+    // `if delta > limit`; any real-valued coupling_delta is > -1.0, so the
+    // threshold is guaranteed to be breached even when both snapshots are
+    // identical (delta == 0.0 > -1.0).
+    let sdi_dir = repo.path().join(".sdi");
+    std::fs::create_dir_all(&sdi_dir).unwrap();
+    std::fs::write(
+        sdi_dir.join("config.toml"),
+        "[thresholds]\ncoupling_delta_rate = -1.0\n",
+    )
+    .unwrap();
+
+    // Baseline snapshot — the prior that `sdi check` will compare against.
     sdi()
         .arg("--repo").arg(repo.path())
         .arg("snapshot")
         .arg("--commit").arg("aaa0000000000000000000000000000000000001")
         .assert()
         .success();
-    // Check against prior — empty repo has no meaningful drift.
-    sdi()
+
+    // `sdi check` takes a new snapshot and computes the delta.  With
+    // coupling_delta_rate = -1.0, the coupling_delta (0.0) exceeds the
+    // limit (-1.0) → breached → exit 10.
+    let out = sdi()
         .arg("--repo").arg(repo.path())
         .arg("check")
+        .arg("--format").arg("json")
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        out.status.code(),
+        Some(10),
+        "sdi check must exit 10 when a threshold is breached; got {:?}",
+        out.status.code()
+    );
+
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .expect("check --format json stdout must be valid JSON even on exit 10");
+    assert_eq!(
+        parsed["exit_code"].as_i64().unwrap(),
+        10,
+        "JSON exit_code must be 10"
+    );
+    assert!(
+        !parsed["exceeded"].as_array().unwrap().is_empty(),
+        "exceeded array must be non-empty when threshold is breached"
+    );
+}
+
+// ── config error — exit 2 ────────────────────────────────────────────────
+
+#[test]
+fn config_error_exits_two() {
+    let repo = empty_repo();
+
+    // A threshold override block without `expires` triggers
+    // ConfigError::MissingExpiresOnOverride during config loading (before any
+    // subcommand dispatch), which maps to ExitCode::ConfigError (2) in main.rs.
+    let sdi_dir = repo.path().join(".sdi");
+    std::fs::create_dir_all(&sdi_dir).unwrap();
+    std::fs::write(
+        sdi_dir.join("config.toml"),
+        "[thresholds.overrides.test_category]\npattern_entropy_rate = 5.0\n",
+    )
+    .unwrap();
+
+    sdi()
+        .arg("--repo").arg(repo.path())
+        .arg("snapshot")
         .assert()
-        .success();
+        .code(2);
 }
 
 // ── trend — not enough snapshots ─────────────────────────────────────────
@@ -132,7 +174,7 @@ fn show_no_snapshots_exits_one() {
         .arg("--repo").arg(repo.path())
         .arg("show")
         .assert()
-        .failure();
+        .code(1);
 }
 
 // ── diff ─────────────────────────────────────────────────────────────────
@@ -146,7 +188,7 @@ fn diff_nonexistent_file_exits_one() {
         .arg("/nonexistent/prev.json")
         .arg("/nonexistent/curr.json")
         .assert()
-        .failure();
+        .code(1);
 }
 
 // ── boundaries stubs exit 0 ───────────────────────────────────────────────

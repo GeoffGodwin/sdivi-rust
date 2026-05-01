@@ -1,3 +1,6 @@
+//! Tests that `sdi boundaries {infer,ratify,show}` handle the no-snapshots /
+//! no-spec case gracefully: exit 0, no stdout, informational message to stderr.
+
 use assert_cmd::Command;
 use tempfile::TempDir;
 
@@ -9,9 +12,10 @@ fn empty_repo() -> TempDir {
     tempfile::tempdir().unwrap()
 }
 
-/// `sdi boundaries infer` exits 0 and writes only to stderr.
+/// `sdi boundaries infer` on a repo with no snapshots exits 0 and reports to
+/// stderr (no stdout output).
 #[test]
-fn boundaries_infer_exits_zero_stderr_only() {
+fn boundaries_infer_no_snapshots_exits_zero_stderr_only() {
     let repo = empty_repo();
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -20,21 +24,22 @@ fn boundaries_infer_exits_zero_stderr_only() {
         .output()
         .unwrap();
 
-    assert!(out.status.success(), "boundaries infer must exit 0");
+    assert!(out.status.success(), "boundaries infer must exit 0; status={}", out.status);
     assert!(
         out.stdout.is_empty(),
-        "boundaries infer must not write to stdout"
+        "boundaries infer must not write to stdout when there are no proposals"
     );
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(
-        stderr.contains("not implemented"),
-        "boundaries infer must print 'not implemented' to stderr; got: {stderr}"
+        !stderr.is_empty(),
+        "boundaries infer must print an informational message to stderr"
     );
 }
 
-/// `sdi boundaries ratify` exits 0 and writes only to stderr.
+/// `sdi boundaries ratify` on a repo with no snapshots exits 0 and reports to
+/// stderr (no stdout output, no file written).
 #[test]
-fn boundaries_ratify_exits_zero_stderr_only() {
+fn boundaries_ratify_no_snapshots_exits_zero_stderr_only() {
     let repo = empty_repo();
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -43,21 +48,28 @@ fn boundaries_ratify_exits_zero_stderr_only() {
         .output()
         .unwrap();
 
-    assert!(out.status.success(), "boundaries ratify must exit 0");
+    assert!(out.status.success(), "boundaries ratify must exit 0; status={}", out.status);
     assert!(
         out.stdout.is_empty(),
-        "boundaries ratify must not write to stdout"
+        "boundaries ratify must not write to stdout when there is nothing to ratify"
     );
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(
-        stderr.contains("not implemented"),
-        "boundaries ratify must print 'not implemented' to stderr; got: {stderr}"
+        !stderr.is_empty(),
+        "boundaries ratify must print an informational message to stderr"
+    );
+    // No boundaries.yaml should have been created.
+    let boundary_file = repo.path().join(".sdi").join("boundaries.yaml");
+    assert!(
+        !boundary_file.exists(),
+        "boundaries ratify with no proposals must not create boundaries.yaml"
     );
 }
 
-/// `sdi boundaries show` exits 0 and writes only to stderr.
+/// `sdi boundaries show` on a repo with no `boundaries.yaml` exits 0 and
+/// reports to stderr (no stdout output).
 #[test]
-fn boundaries_show_exits_zero_stderr_only() {
+fn boundaries_show_no_spec_exits_zero_stderr_only() {
     let repo = empty_repo();
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -66,14 +78,14 @@ fn boundaries_show_exits_zero_stderr_only() {
         .output()
         .unwrap();
 
-    assert!(out.status.success(), "boundaries show must exit 0");
+    assert!(out.status.success(), "boundaries show must exit 0; status={}", out.status);
     assert!(
         out.stdout.is_empty(),
-        "boundaries show must not write to stdout"
+        "boundaries show must not write to stdout when no spec exists"
     );
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(
-        stderr.contains("not implemented"),
-        "boundaries show must print 'not implemented' to stderr; got: {stderr}"
+        !stderr.is_empty(),
+        "boundaries show must print an informational message to stderr when no spec"
     );
 }

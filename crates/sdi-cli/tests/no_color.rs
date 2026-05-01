@@ -77,9 +77,14 @@ fn no_color_env_suppresses_ansi_in_trend_insufficient_snapshots() {
     );
 }
 
-/// `--no-color sdi show` produces no ANSI escape codes on stdout.
+/// `sdi show` (no flags, no env) produces no ANSI escape codes on stdout.
+///
+/// The text formatter does not emit ANSI codes by default.  This test
+/// verifies that invariant holds without any suppression flag.  A separate
+/// test should be added once any formatter gains colour support — it should
+/// assert codes ARE present by default and absent with `--no-color`.
 #[test]
-fn no_color_flag_suppresses_ansi_in_show() {
+fn default_show_output_has_no_ansi_codes() {
     let repo = empty_repo_with_snapshot();
     let out = sdi()
         .arg("--repo").arg(repo.path())
@@ -87,12 +92,10 @@ fn no_color_flag_suppresses_ansi_in_show() {
         .output()
         .unwrap();
 
-    // Our text formatter doesn't emit ANSI codes regardless; this verifies
-    // the invariant is maintained even without the flag.
     assert!(out.status.success());
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(
         !has_ansi(&stdout),
-        "sdi show stdout must not contain ANSI codes; got: {stdout:?}"
+        "sdi show stdout must not contain ANSI codes by default; got: {stdout:?}"
     );
 }

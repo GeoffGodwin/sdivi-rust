@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-cli"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -884,6 +884,7 @@ dependencies = [
  "sdi-patterns",
  "sdi-pipeline",
  "serde_json",
+ "serde_yml",
  "tempfile",
  "tracing",
  "tracing-subscriber",
@@ -892,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-config"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "chrono",
  "dirs",
@@ -906,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-core"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "chrono",
  "sdi-config",
@@ -922,7 +923,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-detection"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "proptest",
  "rand",
@@ -939,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-graph"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "petgraph",
  "sdi-config",
@@ -954,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-go"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -963,7 +964,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-java"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -972,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-javascript"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -981,7 +982,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-python"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -990,7 +991,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-rust"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-config",
  "sdi-parsing",
@@ -1001,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-typescript"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1010,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-parsing"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "globset",
  "ignore",
@@ -1028,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-patterns"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "blake3",
  "globset",
@@ -1043,7 +1044,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-pipeline"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-config",
  "sdi-core",
@@ -1062,14 +1063,14 @@ dependencies = [
 
 [[package]]
 name = "sdi-rust"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "sdi-core",
 ]
 
 [[package]]
 name = "sdi-snapshot"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "blake3",
  "proptest",

@@ -32,6 +32,25 @@ pub struct BoundaryDef {
 }
 
 impl BoundarySpec {
+    /// Serialises this spec to a YAML string.
+    ///
+    /// Does not touch the filesystem — I/O is the caller's responsibility.
+    /// Comments in any prior user-written file are lost on the next write
+    /// (see `docs/migrating-from-sdi-py.md`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sdi_config::BoundarySpec;
+    ///
+    /// let spec = BoundarySpec { version: None, boundaries: vec![] };
+    /// let yaml = spec.to_yaml();
+    /// assert!(yaml.contains("boundaries"));
+    /// ```
+    pub fn to_yaml(&self) -> String {
+        serde_yml::to_string(self).unwrap_or_default()
+    }
+
     /// Load a boundary specification from a YAML file.
     ///
     /// Returns `Ok(None)` if the file does not exist (missing is normal, not an error).

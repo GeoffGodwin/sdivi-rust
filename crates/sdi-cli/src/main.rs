@@ -125,7 +125,9 @@ fn main() {
         Some(Commands::Show { id, format }) => {
             commands::show::run(&cli.repo, &config, id.as_deref(), &format)
         }
-        Some(Commands::Boundaries { subcmd }) => commands::boundaries::run(subcmd),
+        Some(Commands::Boundaries { subcmd }) => {
+            commands::boundaries::run(subcmd, &cli.repo, &config)
+        }
         None => {
             eprintln!("sdi: no subcommand given — try `sdi --help`");
             return;

@@ -156,7 +156,7 @@ impl Pipeline {
         let boundary_spec: Option<BoundarySpec> = BoundarySpec::load(&boundary_path)
             .unwrap_or(None);
 
-        let snapshot = assemble_snapshot(
+        let mut snapshot = assemble_snapshot(
             metrics,
             partition,
             catalog,
@@ -165,6 +165,7 @@ impl Pipeline {
             timestamp,
             commit,
         );
+        snapshot.path_partition = compute_path_partition(&dg, &snapshot.partition);
 
         if let WriteMode::Persist = mode {
             let snapshot_dir = repo_root.join(&self.config.snapshots.dir);
@@ -229,6 +230,25 @@ fn compute_pattern_metrics_from_catalog(
         total_entropy,
         convention_drift,
     }
+}
+
+/// Builds a path→community mapping from a `DependencyGraph` and `LeidenPartition`.
+///
+/// The partition's numeric node indices are resolved to repo-relative path strings
+/// via the graph. Nodes with no valid UTF-8 path are silently dropped.
+fn compute_path_partition(
+    dg: &sdi_graph::dependency_graph::DependencyGraph,
+    partition: &sdi_detection::partition::LeidenPartition,
+) -> std::collections::BTreeMap<String, u32> {
+    let mut map = std::collections::BTreeMap::new();
+    for (&node_idx, &comm_id) in &partition.assignments {
+        if let Some(path) = dg.node_path(node_idx) {
+            if let Some(s) = path.to_str() {
+                map.insert(s.to_string(), comm_id as u32);
+            }
+        }
+    }
+    map
 }
 
 /// Returns the current UTC time as an ISO 8601 string.

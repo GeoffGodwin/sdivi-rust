@@ -115,6 +115,15 @@ pub struct Snapshot {
     /// `None` (omitted from JSON) when no `.sdi/boundaries.yaml` was present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intent_divergence: Option<IntentDivergenceInfo>,
+    /// File-path → community-ID assignments for boundary inference.
+    ///
+    /// Maps each source file's repo-relative path to its community ID from the
+    /// Leiden partition at snapshot time. Populated by `sdi-pipeline` from the
+    /// `DependencyGraph` + `LeidenPartition`. Absent (empty) in snapshots
+    /// produced without path context (e.g., pure-compute path); boundary
+    /// inference from such snapshots yields no proposals.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub path_partition: BTreeMap<String, u32>,
 }
 
 /// Assembles a [`Snapshot`] from pipeline stage outputs.
@@ -171,6 +180,7 @@ pub fn assemble_snapshot(
         catalog,
         pattern_metrics,
         intent_divergence,
+        path_partition: BTreeMap::new(),
     }
 }
 

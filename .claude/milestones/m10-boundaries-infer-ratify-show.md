@@ -1,4 +1,9 @@
 #### Milestone 10: Boundaries — Infer, Ratify, Show
+<!-- milestone-meta
+id: "10"
+status: "done"
+-->
+
 
 **Scope:** Implement the boundary lifecycle: infer modules from a `LeidenPartition` (using the pure `sdi_core::infer_boundaries` function delivered in M08), ratify them into `.sdi/boundaries.yaml`, and inspect via `show`. Comment loss on programmatic write is accepted per KDD-6.
 

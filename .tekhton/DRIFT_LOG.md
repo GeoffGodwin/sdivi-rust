@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-04-30
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdi-rust ahead of mid-June reviews. Today's `sdi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -15,6 +15,9 @@
   - **Files updated this cycle:** `CLAUDE.md` (KDD-12, KDD-13, Module Boundaries, Repository Layout, Critical System Rules 21–23, "What Not to Build Yet"); `.claude/milestones/MANIFEST.cfg`; `.claude/milestones/m08-sdi-core-pure-compute-reshape.md` (new); `.claude/milestones/m09-trend-check-show-remaining-cli-commands.md` (rewritten from old m08); `.claude/milestones/m10-boundaries-infer-ratify-show.md` (rewritten from old m09); `.claude/milestones/m11-documentation-examples-determinism-bifl-tracker.md` (rewritten from old m10); `.claude/milestones/m12-wasm-crate-and-consumer-app-integration.md` (new); `.claude/milestones/m13-release-pipeline-and-distribution.md` (rewritten from old m11). Old `m12-bindings-pyo3-and-napi-rs-post-mvp.md` retained as v1-era post-MVP placeholder (already excluded from manifest).
 
 ## Unresolved Observations
+- [2026-04-30 | "Implement Milestone 10: Boundaries — Infer, Ratify, Show"] `crates/sdi-pipeline/src/store.rs` — `read_snapshots` and `latest_snapshot` each implement identical directory-listing and sorting logic (filter `snapshot_*.json`, sort by filename). Extract to a private `list_snapshot_entries(dir)` helper to eliminate the duplication.
+- [2026-04-30 | "Implement Milestone 10: Boundaries — Infer, Ratify, Show"] `crates/sdi-snapshot/src/boundary_inference.rs:152` — `count_stable_tail` comment says "Walk pairs from newest-1 backwards" but the loop checks individual preceding partitions, not explicit pairs. Semantics are correct; the comment is slightly misleading.
+- [2026-04-30 | "Implement Milestone 10: Boundaries — Infer, Ratify, Show"] `crates/sdi-cli/src/commands/boundaries.rs:93` — Ratified `BoundarySpec` sets `version: None`. Auto-ratified specs could set `version: Some("1.0".to_string())` for forward-compat explicitness, consistent with `SNAPSHOT_VERSION`.
 - [2026-04-30 | "Implement Milestone 9: Trend, Check, Show — Remaining CLI Commands"] `crates/sdi-cli/tests/version.rs:14` — Hardcoded version string is a systemic pattern that will break again on the next version bump. Low-risk but predictably recurring toil; replace with `env!("CARGO_PKG_VERSION")` when touching this file next.
 - [2026-04-30 | "architect audit"] These entries remain in DRIFT_LOG.md for the indicated cycle:
 - [2026-04-30 | "architect audit"] **`[2026-04-29 | "M08"] crates/sdi-core/tests/compute_thresholds_check.rs:96-104 — override_expiry_ignored_when_expired passes for wrong reason`** — Deferred to M09 start. The test currently passes because `cfg.overrides` is accepted but never read in M08's `compute_thresholds_check`. When M09 wires per-category overrides, a companion test must be added that uses an **active** (unexpired) override raising the limit above the test value and asserts the breach is suppressed — proving the override mechanism fires correctly, not just that defaults apply. Without that companion, the expiry test has no meaningful contrast case. Action owner: M09 coder, first task before wiring override logic.

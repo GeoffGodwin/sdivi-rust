@@ -1,8 +1,10 @@
-//! Snapshot persistence helpers — atomic write, retention, and read utilities.
+//! Snapshot and boundary persistence helpers — atomic write, retention, and read utilities.
 //!
 //! Re-exports the write helpers from `sdi-snapshot`; the read utilities
 //! (listing snapshots, loading by id, loading the latest) live here.
+//! Boundary YAML write (atomic tempfile + rename) also lives here.
 
+use std::io::Write as _;
 use std::path::Path;
 
 pub use sdi_snapshot::store::{iso_to_filename_safe, write_snapshot};
@@ -98,4 +100,40 @@ pub fn read_snapshot_by_id(dir: &Path, id: &str) -> std::io::Result<Snapshot> {
         })?;
     serde_json::from_str(&content)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
+/// Writes `spec` atomically to `path` (tempfile in parent dir + rename).
+///
+/// If `path` already exists and contains YAML comments (`#`), a warning is
+/// printed to stderr — comment loss on ratify is documented behaviour (KDD-6).
+///
+/// Creates parent directories if they do not exist.
+pub fn write_boundary_spec(
+    spec: &sdi_config::BoundarySpec,
+    path: &Path,
+) -> std::io::Result<()> {
+    if path.exists() {
+        let existing = std::fs::read_to_string(path)?;
+        if existing.lines().any(|l| {
+            let trimmed = l.trim_start();
+            trimmed.starts_with('#') || trimmed.contains(" #")
+        }) {
+            eprintln!(
+                "sdi: warning: '{}' contains YAML comments — comments will be lost \
+                 after ratify (see docs/migrating-from-sdi-py.md)",
+                path.display()
+            );
+        }
+    }
+
+    let yaml = spec.to_yaml();
+    let parent = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(parent)?;
+
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(yaml.as_bytes())?;
+    tmp.persist(path).map_err(|e| e.error)?;
+
+    tracing::debug!(path = %path.display(), "boundary spec written");
+    Ok(())
 }

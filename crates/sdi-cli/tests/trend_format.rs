@@ -85,8 +85,9 @@ fn trend_json_two_snapshots_valid() {
         "snapshot_count must be 2"
     );
     assert!(
-        parsed.get("coupling_slope").is_some(),
-        "trend JSON must contain 'coupling_slope'"
+        parsed["coupling_slope"].as_f64().is_some(),
+        "trend JSON 'coupling_slope' must be a concrete float with ≥2 snapshots, got: {}",
+        parsed["coupling_slope"]
     );
 }
 
