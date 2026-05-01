@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.0.12] - 2026-04-30
+
+### Added
+- M08 (`sdi-core` Pure-Compute Reshape) was already implemented in a prior session (milestone status: "done"). The workspace had one stale failing test from that implementation: (M08)
 ## [0.0.11] - 2026-04-30
 
 ### Added
