@@ -5,7 +5,6 @@ use std::path::Path;
 use anyhow::Result;
 use sdi_config::Config;
 use sdi_pipeline::{Pipeline, current_timestamp};
-use sdi_parsing::adapter::LanguageAdapter;
 
 use crate::output;
 
@@ -20,7 +19,7 @@ use crate::output;
 ///
 /// Returns an error if the pipeline fails or if output serialization fails.
 pub fn run(repo_root: &Path, config: &Config, commit: Option<&str>, format: &str) -> Result<()> {
-    let adapters = all_adapters();
+    let adapters = super::all_adapters();
     let pipeline = Pipeline::new(config.clone(), adapters);
 
     let timestamp = current_timestamp();
@@ -44,15 +43,5 @@ pub fn run(repo_root: &Path, config: &Config, commit: Option<&str>, format: &str
     Ok(())
 }
 
-/// Returns one instance of every built-in language adapter.
-fn all_adapters() -> Vec<Box<dyn LanguageAdapter>> {
-    vec![
-        Box::new(sdi_lang_rust::RustAdapter),
-        Box::new(sdi_lang_python::PythonAdapter),
-        Box::new(sdi_lang_typescript::TypeScriptAdapter),
-        Box::new(sdi_lang_javascript::JavaScriptAdapter),
-        Box::new(sdi_lang_go::GoAdapter),
-        Box::new(sdi_lang_java::JavaAdapter),
-    ]
-}
+
 

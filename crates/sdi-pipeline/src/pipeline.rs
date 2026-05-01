@@ -25,6 +25,19 @@ use crate::cache::{load_cached_partition, save_cached_partition};
 use crate::error::PipelineError;
 use crate::store::{write_snapshot, enforce_retention};
 
+/// Controls whether a snapshot is written to `.sdi/snapshots/` after capture.
+///
+/// `Persist` is the default for `sdi snapshot`; `EphemeralForCheck` is used
+/// by `sdi check --no-write` when the caller wants threshold evaluation without
+/// polluting snapshot history.  This is the designated seam for any future
+/// dry-run feature.
+pub enum WriteMode {
+    /// Write the snapshot to `.sdi/snapshots/` and enforce retention.
+    Persist,
+    /// Compute the snapshot in memory only — no write, no retention.
+    EphemeralForCheck,
+}
+
 /// The five-stage analysis pipeline.
 ///
 /// `Pipeline` is the primary entry point for embedding sdi in Rust programs.
@@ -89,6 +102,35 @@ impl Pipeline {
         commit: Option<&str>,
         timestamp: &str,
     ) -> Result<Snapshot, PipelineError> {
+        self.snapshot_with_mode(repo_root, commit, timestamp, WriteMode::Persist)
+    }
+
+    /// Runs all five pipeline stages; write behaviour is controlled by `mode`.
+    ///
+    /// [`WriteMode::Persist`] writes to `.sdi/snapshots/` and enforces retention
+    /// (identical to [`Pipeline::snapshot`]).  [`WriteMode::EphemeralForCheck`]
+    /// computes the snapshot in memory only — used by `sdi check --no-write`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use sdi_pipeline::{Pipeline, WriteMode};
+    /// use sdi_config::Config;
+    /// use std::path::Path;
+    ///
+    /// let pipeline = Pipeline::new(Config::default(), vec![]);
+    /// let snap = pipeline.snapshot_with_mode(
+    ///     Path::new("."), None, "2026-04-29T00:00:00Z", WriteMode::EphemeralForCheck,
+    /// )?;
+    /// # Ok::<(), sdi_pipeline::PipelineError>(())
+    /// ```
+    pub fn snapshot_with_mode(
+        &self,
+        repo_root: &Path,
+        commit: Option<&str>,
+        timestamp: &str,
+        mode: WriteMode,
+    ) -> Result<Snapshot, PipelineError> {
         // ── Stage 1: Parsing ─────────────────────────────────────────────
         let records = parse_repository(&self.config, repo_root, &self.adapters);
         tracing::info!(count = records.len(), "parsed {} files", records.len());
@@ -124,11 +166,13 @@ impl Pipeline {
             commit,
         );
 
-        let snapshot_dir = repo_root.join(&self.config.snapshots.dir);
-        write_snapshot(&snapshot, &snapshot_dir)
-            .map_err(PipelineError::SnapshotIo)?;
-        enforce_retention(&snapshot_dir, self.config.snapshots.retention)
-            .map_err(PipelineError::SnapshotIo)?;
+        if let WriteMode::Persist = mode {
+            let snapshot_dir = repo_root.join(&self.config.snapshots.dir);
+            write_snapshot(&snapshot, &snapshot_dir)
+                .map_err(PipelineError::SnapshotIo)?;
+            enforce_retention(&snapshot_dir, self.config.snapshots.retention)
+                .map_err(PipelineError::SnapshotIo)?;
+        }
 
         Ok(snapshot)
     }

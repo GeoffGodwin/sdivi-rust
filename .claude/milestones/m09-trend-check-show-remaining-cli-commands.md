@@ -1,4 +1,9 @@
 #### Milestone 9: Trend, Check, Show — Remaining CLI Commands
+<!-- milestone-meta
+id: "9"
+status: "done"
+-->
+
 
 **Scope:** The four remaining CLI commands — `trend`, `check`, `show`, plus the `boundaries` parent (subcommands in Milestone 10). Wire the threshold-exceeded exit-10 contract through the pure `sdi-core::compute_thresholds_check` function delivered in M08. Polish stdout/stderr discipline and JSON output shape.
 

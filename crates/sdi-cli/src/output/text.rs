@@ -1,6 +1,6 @@
 // Text/table output formatter.
 
-use sdi_core::{DivergenceSummary, Snapshot};
+use sdi_core::{DivergenceSummary, Snapshot, ThresholdCheckResult, TrendResult};
 use sdi_patterns::{PatternCatalog, PatternStats};
 
 /// Prints `catalog` as human-readable text to stdout.
@@ -74,6 +74,50 @@ pub fn print_divergence(summary: &DivergenceSummary) {
     println!(
         "boundary_violation_delta:{}",
         fmt_opt_i64(summary.boundary_violation_delta)
+    );
+}
+
+/// Prints `sdi check` result as human-readable text to stdout.
+pub fn print_check(result: &ThresholdCheckResult, summary: &DivergenceSummary) {
+    if result.breached {
+        println!("check: FAILED — {} threshold(s) exceeded", result.breaches.len());
+        for b in &result.breaches {
+            println!(
+                "  {}: {:.6} > {:.6} (limit)",
+                b.dimension, b.actual, b.limit
+            );
+        }
+    } else {
+        println!("check: OK — all thresholds within limits");
+    }
+    println!();
+    print_divergence(summary);
+}
+
+/// Prints `sdi trend` result as human-readable text to stdout.
+pub fn print_trend(result: &TrendResult) {
+    fn fmt_slope(v: Option<f64>) -> String {
+        match v {
+            Some(x) => format!("{x:+.6}"),
+            None => "null".to_string(),
+        }
+    }
+    println!("snapshots in window: {}", result.snapshot_count);
+    println!(
+        "pattern_entropy_slope:   {}",
+        fmt_slope(result.pattern_entropy_slope)
+    );
+    println!(
+        "convention_drift_slope:  {}",
+        fmt_slope(result.convention_drift_slope)
+    );
+    println!(
+        "coupling_slope:          {}",
+        fmt_slope(result.coupling_slope)
+    );
+    println!(
+        "community_count_slope:   {}",
+        fmt_slope(result.community_count_slope)
     );
 }
 

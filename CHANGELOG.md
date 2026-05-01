@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.0.13] - 2026-04-30
+
+### Added
+- [MILESTONE 08 ✓] feat: M08 (M9)
 
 ## [0.0.12] - 2026-04-30
 

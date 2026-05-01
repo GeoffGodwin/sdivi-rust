@@ -171,6 +171,7 @@ fn local_move_phase(
             state.add_node(graph, node, best_comm);
             any_moved = true;
         } else {
+            // node index is always < n; offset community IDs are >= n, so this singleton ID cannot collide
             let target = if state.size[old_comm] == 0 { node } else { old_comm };
             state.add_node(graph, node, target);
         }

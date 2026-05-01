@@ -21,4 +21,5 @@ pub mod pipeline;
 pub mod store;
 
 pub use error::PipelineError;
-pub use pipeline::{Pipeline, current_timestamp};
+pub use pipeline::{Pipeline, WriteMode, current_timestamp};
+pub use store::{latest_snapshot, read_snapshot_by_id, read_snapshots};
