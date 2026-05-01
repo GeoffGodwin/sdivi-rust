@@ -1,23 +1,36 @@
 # Reviewer Report
-Review cycle: 1 of 2
+**Date:** 2026-05-01
+**Audit cycle:** post-M16 (non-blocking notes sweep, cycle 2)
+**Reviewer:** Code Review Agent
+
+---
 
 ## Verdict
 APPROVED_WITH_NOTES
 
+---
+
 ## Complex Blockers (senior coder)
 - None
+
+---
 
 ## Simple Blockers (jr coder)
 - None
 
+---
+
 ## Non-Blocking Notes
-- `crates/sdi-pipeline/src/commit_extract.rs:46` — All three security findings (MEDIUM: rev-parse missing `--` separator; LOW: tar missing `--no-absolute-filenames`; LOW: stderr truncation) are marked `fixable:yes` in the security report but were explicitly not addressed. The coder's claim "no code change required" is incorrect — the security agent flagged these as code changes. The MEDIUM finding (adding `"--"` between `"--verify"` and `reference`) is a one-liner. Recommend addressing in the next cleanup pass.
-- `crates/sdi-core/src/input/mod.rs:16-17` — `pub use edge_weight::{...}` appears before its `mod edge_weight;` declaration. Valid Rust, but conventional order is `mod` declaration first, then re-exports. Low friction to reorder.
+- Three security-agent findings in `crates/sdi-pipeline/src/commit_extract.rs` remain unfixed: MEDIUM (rev-parse without `--` separator at line 40-47), LOW (tar without `--no-absolute-filenames` at line 115-120), LOW (stderr verbatim in error variants at line 13-33). Coder dismissed all three as "handled by security pipeline / informational." All three were marked `fixable:yes` by the security agent and each requires a one-line code change. They should be applied in the next sweep rather than carried indefinitely as deferred non-blocking items.
+
+---
 
 ## Coverage Gaps
-- `edge_weight_key` wrong-order path: no test passes `source > target` to `edge_weight_key` and exercises the `boundaries.rs:109` normalisation fallback (`if si < ti { (si, ti) } else { (ti, si) }`). Should be a unit test in `leiden_config_serde.rs` or `boundaries.rs` tests to confirm the graceful fallback is intentional.
+- None
+
+---
 
 ## Drift Observations
-- `crates/sdi-core/src/input/edge_weight.rs:14` — doc says `source < target` is required but the invariant is not enforced at runtime. `boundaries.rs:109` already normalises index order, so a mis-ordered single key still works. Only two keys mapping to the same edge pair would silently collide (last iteration wins in `BTreeMap::collect`). The doc is misleading — either enforce with a debug_assert or rewrite the doc to say "callers should canonicalise; detection normalises".
-- Pre-existing compiler warnings not introduced by this task but noted by the coder as out-of-scope: unused `pub(crate) validate_and_prune_overrides` (`sdi-config/src/thresholds.rs:46`), unused import `tracing::debug` (`sdi-graph/src/dependency_graph.rs:9`), dead code in `sdi-patterns/src/catalog.rs`. These are accumulating and worth a dedicated cleanup pass.
-- `crates/sdi-core/src/compute/boundaries.rs:174` — `let _ = &current_communities;` with comment "used for future extension" is dead code and a TODO stub that should live in the issue tracker, not the source.
+- `bindings/sdi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.
+- `bindings/sdi-wasm/src/types.rs:46-48` — `WasmLeidenConfigInput` missing `edge_weights` tracked as ADL-4. Verify ADL-4 actually exists in the architecture log; if not, create the entry so the gap is formally tracked.
+- `.tekhton/NON_BLOCKING_LOG.md` — all 9 items are marked `[x]` (resolved) but items 3, 6, and 7 were deferred rather than fixed. The log offers no way to distinguish "resolved by fixing" from "resolved by deferring," which will obscure the true open count in future audits. Consider a `[deferred]` marker for clarity.

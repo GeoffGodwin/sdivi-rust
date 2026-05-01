@@ -33,3 +33,8 @@ Each entry captures why a structural change was made, preventing future develope
 - **Date**: 2026-05-01
 - **Rationale**: - ACP: `sdi-cli` exposed as library target to enable `cargo install sdi-rust` — **ACCEPT** (confirmed from cycle 1; no rework changed this decision).
 - **Source**: Accepted ACP from pipeline run
+
+## ADL-7: WASM `change_coupling` field hardcoded to `None` in MVP (Task: "M16 Non-Blocking Notes Sweep")
+- **Date**: 2026-05-01
+- **Rationale**: WASM bindings for `assemble_snapshot` hardcode `change_coupling: None` because `compute_change_coupling` is not yet exposed in the WASM API. This is an MVP limitation. Post-MVP, add `change_coupling` field to `WasmAssembleSnapshotInput` and expose `compute_change_coupling` as a WASM export. Tracked in `bindings/sdi-wasm/src/exports.rs:160-162` with TODO comment.
+- **Source**: Non-blocking notes from post-M16 review cycle

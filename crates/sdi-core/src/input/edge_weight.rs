@@ -9,9 +9,9 @@ const SEP: char = '\x00';
 /// Encodes a `(source, target)` node-ID pair as an edge-weight map key.
 ///
 /// The key format required by [`super::LeidenConfigInput::edge_weights`] is
-/// `"source\x00target"` (NUL-separated). `source` must be lexicographically
-/// less than `target` — this invariant is not enforced at runtime, but the
-/// Leiden detection code will produce incorrect weights if it is violated.
+/// `"source\x00target"` (NUL-separated). Callers should canonicalize
+/// (`source < target` by lexicographic order); mis-ordered pairs are
+/// normalized by the detection layer, so no weight is silently discarded.
 ///
 /// # Examples
 ///

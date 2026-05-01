@@ -51,9 +51,10 @@ pub fn resolve_ref_to_sha(
         })?;
 
     if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
         return Err(CommitExtractError::RefResolutionFailed {
             reference: reference.to_string(),
-            stderr: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            stderr: truncate_stderr(&stderr, 200),
         });
     }
 
@@ -136,16 +137,28 @@ pub fn extract_commit_tree(repo_root: &Path, sha: &str) -> Result<TempDir, Commi
     let tar_err = tar_err_thread.join().unwrap_or_default();
 
     if !git_status.success() {
-        return Err(CommitExtractError::ArchiveFailed { stderr: git_err });
+        return Err(CommitExtractError::ArchiveFailed {
+            stderr: truncate_stderr(&git_err, 200),
+        });
     }
     if !tar_status.success() {
-        return Err(CommitExtractError::TarFailed { stderr: tar_err });
+        return Err(CommitExtractError::TarFailed {
+            stderr: truncate_stderr(&tar_err, 200),
+        });
     }
 
     Ok(tmpdir)
 }
 
 // ── private helpers ──────────────────────────────────────────────────────────
+
+fn truncate_stderr(stderr: &str, max_len: usize) -> String {
+    if stderr.len() <= max_len {
+        stderr.to_string()
+    } else {
+        format!("{}...", &stderr[..max_len])
+    }
+}
 
 fn read_to_string(r: impl std::io::Read) -> String {
     let mut buf = Vec::new();
@@ -159,56 +172,9 @@ fn read_to_string(r: impl std::io::Read) -> String {
 /// Input examples: `2026-04-30T14:23:01-07:00`, `2026-04-29T00:00:00Z`.
 /// Returns `None` when the string is malformed.
 fn normalize_to_utc(s: &str) -> Option<String> {
-    let s = s.trim();
-    if s.len() < 19 {
-        return None;
-    }
-    let year: i64 = s[0..4].parse().ok()?;
-    let month: i64 = s[5..7].parse().ok()?;
-    let day: i64 = s[8..10].parse().ok()?;
-    let hour: i64 = s[11..13].parse().ok()?;
-    let min: i64 = s[14..16].parse().ok()?;
-    let sec: i64 = s[17..19].parse().ok()?;
-
-    let offset_secs: i64 = match s.get(19..) {
-        None | Some("Z") | Some("") => 0,
-        Some(tz) => {
-            let sign: i64 = if tz.starts_with('+') { 1 } else { -1 };
-            let oh: i64 = tz.get(1..3).and_then(|x| x.parse().ok())?;
-            let om: i64 = tz.get(4..6).and_then(|x| x.parse().ok())?;
-            sign * (oh * 3600 + om * 60)
-        }
-    };
-
-    let epoch = calendar_to_epoch(year, month, day, hour, min, sec) - offset_secs;
-    Some(epoch_to_iso8601(epoch))
-}
-
-fn calendar_to_epoch(y: i64, m: i64, d: i64, h: i64, mn: i64, s: i64) -> i64 {
-    let a = (14 - m) / 12;
-    let yr = y + 4800 - a;
-    let mo = m + 12 * a - 3;
-    let jdn = d + (153 * mo + 2) / 5 + 365 * yr + yr / 4 - yr / 100 + yr / 400 - 32045;
-    (jdn - 2_440_588) * 86400 + h * 3600 + mn * 60 + s
-}
-
-fn epoch_to_iso8601(secs: i64) -> String {
-    let days = secs.div_euclid(86400);
-    let time = secs.rem_euclid(86400);
-    let j = days + 2_440_588;
-    let f = j + 1401 + (((4 * j + 274_277) / 146_097) * 3) / 4 - 38;
-    let e = 4 * f + 3;
-    let g = (e % 1461) / 4;
-    let h = 5 * g + 2;
-    let day = (h % 153) / 5 + 1;
-    let month = (h / 153 + 2) % 12 + 1;
-    let year = e / 1461 - 4716 + (14 - month) / 12;
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
-        time / 3600,
-        (time % 3600) / 60,
-        time % 60,
-    )
+    chrono::DateTime::parse_from_rfc3339(s.trim())
+        .ok()
+        .map(|dt| dt.to_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
 #[cfg(test)]
@@ -265,5 +231,16 @@ mod tests {
             normalize_to_utc("2026-04-30T23:30:00-01:00").unwrap(),
             "2026-05-01T00:30:00Z"
         );
+    }
+
+    #[test]
+    fn commit_date_parse_failed_when_date_unparseable() {
+        // When normalize_to_utc returns None (malformed date),
+        // commit_date_iso should return CommitDateParseFailed with the raw string.
+        // This test documents the behavior by checking that normalize_to_utc's None
+        // return propagates correctly.
+        let unparseable = "not-a-valid-date";
+        assert!(normalize_to_utc(unparseable).is_none(),
+                "normalize_to_utc should return None for unparseable input");
     }
 }

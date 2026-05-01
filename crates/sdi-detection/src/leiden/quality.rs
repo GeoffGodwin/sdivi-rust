@@ -1,3 +1,5 @@
+//! Per-community stability (internal edge density) computation.
+
 use std::collections::BTreeMap;
 use super::graph::LeidenGraph;
 

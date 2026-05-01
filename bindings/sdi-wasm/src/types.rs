@@ -43,7 +43,9 @@ pub enum WasmQualityFunction {
     Cpm,
 }
 
-/// Leiden algorithm configuration. `edge_weights` is absent — WASM Leiden is always unweighted.
+/// Leiden algorithm configuration. INTENTIONAL GAP: omits `LeidenConfigInput.edge_weights` —
+/// WASM bindings expose unweighted Leiden only (ADL-4). When adding fields to
+/// `LeidenConfigInput`, mirror here unless the field is pipeline-only.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmLeidenConfigInput {

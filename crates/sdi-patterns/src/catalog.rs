@@ -130,6 +130,7 @@ pub fn build_catalog(
     PatternCatalog { entries }
 }
 
+#[cfg(feature = "pipeline-records")]
 fn build_globset(patterns: &[String]) -> Option<GlobSet> {
     if patterns.is_empty() {
         return None;
@@ -143,6 +144,7 @@ fn build_globset(patterns: &[String]) -> Option<GlobSet> {
     builder.build().ok()
 }
 
+#[cfg(feature = "pipeline-records")]
 fn is_excluded(path: &std::path::Path, exclude_set: &Option<GlobSet>) -> bool {
     match exclude_set {
         None => false,

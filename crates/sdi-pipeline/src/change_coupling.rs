@@ -83,11 +83,9 @@ pub fn collect_cochange_events(
     Ok(reversed)
 }
 
-/// Parses the NUL-separated output of `git log -z --name-only --format=%x00COMMIT%x00%H%x00%cI%x00`.
-///
-/// Each commit block looks like:
-///   \0COMMIT\0<sha>\0<date>\0\n\nfile1\nfile2\n\0COMMIT\0...
-/// We split on the sentinel `COMMIT` token (surrounded by NULs).
+/// Parses output of `git log --name-only --format=%x00COMMIT%x00%H%x00%cI%x00` where
+/// commit-header tokens are NUL-delimited and file names within each commit block
+/// are newline-separated.
 fn parse_git_log_output(raw: &str) -> Vec<CoChangeEventInput> {
     let parts: Vec<&str> = raw.split('\0').collect();
     let mut events = Vec::new();

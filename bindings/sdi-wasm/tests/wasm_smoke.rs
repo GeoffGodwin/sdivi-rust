@@ -317,3 +317,44 @@ fn test_compute_trend_with_multiple_snapshots_returns_nonzero_slopes() {
     assert!(result.convention_drift_slope.is_some());
     assert!(result.community_count_slope.is_some());
 }
+
+// ── ADL-4 & ADL-7 Verification Tests ────────────────────────────────────────
+
+/// ADL-4 verification: WasmLeidenConfigInput must NOT have an `edge_weights` field.
+/// This is an intentional MVP gap documented in the ARCHITECTURE_LOG.md.
+/// WASM bindings expose unweighted Leiden only.
+#[wasm_bindgen_test]
+fn test_adl4_wasm_leiden_config_input_omits_edge_weights() {
+    // Create a config with all fields that are present
+    let config = WasmLeidenConfigInput {
+        seed: 42,
+        gamma: 1.0,
+        iterations: 100,
+        quality: WasmQualityFunction::Modularity,
+    };
+
+    // Verify that config can be created without edge_weights field
+    // (if edge_weights were required, this would not compile)
+    assert_eq!(config.seed, 42);
+    assert_eq!(config.gamma, 1.0);
+    assert_eq!(config.iterations, 100);
+
+    // The absence of edge_weights is verified by type system at compile time
+    // This test confirms the struct shape matches the WASM-only surface
+}
+
+/// ADL-7 verification: assemble_snapshot must hardcode change_coupling to None in MVP.
+/// This is an intentional MVP limitation documented in the ARCHITECTURE_LOG.md.
+/// Post-MVP, expose `compute_change_coupling` in WASM and add field to input.
+#[wasm_bindgen_test]
+fn test_adl7_assemble_snapshot_change_coupling_is_none() {
+    let snap_js = assemble_snapshot(make_assemble_input(0.25, "2026-05-01T00:00:00Z")).unwrap();
+    let snap: sdi_core::Snapshot =
+        serde_wasm_bindgen::from_value(snap_js).expect("must deserialize as Snapshot");
+
+    // Verify that change_coupling is None (MVP limitation)
+    assert!(
+        snap.change_coupling.is_none(),
+        "change_coupling must be None in MVP (ADL-7 — hardcoded to None)"
+    );
+}

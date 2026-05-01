@@ -133,7 +133,7 @@ pub fn detect_boundaries(
         .map(|(&comm, &density)| (comm as u32, density))
         .collect();
 
-    let historical_stability = compute_historical_stability(prior, &cluster_assignments);
+    let historical_stability = compute_historical_stability(prior);
 
     let component_count = sdi_graph::metrics::compute_metrics(&dg).component_count as u32;
 
@@ -149,15 +149,11 @@ pub fn detect_boundaries(
 
 /// Computes the fraction of consecutive prior-partition pairs that agree with
 /// the current cluster assignments (by node-set membership).
-fn compute_historical_stability(
-    prior: &[PriorPartition],
-    current: &BTreeMap<String, u32>,
-) -> f64 {
+fn compute_historical_stability(prior: &[PriorPartition]) -> f64 {
     if prior.len() < 2 {
         return 0.0;
     }
 
-    let current_communities = invert_assignments(current);
     let n_pairs = (prior.len() - 1) as f64;
     let mut matching = 0.0f64;
 
@@ -170,8 +166,6 @@ fn compute_historical_stability(
         }
     }
 
-    // Also measure how similar the prior history is to the current.
-    let _ = &current_communities; // used for future extension
     matching / n_pairs
 }
 
