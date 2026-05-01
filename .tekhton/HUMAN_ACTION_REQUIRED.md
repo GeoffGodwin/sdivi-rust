@@ -6,7 +6,6 @@ all items are resolved.
 
 ## Action Items
 
-- [ ] **`CLAUDE.md` § Code Conventions — add doc comment placement rule.** Inserting a `pub fn` immediately before an existing documented `pub fn` silently re-attaches the existing function's doc block to the new function. This has recurred across three milestone runs. Proposed addition: *"When inserting a function or item immediately before an existing documented item, verify that a non-`///` line separates the two doc blocks. A `///` comment block attaches to the next item — displacing an existing comment is a silent correctness bug, not a style issue."*
-
 ## Resolved
 
+- [x] **`CLAUDE.md` § Code Conventions — add doc comment placement rule.** Resolved 2026-05-01: added a `Doc comment placement when inserting items` bullet under `## Code Conventions` → `Doc discipline` in `CLAUDE.md`. Captures the `///`-attaches-to-next-item invariant and notes that `#![deny(missing_docs)]` only catches it on `sdi-core`.

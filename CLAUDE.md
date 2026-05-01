@@ -7,7 +7,7 @@ sdi-rust is the Rust reimplementation of the Structural Divergence Indexer (SDI)
 **Languages:**
 - Rust
 
-**Frameworks and key dependencies:** `tree-sitter` (AST parsing, native Rust crate, per-language grammars gated by Cargo features), `petgraph` (graph representation; KDD-5 ratified no CSR view), `clap` v4 with derive macros (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yml` (maintained `serde_yaml` fork) + `toml` (serialization), `rand` with `StdRng` (explicit seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs), `chrono` (M08+, `default-features = false` in sdi-core to avoid the clock feature). M12 adds `wasm-bindgen` + `tsify` + `serde-wasm-bindgen` for `bindings/sdi-wasm`. PyO3 (`sdi-py`) and napi-rs (`sdi-node`) remain post-MVP.
+**Frameworks and key dependencies:** `tree-sitter` (AST parsing, per-language grammars gated by Cargo features), `petgraph` (graph representation; KDD-5 — no CSR view), `clap` v4 with derive (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yml` + `toml` (serialization), `rand` with `StdRng` (seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs), `chrono` with `default-features = false` in sdi-core to avoid the clock feature. M12 adds `wasm-bindgen` + `tsify` + `serde-wasm-bindgen` for `bindings/sdi-wasm`. PyO3 (`sdi-py`) and napi-rs (`sdi-node`) remain post-MVP.
 
 **Target platforms and deployment model:**
 - Tier 1: Linux x86_64 + aarch64 (CI on `ubuntu-latest`); macOS x86_64 + aarch64 (CI on `macos-latest`)
@@ -120,49 +120,31 @@ caller assembles its own report (the consumer app, agent runtime, etc.)
 
 ## Repository Layout
 
-Workspace shape (file-level detail for the M08+ frontier; established crates summarised):
-
 ```
 sdi-rust/
 ├── Cargo.toml, Cargo.lock, rust-toolchain.toml, rustfmt.toml, clippy.toml, deny.toml
 ├── README.md, CHANGELOG.md, MIGRATION_NOTES.md, DRIFT_LOG.md, LICENSE, NOTICE
-├── .github/workflows/   ci.yml · release.yml · audit.yml · verify-leiden.yml · wasm.yml (M12)
+├── .github/workflows/   ci.yml · release.yml · audit.yml · verify-leiden.yml · wasm.yml
 ├── .tekhton/DESIGN.md
 ├── crates/
-│   ├── sdi-core/                        # M08 reshape: pure-compute facade, WASM-compatible (KDD-12)
-│   │   └── src/
-│   │       ├── lib.rs                   # re-exports + #![deny(missing_docs)]
-│   │       ├── input.rs                 # DependencyGraphInput, PatternInstanceInput, …
-│   │       ├── compute/{coupling,boundaries,patterns,thresholds,normalize}.rs
-│   │       ├── facade.rs                # re-exports compute_delta, assemble_snapshot, compute_trend, infer_boundaries
-│   │       ├── exit_code.rs, error.rs, prelude.rs
-│   ├── sdi-pipeline/                    # NEW in M08: orchestration crate — owns FS, clock, atomic writes
-│   │   └── src/
-│   │       ├── lib.rs, pipeline.rs      # Pipeline::{new, snapshot}; calls sdi-core for compute
-│   │       ├── cache.rs                 # warm-start partition load/save (.sdi/cache/)
-│   │       ├── store.rs                 # snapshot atomic write + retention; YAML boundary write
-│   │       └── error.rs
-│   ├── sdi-cli/                         # M09 fills out trend/check/show/boundaries; today: init/snapshot/diff/catalog
-│   │   └── src/
-│   │       ├── main.rs                  # composition root; anyhow allowed here only
-│   │       ├── commands/{init,snapshot,diff,catalog,trend,check,show,boundaries}.rs
-│   │       ├── output/{json,text}.rs    # ratatui tables + owo-colors
-│   │       └── logging.rs
-│   ├── sdi-parsing/                     # walkdir+ignore+rayon+tree-sitter; LanguageAdapter trait; CST drop invariant
-│   ├── sdi-graph/                       # feature `pipeline-records` (default ON; OFF in sdi-core's WASM build)
-│   ├── sdi-detection/                   # feature `pipeline-records`; native Leiden + LeidenPartition + stability.rs
-│   ├── sdi-patterns/                    # feature `pipeline-records`; fingerprint.rs (PUBLIC), normalize.rs, from_inputs.rs
-│   ├── sdi-snapshot/                    # pure: snapshot.rs, delta.rs, trend.rs (M08), boundary_inference.rs (M08)
-│   ├── sdi-config/                      # feature `loader` (default ON); types-only when off (sdi-core's WASM build)
-│   └── sdi-lang-{rust,python,typescript,javascript,go,java}/   # one per language adapter
+│   ├── sdi-core/        # pure-compute facade, WASM-compatible (KDD-12)
+│   ├── sdi-pipeline/    # orchestration: FS, clock, atomic writes; Pipeline::{new, snapshot}
+│   ├── sdi-cli/         # composition root; anyhow allowed here only
+│   ├── sdi-parsing/     # walkdir+ignore+rayon+tree-sitter; LanguageAdapter trait; CST drop invariant
+│   ├── sdi-graph/       # feature `pipeline-records` (default ON; OFF in sdi-core's WASM build)
+│   ├── sdi-detection/   # feature `pipeline-records`; native Leiden + LeidenPartition
+│   ├── sdi-patterns/    # feature `pipeline-records`; fingerprint.rs (PUBLIC) re-exposed via sdi-core
+│   ├── sdi-snapshot/    # pure: snapshot · delta · trend · boundary_inference
+│   ├── sdi-config/      # feature `loader` (default ON); types-only when off
+│   └── sdi-lang-{rust,python,typescript,javascript,go,java}/
 ├── bindings/
-│   ├── sdi-wasm/                        # M12: @geoffgodwin/sdi-wasm; depends on sdi-core only
-│   ├── sdi-py/                          # post-MVP / v1: PyO3 wheel
-│   └── sdi-node/                        # post-MVP / v1: napi-rs prebuilt
-├── examples/                            # embed_pipeline.rs · embed_compute.rs · custom_config.rs · binding_node.ts
-├── tests/                               # cross-crate: full_pipeline · snapshot_diff_trend · boundary_lifecycle + fixtures/
-├── benches/                             # criterion, gated behind `bench` feature
-└── docs/                                # cli-integration · library-embedding · migrating-from-sdi-py · determinism
+│   ├── sdi-wasm/        # @geoffgodwin/sdi-wasm; depends on sdi-core only
+│   ├── sdi-py/          # post-MVP / v1: PyO3 wheel
+│   └── sdi-node/        # post-MVP / v1: napi-rs prebuilt
+├── examples/            # embed_pipeline.rs · embed_compute.rs · custom_config.rs · binding_node.ts
+├── tests/               # cross-crate: full_pipeline · snapshot_diff_trend · boundary_lifecycle + fixtures/
+├── benches/             # criterion, gated behind `bench` feature
+└── docs/                # cli-integration · library-embedding · migrating-from-sdi-py · determinism
 ```
 
 ## Key Design Decisions
@@ -175,7 +157,7 @@ sdi-rust/
 
 **Decision (ratified M05):** Native Rust port of Leiden (Traag et al. 2019, Modularity + CPM) in `sdi-detection`. Verification is partition quality (modularity within 1%, community count within ±10%) — not bit-identity. FFI to C++ `leidenalg` rejected: non-Rust toolchain, complicates single-binary distribution, breaks determinism across platforms.
 
-### KDD-3: Library surface is canonical (reshaped by KDD-12)
+### KDD-3: Library surface is canonical
 
 **Decision:** Every CLI feature is a library feature first. `sdi-cli` cannot add analysis code paths unreachable through `sdi-core` or `sdi-pipeline`. SemVer commitment begins at `0.1.0`; adding `pub` is deliberate, removing `pub` is breaking. See KDD-12 for the layered structure.
 
@@ -213,23 +195,15 @@ sdi-rust/
 
 ### KDD-12: Two-layer library shape — `sdi-core` (pure compute) + `sdi-pipeline` (orchestration)
 
-**Decision (ratified 2026-04-29):** Split today's monolithic `sdi-core` into:
-- **`sdi-core`** — pure-compute facade. No I/O, no clock, no tree-sitter, WASM-compatible. Public surface: `compute_*` functions over `*Input` serde structs (`DependencyGraphInput`, `PatternInstanceInput`, `LeidenConfigInput`, `BoundarySpecInput`, `ThresholdsInput`, `PriorPartition`, `NormalizeNode`); `compute_delta`, `assemble_snapshot`, `compute_trend`, `infer_boundaries` re-exported from `sdi-snapshot`; `normalize_and_hash` for foreign extractors (the consumer app).
-- **`sdi-pipeline`** (new crate) — orchestration. Owns `Pipeline::snapshot(&Path)` + warm-start cache I/O + atomic snapshot writes. Depends on `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-config`, and `sdi-core`. CLI consumers and FS-based Rust embedders use this.
+**Decision (ratified 2026-04-29):**
+- **`sdi-core`** — pure-compute facade. No I/O, no clock, no tree-sitter, WASM-compatible. Public surface: `compute_*` functions over `*Input` serde structs (`DependencyGraphInput`, `PatternInstanceInput`, `LeidenConfigInput`, `BoundarySpecInput`, `ThresholdsInput`, `PriorPartition`, `NormalizeNode`); `compute_delta`, `assemble_snapshot`, `compute_trend`, `infer_boundaries` re-exported from `sdi-snapshot`; `normalize_and_hash` for foreign extractors.
+- **`sdi-pipeline`** — orchestration. Owns `Pipeline::snapshot(&Path)` + warm-start cache I/O + atomic snapshot writes. Depends on `sdi-parsing`, `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-config`, and `sdi-core`. CLI consumers and FS-based Rust embedders use this.
 
-`sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot` get a default Cargo feature `pipeline-records` that pulls `sdi-parsing` and exposes the `*_from_records` paths. `sdi-core` declares them with `default-features = false` so the WASM build pulls only the pure-compute paths taking `*Input` structs.
+`sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot` carry a default Cargo feature `pipeline-records` that pulls `sdi-parsing` and exposes `*_from_records` paths. `sdi-core` declares them with `default-features = false` so the WASM build pulls only the pure-compute paths taking `*Input` structs.
 
-**Alternatives considered:** (a) Keep monolithic `sdi-core` and feature-gate everything inside it. Rejected — the dep tree still pulls `walkdir`/`rayon`/`tree-sitter` at the workspace level; verifying WASM-cleanliness becomes brittle. (b) Create a separate `sdi-types` leaf crate for shared serde structs. Rejected — `FeatureRecord` is logically a parsing concern; feature-gating sdi-parsing in the four compute crates is simpler than introducing a fifth leaf crate.
+### KDD-13: WASM is in v0
 
-**Rationale:** The consumer app (a strict-mode TS tool at the user's workplace) is the first concrete consumer (mid-June review deadline drove the decision date). It needs to import sdi-rust as a WASM library and feed pre-parsed graph + pattern data from its own AST extractors. Today's `sdi-core` transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, and `std::fs::*` — none WASM-compatible. Rule 18 says public API stability begins at 0.1.0, so the reshape must land before the M11 release tag — hence inserting it as the new M08 (was: Trend/Check/Show CLI). See `m08-sdi-core-pure-compute-reshape.md`.
-
-### KDD-13: WASM moves into v0 (the consumer app is the concrete consumer)
-
-**Decision (ratified 2026-04-29):** Add `bindings/sdi-wasm` to the v0 manifest. Build `wasm-bindgen` exports of every `sdi-core::compute_*` function plus `normalize_and_hash`. Use `tsify` for derived `.d.ts` so the consumer app gets accurate strict-TS types without manual sync. Ship as `@geoffgodwin/sdi-wasm@0.1.0` to npm in the same release workflow as the crates.io publish, behind the same manual approval gate.
-
-**Alternatives considered:** Defer WASM to v1 era with its own design doc. Rejected — the consumer app's June review deadline is the calendar driver, and shipping WASM after the 0.1.0 SemVer commitment risks breaking changes to `sdi-core`'s public surface to accommodate WASM-specific ergonomics (e.g. `BTreeMap` serialization). Doing it now means `sdi-core` is shaped right the first time.
-
-**Rationale (overrides KD14 from sdi-py-era thinking):** KD14 said "WASM lands when a concrete consumer exists." That condition now holds. The implementation is bounded: `sdi-wasm` depends on `sdi-core` only, no `sdi-pipeline` (no FS in WASM). PyO3/napi-rs bindings remain post-MVP / v1 era — they don't have a concrete consumer demanding them. See `m12-wasm-crate-and-consumer-app-integration.md`.
+**Decision (ratified 2026-04-29):** `bindings/sdi-wasm` ships in v0. `wasm-bindgen` exports of every `sdi-core::compute_*` function plus `normalize_and_hash`; `tsify`-derived `.d.ts` for strict-TS consumers. Published as `@geoffgodwin/sdi-wasm@0.1.0` to npm in the same release workflow as the crates.io publish, behind the same manual approval gate. PyO3/napi-rs bindings remain post-MVP / v1 era.
 
 ### Unresolved Open Questions
 
@@ -326,7 +300,7 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 ## Implementation Milestones
 
 Managed as individual files in `.claude/milestones/`; see `MANIFEST.cfg` for ordering and status.
-M01–M07 done. M08 reshape (sdi-core pure-compute / new sdi-pipeline crate) → M09 CLI fill-out (trend/check/show) → M10 boundaries → M11 docs + bifl-tracker validation → M12 sdi-wasm + consumer-app integration → M13 release pipeline. M11 and M12 run in parallel after M10; M13 depends on both.
+M01–M11 done. Remaining: **M12** (sdi-wasm + consumer-app integration) and **M13** (release pipeline). M13 depends on M12.
 
 ## Code Conventions
 
@@ -355,6 +329,7 @@ M01–M07 done. M08 reshape (sdi-core pure-compute / new sdi-pipeline crate) →
   - `#![deny(missing_docs)]` on `sdi-core`.
   - Every public item has a doc comment; an `# Examples` block where meaningful.
   - Doc tests run in CI; broken examples fail the build.
+  - **Doc comment placement when inserting items.** A `///` block attaches to the *next* item declaration. When inserting a new `pub fn`/`struct`/`const` immediately before an existing documented item, verify that a non-`///` line (a blank line is sufficient) separates the two doc blocks — otherwise the existing item's doc block silently re-attaches to your new item, and the original item is left undocumented. This is a correctness bug, not a style issue: it has recurred across multiple milestone runs and `#![deny(missing_docs)]` will catch it on `sdi-core` but not on the inner crates.
 - **Lint discipline:**
   - `cargo clippy -- -D warnings` and `cargo fmt --check` are CI gates.
   - `#[allow(...)]` on public items requires an inline justification comment.
@@ -388,28 +363,27 @@ M01–M07 done. M08 reshape (sdi-core pure-compute / new sdi-pipeline crate) →
 19. Pattern fingerprints use `blake3` with a single fixed key constant. The constant lives in `sdi-patterns::fingerprint` and is re-exposed via `sdi_core::normalize_and_hash` for foreign extractors. Changing the constant invalidates all existing snapshot fingerprints and requires a snapshot version bump.
 20. Adding a new variant to `ExitCode` is a breaking change. Reusing or repurposing an existing exit code is a breaking change.
 21. **`sdi-core` is WASM-compatible.** No `std::fs::*`, no `std::time::SystemTime`, no `walkdir`, no `ignore`, no `rayon`, no `tree-sitter` in its dependency tree. CI verifies via `cargo build -p sdi-core --target wasm32-unknown-unknown --no-default-features` and `cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features` (asserting zero entries for the forbidden crates). Any code path that needs the clock takes the time as input (e.g. `compute_thresholds_check` takes `today: NaiveDate`).
-22. **All FS, clock, and atomic-write I/O lives in `sdi-pipeline` or `sdi-cli`, never in `sdi-core` or the compute crates with the `pipeline-records` feature disabled.** When extracting code from the compute crates during M08 (warm-start cache, snapshot store, retention), the pure (de)serialization stays in the original crate; the FS calls move to `sdi-pipeline`.
+22. **All FS, clock, and atomic-write I/O lives in `sdi-pipeline` or `sdi-cli`, never in `sdi-core` or the compute crates with the `pipeline-records` feature disabled.** Pure (de)serialization stays in the originating compute crate; the FS calls live in `sdi-pipeline`.
 23. **`normalize_and_hash` produces the same `blake3` digest in WASM as in native sdi-core for the same `NormalizeNode` input.** Cross-platform determinism is asserted in CI.
 
 ## What Not to Build Yet
 
-- **GitHub Actions reusable action** — easier with a single binary, but still post-MVP polish. Document manual `cargo install sdi && sdi check` for m01–m03; revisit after a stable schema.
-- **PyO3 / napi-rs bindings (`sdi-py`, `sdi-node`)** — post-MVP / v1 era. KDD-13 brings WASM into v0 because the consumer app is a concrete consumer; PyO3/napi-rs do not have one yet. Revisit when one appears.
+- **GitHub Actions reusable action** — post-MVP polish. Document manual `cargo install sdi && sdi check` for now.
+- **PyO3 / napi-rs bindings (`sdi-py`, `sdi-node`)** — post-MVP / v1 era. Revisit when a concrete consumer appears.
 - **IDE / editor plugin** — requires a stable API and snapshot schema. Post-1.0.
-- **SaaS dashboard or web UI** — sdi-rust is a measurement instrument, not a platform. Output is JSON; existing dashboards (Grafana, Datadog) consume it.
-- **Auto-remediation / gardener agent** — sdi-rust detects and measures drift; it never fixes it. A companion tool generating consolidation PRs is a separate project.
-- **Plugin system for custom analyzers** — built-in pattern categories only at MVP (KD6 from sdi-py). Extensibility design after real user feedback.
-- **Cross-language dependency inference** — v0 tracks only explicit in-language imports. Modeling cross-language coupling (TypeScript → Python via API) requires API contract parsing — out of scope.
-- **Historical backfill UX** — `sdi snapshot --commit REF` works for individual commits. Batch backfill across hundreds of commits (parallelism, progress, storage) is not designed; users script it with a bash loop.
-- **Real-time / watch mode** — no file watcher daemon. CLI invocation on merge events is the intended cadence. Watch mode violates the Unix-philosophy constraint.
-- **Automatic drift-vs-evolution classification** — explicitly rejected (KD1 from sdi-py). Humans declare migration intent via threshold overrides.
-- **Stdin input for `sdi diff`** — carries forward as deferred from sdi-py.
-- **`sdi config` subcommand** — edit `.sdi/config.toml` directly. Same deferral as sdi-py.
-- **Comment-preserving YAML write** — KDD-6 accepts comment loss for MVP. Revisit only on user complaint.
-- **CSR-view custom graph type** — KDD-5 ratified NO in Milestone 5. No CSR module; `petgraph` is fast enough.
-- **Importing sdi-py snapshots** — KDD-1 clean break. Trend continuity for migrators is acceptably lost.
-- **Bit-identical snapshot output across platforms** — Open Q #10. Aggregate equality only across platforms; revisit via build flag if a real adopter needs it.
-- **Bindings split into separate repos** — KDD-11 in-repo until non-trivial cross-repo CI complexity earns the split.
+- **SaaS dashboard or web UI** — sdi-rust is a measurement instrument. Output is JSON; existing dashboards consume it.
+- **Auto-remediation / gardener agent** — sdi-rust measures drift; it never fixes it. Separate project.
+- **Plugin system for custom analyzers** — built-in pattern categories only at MVP. Extensibility design after real user feedback.
+- **Cross-language dependency inference** — v0 tracks only explicit in-language imports.
+- **Historical backfill UX** — `sdi snapshot --commit REF` works for individual commits. Batch backfill is unsupported; users script it.
+- **Real-time / watch mode** — no file watcher daemon. CLI invocation on merge events is the intended cadence.
+- **Automatic drift-vs-evolution classification** — humans declare migration intent via threshold overrides.
+- **Stdin input for `sdi diff`** — deferred.
+- **`sdi config` subcommand** — edit `.sdi/config.toml` directly.
+- **Comment-preserving YAML write** — accept comment loss for MVP (KDD-6). Revisit on user complaint.
+- **Importing sdi-py snapshots** — clean break (KDD-1). Trend continuity for migrators is acceptably lost.
+- **Bit-identical snapshot output across platforms** — aggregate equality only; revisit via build flag if a real adopter needs it.
+- **Bindings split into separate repos** — in-repo until non-trivial cross-repo CI complexity earns the split (KDD-11).
 
 ## Testing Strategy
 
@@ -431,7 +405,7 @@ M01–M07 done. M08 reshape (sdi-core pure-compute / new sdi-pipeline crate) →
 - **Workspace-level integration tests** in `tests/` (top level) covering cross-crate scenarios: full pipeline, snapshot/diff/trend lifecycles, boundary lifecycle.
 - **Doc tests** via `cargo test --doc`. Every public function with an `# Examples` block has a runnable doc test. Broken examples fail CI.
 - **Property tests** in `crates/<crate>/tests/proptest.rs` files: `prop_test_pipeline_deterministic`, `prop_test_delta_pure`, `prop_test_leiden_seeded`. `proptest-regressions/` directories committed.
-- **KD11 verification suite** in `crates/sdi-detection/tests/leiden_quality.rs`, gated `#[cfg(feature = "verify-leiden")]`. Pass criteria: modularity within 1%, community count within ±10%. **Not** bit-identity.
+- **KDD-2 verification suite** in `crates/sdi-detection/tests/leiden_quality.rs`, gated `#[cfg(feature = "verify-leiden")]`. Pass criteria: modularity within 1%, community count within ±10%. **Not** bit-identity.
 - **CLI exit-code tests** in `crates/sdi-cli/tests/exit_codes.rs` exhaustively covering 0/1/2/3/10.
 - **Stdout/stderr discipline tests** in `crates/sdi-cli/tests/stdout_stderr_split.rs`.
 - **Atomic-write tests** in `crates/sdi-snapshot/tests/atomic_write.rs` simulating mid-write panic.
@@ -447,7 +421,7 @@ Under `tests/fixtures/`:
 - `multi-language/` — Python + TypeScript exercise
 - `high-entropy/` — deliberate pattern variance
 - `evolving/` — git repo with progressive drift, built by setup script under `target/test-fixtures` before tests run
-- `leiden-graphs/{small,medium,large}/` — adjacency lists + reference modularities for KD11 verification
+- `leiden-graphs/{small,medium,large}/` — adjacency lists + reference modularities for KDD-2 verification
 
 ### Patterns
 
@@ -460,8 +434,8 @@ Under `tests/fixtures/`:
 ### What We Do NOT Test
 
 - Real network access (Rule 13).
-- Cross-version migration of sdi-py snapshot JSON (KD13 clean break).
-- Bit-identity of snapshot output across platforms (Open Q #10 — aggregate equality only).
+- Cross-version migration of sdi-py snapshot JSON (KDD-1 clean break).
+- Bit-identity of snapshot output across platforms (aggregate equality only — see `docs/determinism.md`).
 
 ### Commands
 
