@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-01
-- Runs since audit: 2
+- Runs since audit: 3
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdi-rust ahead of mid-June reviews. Today's `sdi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -20,6 +20,9 @@
 - [2026-05-01 | "M12"] **`sdi-core` now re-exports inner-crate types** (`GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint`). These were previously only reachable via internal crate paths. The re-exports are additive (backward-compatible) but widen the public surface of sdi-core. Document in the "Module Boundaries" section of CLAUDE.md during M13 review.
 
 ## Unresolved Observations
+- [2026-05-01 | "Address all 10 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `crates/sdi-core/src/input/edge_weight.rs:14` — doc says `source < target` is required but the invariant is not enforced at runtime. `boundaries.rs:109` already normalises index order, so a mis-ordered single key still works. Only two keys mapping to the same edge pair would silently collide (last iteration wins in `BTreeMap::collect`). The doc is misleading — either enforce with a debug_assert or rewrite the doc to say "callers should canonicalise; detection normalises".
+- [2026-05-01 | "Address all 10 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] Pre-existing compiler warnings not introduced by this task but noted by the coder as out-of-scope: unused `pub(crate) validate_and_prune_overrides` (`sdi-config/src/thresholds.rs:46`), unused import `tracing::debug` (`sdi-graph/src/dependency_graph.rs:9`), dead code in `sdi-patterns/src/catalog.rs`. These are accumulating and worth a dedicated cleanup pass.
+- [2026-05-01 | "Address all 10 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `crates/sdi-core/src/compute/boundaries.rs:174` — `let _ = &current_communities;` with comment "used for future extension" is dead code and a TODO stub that should live in the issue tracker, not the source.
 - [2026-05-01 | "M16"] `commit_extract.rs:158-209` — `normalize_to_utc`, `calendar_to_epoch`, and `epoch_to_iso8601` are hand-rolled ISO 8601 + Proleptic Gregorian arithmetic. `sdi-pipeline` already depends on `chrono` (via `sdi-config`) with `default-features = false`; using `chrono::DateTime::parse_from_rfc3339` would eliminate ~50 lines of custom arithmetic with no WASM impact (pipeline is FS-bearing and not WASM-compatible). This is a simplification opportunity for a future cleanup pass, not a bug.
 - [2026-05-01 | "M16"] `tests/historical_commit_lifecycle.rs` — workspace-level `tests/` placeholder is a comment-only file that explains why the real test lives under `crates/sdi-cli/`. The comment is accurate but the file itself adds no value and will accumulate as noise if the pattern is repeated for future milestones.
 - [2026-05-01 | "M15"] `[bindings/sdi-wasm/src/types.rs vs crates/sdi-core/src/input/types.rs]` — `WasmLeidenConfigInput` silently diverged from `LeidenConfigInput` in M15 (core gained `edge_weights`; WASM wrapper did not). The `to_core` deserialization silently defaults to `None`, so no crash, but the divergence will widen as fields are added without mirrored updates to the WASM wrapper.

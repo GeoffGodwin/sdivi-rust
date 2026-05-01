@@ -157,6 +157,9 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
     let catalog = build_pattern_catalog(&input.pattern_instances)?;
     let pm: sdi_core::PatternMetricsResult = to_core(input.pattern_metrics)?;
 
+    // TODO: `change_coupling` is hardcoded to `None`. WASM consumers who call
+    // `compute_change_coupling` cannot include the result here. Track as a
+    // follow-up field addition to `WasmAssembleSnapshotInput`.
     let mut snap = sdi_core::assemble_snapshot(
         graph,
         partition,

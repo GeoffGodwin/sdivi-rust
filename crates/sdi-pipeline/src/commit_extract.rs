@@ -19,6 +19,10 @@ pub enum CommitExtractError {
     #[error("commit not found: {sha}")]
     CommitNotFound { sha: String },
 
+    /// The date string returned by `git show --format=%cI` could not be parsed.
+    #[error("could not parse commit date for {sha}: {raw:?}")]
+    CommitDateParseFailed { sha: String, raw: String },
+
     /// `git archive` exited non-zero.
     #[error("git archive failed: {stderr}")]
     ArchiveFailed { stderr: String },
@@ -78,10 +82,8 @@ pub fn commit_date_iso(repo_root: &Path, sha: &str) -> Result<String, CommitExtr
     }
 
     let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    normalize_to_utc(&raw).ok_or_else(|| CommitExtractError::RefResolutionFailed {
-        reference: sha.to_string(),
-        stderr: format!("could not parse commit date: {raw:?}"),
-    })
+    normalize_to_utc(&raw)
+        .ok_or_else(|| CommitExtractError::CommitDateParseFailed { sha: sha.to_string(), raw })
 }
 
 /// Extracts the tree at `sha` into a fresh [`TempDir`] via `git archive | tar`.
@@ -91,16 +93,8 @@ pub fn commit_date_iso(repo_root: &Path, sha: &str) -> Result<String, CommitExtr
 pub fn extract_commit_tree(repo_root: &Path, sha: &str) -> Result<TempDir, CommitExtractError> {
     let tmpdir = TempDir::new()?;
 
-    let mut git = Command::new("git")
-        .current_dir(repo_root)
-        .args(["archive", "--format=tar", sha])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let git_stdout = git.stdout.take().expect("stdout is piped");
-
-    // Sanity-check that tar is available before attempting extraction.
+    // Verify tar is available before spawning git archive so we don't spawn a
+    // process whose stdout pipe will be immediately abandoned.
     let tar_check = Command::new("tar")
         .arg("--version")
         .stdout(Stdio::null())
@@ -111,6 +105,15 @@ pub fn extract_commit_tree(repo_root: &Path, sha: &str) -> Result<TempDir, Commi
             stderr: "tar not found on PATH; install tar to use --commit".to_string(),
         });
     }
+
+    let mut git = Command::new("git")
+        .current_dir(repo_root)
+        .args(["archive", "--format=tar", sha])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let git_stdout = git.stdout.take().expect("stdout is piped");
 
     let mut tar = Command::new("tar")
         .arg("-xC")

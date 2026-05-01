@@ -140,9 +140,10 @@ pub struct LeidenConfigInput {
     pub iterations: usize,
     /// Quality function to optimise.
     pub quality: QualityFunctionInput,
-    /// Per-edge weights (`source < target` keys) for weighted Leiden. `None` = all weights 1.0.
+    /// Per-edge weights for weighted Leiden; `None` = 1.0 for all edges.
+    /// Keys: `"source\x00target"` (NUL-sep, `source < target`); use [`edge_weight_key`].
     #[serde(default)]
-    pub edge_weights: Option<BTreeMap<(String, String), f64>>,
+    pub edge_weights: Option<BTreeMap<String, f64>>,
 }
 
 impl Default for LeidenConfigInput {
@@ -201,7 +202,7 @@ pub struct NormalizeNode {
     pub children: Vec<NormalizeNode>,
 }
 
-// ── Threshold inputs ─────────────────────────────────────────────────────────
+// ── Threshold inputs ──────────────────────────────────────────────────────────
 /// Per-category threshold override for [`ThresholdsInput`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ThresholdOverrideInput {
@@ -271,7 +272,6 @@ impl Default for ThresholdsInput {
 }
 
 // ── Boundary inputs ───────────────────────────────────────────────────────────
-
 /// A single boundary definition for [`BoundarySpecInput`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BoundaryDefInput {

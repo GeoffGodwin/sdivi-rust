@@ -1,4 +1,5 @@
-# Reviewer Report — M16: Snapshot at Historical Commit
+# Reviewer Report
+Review cycle: 1 of 2
 
 ## Verdict
 APPROVED_WITH_NOTES
@@ -10,15 +11,13 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `commit_extract.rs:81` — `commit_date_iso` returns `CommitExtractError::RefResolutionFailed` when the date string cannot be parsed. That variant name is misleading (ref resolution succeeded; the failure is date-format parsing). A `CommitDateParseFailed { sha, raw }` variant would be clearer, though the error message is descriptive enough to diagnose.
-- `CODER_SUMMARY.md` lists `docs/library-embedding.md` in the `## Docs Updated` section but does NOT list it under `## Files Modified`. Either the file was updated (and should appear in the modified list) or the Docs Updated entry is erroneous. The omission is harmless but creates an audit gap.
-- `commit_extract.rs:94-113` — `git archive` is spawned before the `tar --version` availability check. If `tar` is absent, `git archive` is already running; it will exit cleanly once its stdout pipe is closed on early return, but spawning a process that will be immediately abandoned is sub-optimal. The check should precede the spawn.
-- Security findings MEDIUM/LOW (rev-parse `--` separator, tar `--no-absolute-filenames`, stderr truncation) are handled by the security pipeline and noted here for completeness only.
+- `crates/sdi-pipeline/src/commit_extract.rs:46` — All three security findings (MEDIUM: rev-parse missing `--` separator; LOW: tar missing `--no-absolute-filenames`; LOW: stderr truncation) are marked `fixable:yes` in the security report but were explicitly not addressed. The coder's claim "no code change required" is incorrect — the security agent flagged these as code changes. The MEDIUM finding (adding `"--"` between `"--verify"` and `reference`) is a one-liner. Recommend addressing in the next cleanup pass.
+- `crates/sdi-core/src/input/mod.rs:16-17` — `pub use edge_weight::{...}` appears before its `mod edge_weight;` declaration. Valid Rust, but conventional order is `mod` declaration first, then re-exports. Low friction to reorder.
 
 ## Coverage Gaps
-- `change_coupling_ends_at_commit_not_head` (`commit_snapshot.rs:185`) validates that `snap_hist.commit` equals `sha_head1` but does not verify that the change-coupling data actually differs between HEAD and HEAD~1. With only 3 single-file commits and the default `min_frequency = 0.6`, both snapshots likely have empty coupling, so the window-clamping logic is not exercised. A fixture with co-changing files would give this test meaningful coverage.
-- No test exercises `normalize_to_utc` edge cases for timezone offsets that cross a day boundary (e.g., `2026-04-30T23:30:00+01:00` → `2026-04-30T22:30:00Z` vs. `2026-05-01T00:30:00+01:00` → day rollover). The existing unit tests cover the happy path; DST/rollover is unexercised.
+- `edge_weight_key` wrong-order path: no test passes `source > target` to `edge_weight_key` and exercises the `boundaries.rs:109` normalisation fallback (`if si < ti { (si, ti) } else { (ti, si) }`). Should be a unit test in `leiden_config_serde.rs` or `boundaries.rs` tests to confirm the graceful fallback is intentional.
 
 ## Drift Observations
-- `commit_extract.rs:158-209` — `normalize_to_utc`, `calendar_to_epoch`, and `epoch_to_iso8601` are hand-rolled ISO 8601 + Proleptic Gregorian arithmetic. `sdi-pipeline` already depends on `chrono` (via `sdi-config`) with `default-features = false`; using `chrono::DateTime::parse_from_rfc3339` would eliminate ~50 lines of custom arithmetic with no WASM impact (pipeline is FS-bearing and not WASM-compatible). This is a simplification opportunity for a future cleanup pass, not a bug.
-- `tests/historical_commit_lifecycle.rs` — workspace-level `tests/` placeholder is a comment-only file that explains why the real test lives under `crates/sdi-cli/`. The comment is accurate but the file itself adds no value and will accumulate as noise if the pattern is repeated for future milestones.
+- `crates/sdi-core/src/input/edge_weight.rs:14` — doc says `source < target` is required but the invariant is not enforced at runtime. `boundaries.rs:109` already normalises index order, so a mis-ordered single key still works. Only two keys mapping to the same edge pair would silently collide (last iteration wins in `BTreeMap::collect`). The doc is misleading — either enforce with a debug_assert or rewrite the doc to say "callers should canonicalise; detection normalises".
+- Pre-existing compiler warnings not introduced by this task but noted by the coder as out-of-scope: unused `pub(crate) validate_and_prune_overrides` (`sdi-config/src/thresholds.rs:46`), unused import `tracing::debug` (`sdi-graph/src/dependency_graph.rs:9`), dead code in `sdi-patterns/src/catalog.rs`. These are accumulating and worth a dedicated cleanup pass.
+- `crates/sdi-core/src/compute/boundaries.rs:174` — `let _ = &current_communities;` with comment "used for future extension" is dead code and a TODO stub that should live in the issue tracker, not the source.

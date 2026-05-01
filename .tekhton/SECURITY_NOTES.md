@@ -1,6 +1,6 @@
 # Security Notes
 
-Generated: 2026-05-01 17:57:34
+Generated: 2026-05-01 18:44:06
 
 ## Non-Blocking Findings (MEDIUM/LOW)
 - [MEDIUM] [category:A03] [crates/sdi-pipeline/src/commit_extract.rs:40-47] fixable:yes — `reference` is passed directly to `git rev-parse --verify <reference>` without a `--` separator. Rust's `Command::args()` does not invoke a shell so there is no shell injection, but a reference starting with `-` (e.g. `--local-env-vars`, `--show-toplevel`) could be interpreted as a git option. The subsequent 40-hex-char SHA validation prevents meaningful exploitation in practice, but the library surface is public and could be called with externally-sourced references. Fix: change the args slice to `["rev-parse", "--verify", "--", reference]`.

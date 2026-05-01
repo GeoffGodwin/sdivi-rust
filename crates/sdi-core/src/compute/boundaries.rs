@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::AnalysisError;
 use crate::input::{
     BoundarySpecInput, DependencyGraphInput, LeidenConfigInput, PriorPartition,
-    QualityFunctionInput, validate_node_id,
+    QualityFunctionInput, split_edge_weight_key, validate_node_id,
 };
 
 /// Result of [`detect_boundaries`].
@@ -102,11 +102,12 @@ pub fn detect_boundaries(
     let partition = if let Some(ref ew) = cfg.edge_weights {
         let weight_map: std::collections::BTreeMap<(usize, usize), f64> = ew
             .iter()
-            .filter_map(|((s, t), &w)| {
-                let si = *id_to_idx.get(s.as_str())?;
-                let ti = *id_to_idx.get(t.as_str())?;
-                let key = if si < ti { (si, ti) } else { (ti, si) };
-                Some((key, w))
+            .filter_map(|(key, &w)| {
+                let (s, t) = split_edge_weight_key(key)?;
+                let si = *id_to_idx.get(s)?;
+                let ti = *id_to_idx.get(t)?;
+                let ordered = if si < ti { (si, ti) } else { (ti, si) };
+                Some((ordered, w))
             })
             .collect();
         sdi_detection::run_leiden_with_weights(&dg, &leiden_cfg, None, &weight_map)

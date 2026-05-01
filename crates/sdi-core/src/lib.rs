@@ -56,6 +56,7 @@ pub use input::{
     DependencyGraphInput, EdgeInput, LeidenConfigInput,
     NodeInput, NormalizeNode, PatternInstanceInput, PatternLocationInput, PriorPartition,
     QualityFunctionInput, ThresholdOverrideInput, ThresholdsInput, validate_node_id,
+    edge_weight_key, split_edge_weight_key,
 };
 
 // ── compute function re-exports ────────────────────────────────────────────

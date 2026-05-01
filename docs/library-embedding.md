@@ -291,3 +291,28 @@ for pair in &result.pairs {
 
 The same function is exported from `@geoffgodwin/sdi-wasm` as
 `compute_change_coupling`, making it callable from TypeScript consumers.
+
+## Weighted Leiden — `edge_weight_key`
+
+`LeidenConfigInput::edge_weights` accepts optional per-edge weights for
+weighted Leiden. Because `serde_json` cannot serialize tuple-keyed maps, the
+field uses `BTreeMap<String, f64>` with NUL-delimited string keys. Use the
+`edge_weight_key` helper to construct keys:
+
+```rust
+use sdi_core::input::{edge_weight_key, split_edge_weight_key, LeidenConfigInput};
+use std::collections::BTreeMap;
+
+let mut weights = BTreeMap::new();
+// Keys must be (source, target) with source < target lexicographically.
+weights.insert(edge_weight_key("src/auth.rs", "src/session.rs"), 3.0);
+weights.insert(edge_weight_key("src/auth.rs", "src/models.rs"), 1.5);
+
+let cfg = LeidenConfigInput {
+    edge_weights: Some(weights),
+    ..LeidenConfigInput::default()
+};
+```
+
+`split_edge_weight_key` inverts the encoding: it splits a key back into
+`(source, target)` — useful when iterating the map for display or export.

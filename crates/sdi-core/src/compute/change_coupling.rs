@@ -1,6 +1,6 @@
 //! [`compute_change_coupling`] — pure change-coupling analysis.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use sdi_snapshot::change_coupling::{ChangeCouplingResult, CoChangePair};
 
@@ -80,7 +80,7 @@ pub fn compute_change_coupling(
 
     // Count co-occurrences per pair.
     let mut pair_counts: BTreeMap<(String, String), u32> = BTreeMap::new();
-    let mut all_files: HashSet<String> = HashSet::new();
+    let mut all_files: BTreeSet<String> = BTreeSet::new();
 
     for event in window {
         for f in &event.files {
@@ -92,12 +92,8 @@ pub fn compute_change_coupling(
         sorted_files.dedup();
         for i in 0..sorted_files.len() {
             for j in (i + 1)..sorted_files.len() {
-                let (a, b) = (&sorted_files[i], &sorted_files[j]);
-                let key = if a < b {
-                    (a.clone(), b.clone())
-                } else {
-                    (b.clone(), a.clone())
-                };
+                // sorted_files is sorted, so i < j guarantees sorted_files[i] < sorted_files[j].
+                let key = (sorted_files[i].clone(), sorted_files[j].clone());
                 *pair_counts.entry(key).or_insert(0) += 1;
             }
         }

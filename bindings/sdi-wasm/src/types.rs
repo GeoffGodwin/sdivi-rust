@@ -10,8 +10,6 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 
-// ── Graph inputs ─────────────────────────────────────────────────────────────
-
 /// A single node in a [`WasmDependencyGraphInput`].
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -37,8 +35,6 @@ pub struct WasmDependencyGraphInput {
     pub edges: Vec<WasmEdgeInput>,
 }
 
-// ── Detection inputs ─────────────────────────────────────────────────────────
-
 /// Quality function for Leiden community detection.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -47,7 +43,7 @@ pub enum WasmQualityFunction {
     Cpm,
 }
 
-/// Leiden algorithm configuration.
+/// Leiden algorithm configuration. `edge_weights` is absent — WASM Leiden is always unweighted.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmLeidenConfigInput {
@@ -66,18 +62,13 @@ pub struct WasmPriorPartition {
 }
 
 /// A prior partition for [`infer_boundaries`] — mirrors [`sdi_core::SnapshotPriorPartition`].
-///
-/// Kept separate from [`WasmPriorPartition`] (used by [`detect_boundaries`]) so that
-/// future field additions to either Rust type produce a compile error here rather than
-/// a silent runtime serialization failure.
+/// Kept separate from [`WasmPriorPartition`] to surface struct-shape divergence at compile time.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmSnapshotPriorPartition {
     /// node_id → community_id mapping.
     pub cluster_assignments: BTreeMap<String, u32>,
 }
-
-// ── Pattern inputs ────────────────────────────────────────────────────────────
 
 /// Source location of a pattern instance.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
@@ -99,8 +90,6 @@ pub struct WasmPatternInstanceInput {
     pub location: Option<WasmPatternLocationInput>,
 }
 
-// ── Normalize input ───────────────────────────────────────────────────────────
-
 /// A node in the pattern AST subtree for [`normalize_and_hash`].
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -108,8 +97,6 @@ pub struct WasmNormalizeNode {
     pub kind: String,
     pub children: Vec<WasmNormalizeNode>,
 }
-
-// ── Threshold inputs ──────────────────────────────────────────────────────────
 
 /// Per-category threshold override.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
@@ -142,8 +129,6 @@ pub struct WasmThresholdsInput {
     pub today: String,
 }
 
-// ── Boundary inputs ───────────────────────────────────────────────────────────
-
 /// A single boundary definition.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -159,8 +144,6 @@ pub struct WasmBoundaryDefInput {
 pub struct WasmBoundarySpecInput {
     pub boundaries: Vec<WasmBoundaryDefInput>,
 }
-
-// ── Output types ──────────────────────────────────────────────────────────────
 
 /// Output of [`compute_coupling_topology`].
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]

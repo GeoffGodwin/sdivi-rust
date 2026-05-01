@@ -13,6 +13,8 @@ pub use types::{
     NodeInput, NormalizeNode, PatternInstanceInput, PatternLocationInput, PriorPartition,
     QualityFunctionInput, ThresholdOverrideInput, ThresholdsInput,
 };
+pub use edge_weight::{edge_weight_key, split_edge_weight_key};
+mod edge_weight;
 
 use crate::error::AnalysisError;
 

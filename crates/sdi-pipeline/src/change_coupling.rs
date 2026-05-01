@@ -120,9 +120,7 @@ fn parse_git_log_output(raw: &str) -> Vec<CoChangeEventInput> {
                 j += 1;
             }
 
-            if !sha.is_empty() {
-                events.push(CoChangeEventInput { commit_sha: sha, commit_date: date, files });
-            }
+            events.push(CoChangeEventInput { commit_sha: sha, commit_date: date, files });
             i = j;
         } else {
             i += 1;

@@ -1,13 +1,15 @@
 //! Serde round-trip tests for LeidenConfigInput, including the edge_weights field.
 //!
-//! The `edge_weights` field is `Option<BTreeMap<(String, String), f64>>`.
-//! serde_json cannot serialize a map whose keys are tuples — they serialize as
-//! JSON arrays, which are not valid JSON object keys.  This test surfaces that
-//! known limitation.
+//! `edge_weights` uses `BTreeMap<String, f64>` with NUL-delimited string keys
+//! (`"source\x00target"`) so that `serde_json` can serialize them as JSON
+//! object keys. Use [`sdi_core::input::edge_weight_key`] to construct keys.
 
 use std::collections::BTreeMap;
 
-use sdi_core::input::{LeidenConfigInput, QualityFunctionInput};
+use sdi_core::compute::boundaries::detect_boundaries;
+use sdi_core::input::{
+    DependencyGraphInput, NodeInput, EdgeInput, LeidenConfigInput, QualityFunctionInput, edge_weight_key,
+};
 
 #[test]
 fn leiden_config_default_round_trips_through_serde_json() {
@@ -34,13 +36,9 @@ fn leiden_config_none_edge_weights_round_trips() {
 
 #[test]
 fn leiden_config_populated_edge_weights_round_trips_through_serde_json() {
-    // serde_json requires map keys to be strings; BTreeMap<(String, String), f64>
-    // serializes tuple keys as JSON arrays, not strings — this is a known
-    // limitation (flagged as a non-blocking reviewer note in M15).
-    // This test documents the actual behavior: serialization must succeed.
     let mut weights = BTreeMap::new();
-    weights.insert(("src/a.rs".to_string(), "src/b.rs".to_string()), 3.0_f64);
-    weights.insert(("src/a.rs".to_string(), "src/c.rs".to_string()), 1.5_f64);
+    weights.insert(edge_weight_key("src/a.rs", "src/b.rs"), 3.0_f64);
+    weights.insert(edge_weight_key("src/a.rs", "src/c.rs"), 1.5_f64);
     let cfg = LeidenConfigInput {
         seed: 42,
         gamma: 1.0,
@@ -49,9 +47,76 @@ fn leiden_config_populated_edge_weights_round_trips_through_serde_json() {
         edge_weights: Some(weights.clone()),
     };
     let value = serde_json::to_value(&cfg)
-        .expect("LeidenConfigInput with populated edge_weights must serialize without error");
+        .expect("LeidenConfigInput with populated edge_weights must serialize");
     let back: LeidenConfigInput =
         serde_json::from_value(value).expect("must deserialize back to LeidenConfigInput");
     assert_eq!(back.seed, cfg.seed);
     assert_eq!(back.edge_weights, cfg.edge_weights);
+}
+
+#[test]
+fn detect_boundaries_normalizes_wrong_order_edge_weight_keys() {
+    // Test the normalization fallback at boundaries.rs:109:
+    // if si < ti { (si, ti) } else { (ti, si) }
+    // When edge weights keys are provided in reverse order (target < source),
+    // the normalization should still apply them correctly.
+
+    // Create a simple 3-node graph: a -> b, a -> c, b -> c
+    let graph = DependencyGraphInput {
+        nodes: vec![
+            NodeInput {
+                id: "a".to_string(),
+                path: "a".to_string(),
+                language: "rust".to_string(),
+            },
+            NodeInput {
+                id: "b".to_string(),
+                path: "b".to_string(),
+                language: "rust".to_string(),
+            },
+            NodeInput {
+                id: "c".to_string(),
+                path: "c".to_string(),
+                language: "rust".to_string(),
+            },
+        ],
+        edges: vec![
+            EdgeInput {
+                source: "a".to_string(),
+                target: "b".to_string(),
+            },
+            EdgeInput {
+                source: "a".to_string(),
+                target: "c".to_string(),
+            },
+            EdgeInput {
+                source: "b".to_string(),
+                target: "c".to_string(),
+            },
+        ],
+    };
+
+    // Create edge weights with at least one key in wrong order: b > a
+    // The normalization should reorder it internally to (a, b).
+    let mut weights = BTreeMap::new();
+    // Correct order: a < b
+    weights.insert(edge_weight_key("a", "b"), 2.0_f64);
+    // Wrong order: c > b, will be normalized to (b, c)
+    weights.insert(edge_weight_key("c", "b"), 1.5_f64);
+
+    let cfg = LeidenConfigInput {
+        seed: 42,
+        gamma: 1.0,
+        iterations: 50,
+        quality: QualityFunctionInput::Modularity,
+        edge_weights: Some(weights),
+    };
+
+    let result = detect_boundaries(&graph, &cfg, &[]).expect("detect_boundaries should succeed");
+
+    // Verify that the result contains all three nodes in their communities
+    assert_eq!(result.cluster_assignments.len(), 3);
+    assert!(result.cluster_assignments.contains_key("a"));
+    assert!(result.cluster_assignments.contains_key("b"));
+    assert!(result.cluster_assignments.contains_key("c"));
 }
