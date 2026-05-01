@@ -1,4 +1,9 @@
 #### Milestone 12: WASM Crate, npm Package, Consumer App Integration
+<!-- milestone-meta
+id: "12"
+status: "done"
+-->
+
 
 **Scope:** Build the `sdi-wasm` crate that wraps `sdi-core` with `wasm-bindgen` + `tsify`-derived `.d.ts`. Produce npm package `@geoffgodwin/sdi-wasm` matching the shape the consumer app needs (sql.js-style async `init()`, then synchronous calls). Validate end-to-end against the consumer app as the first concrete consumer. This milestone closes the loop on KDD-13 (WASM in v0).
 

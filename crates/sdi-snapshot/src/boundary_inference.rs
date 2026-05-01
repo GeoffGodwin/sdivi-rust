@@ -148,7 +148,7 @@ fn count_stable_tail(
     }
 
     let mut stable = 0u32;
-    // Walk pairs from newest-1 backwards.
+    // Walk preceding partitions from newest-1 backwards; stop on first miss.
     for i in (0..partitions.len() - 1).rev() {
         let p = &partitions[i];
         let communities = invert_assignments(&p.cluster_assignments);

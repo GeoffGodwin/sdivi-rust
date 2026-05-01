@@ -1,5 +1,5 @@
-# Reviewer Report — Milestone 11: Documentation, Examples, Determinism Polish, bifl-tracker Validation
-Review cycle: 1 of 4
+# Reviewer Report — M12 (WASM crate + consumer-app integration)
+## Review cycle: 2 of 4
 
 ## Verdict
 APPROVED_WITH_NOTES
@@ -11,15 +11,33 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `docs/determinism.md` says `compute_thresholds_check` "takes `today: NaiveDate` as a parameter" but `today` is embedded inside `ThresholdsInput`, not a standalone argument — mildly misleading for WASM callers reading this doc.
-- `tools/validate-against-bifl-tracker.sh:27` — variable is named `SDE_BIN` (typo); should be `SDI_BIN`. Works correctly since it is used consistently, but confusing.
-- `docs/determinism.md` property tests table is missing two new tests added in this PR: `prop_test_pipeline_deterministic` (sdi-pipeline) and `prop_none_delta_never_breaches` (sdi-core).
-- `crates/sdi-cli/examples/embed_compute.rs:108-114` — parity check compares `reference.graph.node_count` against `coupling.node_count` built from `path_partition.keys()`. Isolated nodes (no community assignment) appear in the graph count but not in `path_partition`, so the check can print `match=false` on a correct implementation. Comment should warn this is an approximate check, not an identity assertion.
+- (Carried from cycle 1) `exports.rs:217-232` — `build_pattern_catalog` silently discards `WasmPatternInstanceInput.location`; assembled snapshots always have empty `locations` vectors in `PatternStats` even when callers supply location data.
+- (Carried from cycle 1) `wasm.yml:29-30` — WASM CI hardcodes `toolchain: "1.85.0"` instead of reading `rust-toolchain.toml`; an MSRV bump will cause silent drift in the WASM workflow.
+- (Carried from cycle 1) `crates/sdi-core/src/lib.rs:97-109` — CLAUDE.md "Module Boundaries and Dependency Rules" section was not updated to document the new `pub use` re-exports of `GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint` from inner crates; the coder's own architecture note flagged this as required.
+- `wasm.yml:62` — `|| true` still swallows wasm-pack test failures in the hash-capture step; if wasm-bindgen-test changes behavior the CI will accept an empty hash with a warning (exit 0) rather than failing. This was a deliberate tradeoff to handle environments where `--test <filter>` is unsupported; acceptable given the explicit empty-hash guard added in the comparison job (lines 106-109).
+- (Carried from cycle 1) `fingerprint.rs:56-63` — `PatternFingerprint::from_hex` does not check `hex.is_ascii()` before byte-indexing; a 64-byte string with multi-byte UTF-8 characters could panic. Pre-existing; `if !hex.is_ascii() { return None; }` before the loop would close it cleanly.
 
 ## Coverage Gaps
-- No test covers the `.sdi/`-exclusion branch of the `NoGrammarsAvailable` check: a repo where `records.is_empty()` but all extensioned files are inside `.sdi/` (e.g., only snapshot JSON) should NOT trigger exit 3. The current test only exercises the positive case (extensioned file outside `.sdi/`).
+- `assemble_snapshot` is absent from the smoke test imports (`wasm_smoke.rs:9-12`); no WASM test exercises the full assemble path.
+- `compute_trend` is absent from the smoke test imports; no WASM test exercises trend computation.
+- `compute_delta` is tested only with two identical snapshots; no smoke test verifies that distinct snapshots produce non-zero deltas.
+
+## Blocker Verification
+
+**Blocker 1 — `assemble_snapshot` hardcodes `violation_count: 0`**: FIXED.
+`types.rs:296-298` adds `violation_count: Option<u32>` to `WasmAssembleSnapshotInput`.
+`exports.rs:170-174` now uses `input.violation_count.unwrap_or(0) as usize` — violation data from `compute_boundary_violations` is faithfully propagated to the snapshot.
+
+**Blocker 2 — CI cross-platform hash determinism check always exits 0**: FIXED.
+`wasm_smoke.rs:191-196` adds `#[wasm_bindgen_test] fn normalize_hash_deterministic` that calls `normalize_and_hash("try_expression", vec![])` and prints `CI_HASH:{hash}`.
+`wasm.yml:64` updated grep to `CI_HASH:[0-9a-f]{64}` and strips the prefix via `sed`; the comparison job (lines 106-109) now fails on a real hash mismatch and warns (rather than silently passing) when hashes are empty.
+
+## ACP Verdicts
+- ACP: Re-exporting inner types from sdi-core — ACCEPT. Additive re-exports, WASM-safe, required by the KDD-12 architecture where `sdi-wasm` depends only on `sdi-core`. The corresponding CLAUDE.md update remains outstanding (noted above as non-blocking).
+- ACP: WASM wrapper types use serde_json round-trip conversion — ACCEPT. Internal to `sdi-wasm`; avoids ~200 lines of boilerplate `From` impls with no observable behavior difference to callers.
+- ACP: wasm-pack --profile syntax (wasm-pack 0.12+) — ACCEPT. Correct fix for the `--release` + `--profile` Cargo flag conflict; documented in build.sh and wasm.yml.
 
 ## Drift Observations
-- `crates/sdi-pipeline/src/pipeline.rs:160-163` — `save_cached_partition` executes unconditionally regardless of `WriteMode`. `EphemeralForCheck` suppresses the snapshot write but still mutates `tests/fixtures/simple-rust/.sdi/cache/partition.json` when `prop_test_pipeline_deterministic` runs. This makes a checked-in fixture a mutable side-effect of the new prop test. Pre-existing pipeline behavior, but the new prop test amplifies the cross-run state mutation.
-- `tools/validate-against-bifl-tracker.sh:119` — commit SHA is extracted via a Python one-liner with bash-interpolated `$baseline_file`. If `BASELINES_DIR` ever contains a single-quote in a path component the Python command breaks. Low risk for a tool-controlled path, but heredoc or temp-file approach would be more robust.
-- `crates/sdi-cli/examples/embed_compute.rs:63-83` — the "pure-compute path" example re-invokes `sdi_parsing::parse_repository` to extract edges, introducing a FS dependency. Comment "In a real consumer app the caller supplies these" correctly flags this, but the example header says "pure-compute path (WASM-path)" and may mislead readers who expect it to be runnable without FS/tree-sitter.
+- `exports.rs:187-190` — `build_graph_metrics` converts string node IDs to `PathBuf::from(id)` to satisfy `GraphMetrics.top_hubs: Vec<(PathBuf, usize)>`; couples the WASM binding layer to an internal `sdi-graph` field type. If that field changes to `String` the mapping becomes dead code without a compile error at the binding layer.
+- `exports.rs:127-134` vs `exports.rs:55-61` — `WasmPriorPartition` is silently reused for two distinct Rust types (`sdi_core::PriorPartition` via serde round-trip in `detect_boundaries`, and `sdi_core::SnapshotPriorPartition` via manual struct construction in `infer_boundaries`). Safe today because both share identical serde field layouts; a future field change to either type will produce a silent runtime serialization failure, not a compile error.
+- `lib.rs:51-57` (SNAPSHOT_TS constant) — TypeScript interface declares `LeidenPartition.seed: number`, but the Rust field is `u64`; JavaScript `number` (IEEE-754 f64) cannot exactly represent seeds above 2^53. Default seed 42 is safe; the README or the TypeScript interface should document the limit.

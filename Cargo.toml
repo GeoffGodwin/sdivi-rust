@@ -16,11 +16,20 @@ members = [
     "crates/sdi-lang-go",
     "crates/sdi-lang-java",
     "crates/sdi-lang-rust",
+    "bindings/sdi-wasm",
 ]
 resolver = "2"
 
+# Custom WASM release profile — smaller output at cost of longer link time.
+# wasm-pack build --release uses this profile when invoked with --profile release-wasm.
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+
 [workspace.package]
-version = "0.0.15"
+version = "0.0.16"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -62,7 +71,7 @@ thiserror = "2"
 anyhow    = "1"
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
-clap = { version = ">=4.4, <4.5", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 
 # ── terminal output ───────────────────────────────────────────────────────────
 ratatui    = "0.28"
@@ -115,6 +124,16 @@ chrono = { version = "0.4", default-features = false, features = ["serde"] }
 # ── filesystem helpers ────────────────────────────────────────────────────────
 dirs     = "5"
 tempfile = ">=3.0, <3.20"   # <3.20 avoids getrandom 0.4 (edition2024) on Cargo 1.75
+
+# ── WASM / bindings ──────────────────────────────────────────────────────────
+# Pinned per KDD-13; pre-1.0 crates require explicit version management.
+wasm-bindgen       = "0.2"
+wasm-bindgen-test  = "0.3"
+# tsify 0.4.x is pre-1.0; pinned in DRIFT_LOG.md — update deliberately.
+tsify              = { version = "0.4", features = ["js"] }
+serde-wasm-bindgen = "0.6"
+js-sys             = "0.3"
+console_error_panic_hook = "0.1"
 
 # ── testing ───────────────────────────────────────────────────────────────────
 assert_cmd = { version = ">=2.0, <2.1" }

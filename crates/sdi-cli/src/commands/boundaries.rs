@@ -91,7 +91,7 @@ fn run_ratify(repo_root: &Path, config: &Config) -> Result<()> {
         .collect();
 
     let spec = BoundarySpec {
-        version: None,
+        version: Some("1.0".to_string()),
         boundaries,
     };
 

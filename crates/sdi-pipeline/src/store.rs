@@ -12,6 +12,20 @@ pub use sdi_snapshot::retention::enforce_retention;
 
 use sdi_snapshot::Snapshot;
 
+/// Returns sorted `snapshot_*.json` entries from `dir`.
+fn list_snapshot_entries(dir: &Path) -> std::io::Result<Vec<std::fs::DirEntry>> {
+    let mut entries: Vec<_> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.starts_with("snapshot_") && s.ends_with(".json")
+        })
+        .collect();
+    entries.sort_by_key(|e| e.file_name());
+    Ok(entries)
+}
+
 /// Reads all snapshots from `dir` in chronological order (oldest→newest).
 ///
 /// Files are sorted lexicographically by filename. The `snapshot_*` naming
@@ -24,19 +38,8 @@ pub fn read_snapshots(dir: &Path) -> std::io::Result<Vec<Snapshot>> {
     if !dir.exists() {
         return Ok(vec![]);
     }
-    let mut entries: Vec<_> = std::fs::read_dir(dir)?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            let name = e.file_name();
-            let s = name.to_string_lossy();
-            s.starts_with("snapshot_") && s.ends_with(".json")
-        })
-        .collect();
-
-    entries.sort_by_key(|e| e.file_name());
-
     let mut snapshots = Vec::new();
-    for entry in entries {
+    for entry in list_snapshot_entries(dir)? {
         let content = std::fs::read_to_string(entry.path())?;
         match serde_json::from_str::<Snapshot>(&content) {
             Ok(s) => snapshots.push(s),
@@ -60,16 +63,7 @@ pub fn latest_snapshot(dir: &Path) -> std::io::Result<Option<Snapshot>> {
     if !dir.exists() {
         return Ok(None);
     }
-    let mut entries: Vec<_> = std::fs::read_dir(dir)?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            let name = e.file_name();
-            let s = name.to_string_lossy();
-            s.starts_with("snapshot_") && s.ends_with(".json")
-        })
-        .collect();
-
-    entries.sort_by_key(|e| e.file_name());
+    let entries = list_snapshot_entries(dir)?;
 
     match entries.last() {
         None => Ok(None),

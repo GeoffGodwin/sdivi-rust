@@ -2,7 +2,8 @@
 //!
 //! This mirrors what the consumer app does: the caller supplies pre-parsed graph
 //! data and pattern instances via `*Input` structs, then calls `sdi-core::compute_*`
-//! functions directly — no FS, no clock, no tree-sitter required.
+//! functions directly. Graph edges are bootstrapped from `sdi_parsing::parse_repository`
+//! for illustration; in a real WASM consumer the caller supplies its own extracted edges.
 //!
 //! The example also runs the same fixture through `sdi-pipeline` and asserts
 //! that both paths produce the same node and edge counts.

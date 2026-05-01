@@ -94,6 +94,20 @@ pub use sdi_snapshot::trend::TrendResult;
 /// See [`normalize_and_hash`] for the canonical tree-aware algorithm.
 pub use sdi_patterns::FINGERPRINT_KEY;
 
+// ── inner-crate type re-exports (for sdi-wasm and other embedders) ─────────
+
+/// Graph metrics summary — re-exported from `sdi-graph` for WASM embedders.
+pub use sdi_graph::metrics::GraphMetrics;
+
+/// Leiden community detection result — re-exported from `sdi-detection` for WASM embedders.
+pub use sdi_detection::partition::LeidenPartition;
+
+/// Pattern fingerprint catalog — re-exported from `sdi-patterns` for WASM embedders.
+pub use sdi_patterns::catalog::{PatternCatalog, PatternStats};
+
+/// Pattern fingerprint type — re-exported from `sdi-patterns` for WASM embedders.
+pub use sdi_patterns::fingerprint::PatternFingerprint;
+
 /// Commonly-imported items from sdi-core.
 pub mod prelude {
     pub use crate::AnalysisError;

@@ -159,8 +159,10 @@ impl Pipeline {
         let warm_partition = load_cached_partition(&cache_path);
         let leiden_cfg = LeidenConfig::from_sdi_config(&self.config);
         let partition = run_leiden(&dg, &leiden_cfg, warm_partition.as_ref());
-        save_cached_partition(&partition, &cache_path)
-            .map_err(PipelineError::SnapshotIo)?;
+        if let WriteMode::Persist = mode {
+            save_cached_partition(&partition, &cache_path)
+                .map_err(PipelineError::SnapshotIo)?;
+        }
 
         // ── Stage 4: Patterns ────────────────────────────────────────────
         let catalog = build_catalog(&records, &self.config.patterns);

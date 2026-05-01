@@ -116,7 +116,8 @@ trap 'rm -rf "$TMPDIR_SNAPSHOTS"' EXIT
 declare -A SEEN_COMMITS
 COMMITS=()
 for baseline_file in "$BASELINES_DIR"/snapshot_*.json; do
-    commit=$(python3 -c "import json,sys; print(json.load(open('$baseline_file')).get('commit_sha',''))")
+    commit=$(baseline_file="$baseline_file" python3 -c \
+        "import json,os; print(json.load(open(os.environ['baseline_file'])).get('commit_sha',''))")
     if [[ -n "$commit" && -z "${SEEN_COMMITS[$commit]+_}" ]]; then
         SEEN_COMMITS[$commit]=1
         COMMITS+=("$commit")

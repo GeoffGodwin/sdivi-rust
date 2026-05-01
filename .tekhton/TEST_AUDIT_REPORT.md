@@ -1,153 +1,138 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 12 files, 51 test functions
-(exit_codes.rs:9, version.rs:2, check_thresholds.rs:5, stdout_stderr_split.rs:4,
-show_format.rs:5, trend_format.rs:5, boundaries_stub.rs:3, no_color.rs:4,
-write_boundary_spec.rs:6, boundaries_comment_loss_warning.rs:3, path_partition.rs:5,
-boundary_lifecycle.rs:0 — comment-only placeholder)
+Tests audited: 1 file (`bindings/sdi-wasm/tests/wasm_smoke.rs`), 16 test functions
+Implementation files cross-referenced: `bindings/sdi-wasm/src/exports.rs`,
+`bindings/sdi-wasm/src/types.rs`, `crates/sdi-core/src/lib.rs`,
+`crates/sdi-core/src/compute/boundaries.rs`, `crates/sdi-core/src/compute/coupling.rs`,
+`crates/sdi-core/src/compute/thresholds.rs`, `crates/sdi-snapshot/src/delta.rs`,
+`crates/sdi-snapshot/src/trend.rs`, `crates/sdi-snapshot/src/boundary_inference.rs`,
+`crates/sdi-patterns/src/fingerprint.rs`.
 
-Freshness samples examined: tests/boundary_lifecycle.rs,
-tests/fixtures/simple-rust/.sdi/snapshots/ (two snapshot files).
+Verdict: CONCERNS
 
-Implementation files cross-referenced: crates/sdi-pipeline/src/pipeline.rs,
-crates/sdi-cli/src/main.rs, crates/sdi-pipeline/src/error.rs,
-crates/sdi-pipeline/src/store.rs, crates/sdi-config/src/load.rs,
-crates/sdi-config/src/thresholds.rs.
-
-Verdict: PASS
+---
 
 ### Findings
 
-#### SCOPE: tests/boundary_lifecycle.rs is a comment-only placeholder that is never executed
-- File: `tests/boundary_lifecycle.rs`
-- Issue: The file contains only a block comment pointing to
-  `crates/sdi-cli/tests/boundary_lifecycle.rs`. Cargo requires a `[package]` section to compile
-  workspace-root `tests/*.rs` files; without it this file is silently ignored and never run.
-  The coder noted it in the summary ("should be removed in a future cleanup pass") but it was
-  not actioned in M11.
+#### INTEGRITY: test_compute_boundary_violations_with_spec asserts against a stub that always returns 0
+- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:61` (`test_compute_boundary_violations_with_spec`)
+- Issue: The test constructs a two-boundary spec (`core` / `data`) and a graph with an edge
+  lib.rs → models.rs, reasons about whether the edge is a violation, and asserts
+  `result.violation_count == 0`. However, `compute_boundary_violations` in
+  `crates/sdi-core/src/compute/boundaries.rs:224–236` is an explicit stub: the `spec`
+  parameter is named `_spec` and the function body always returns
+  `Ok(BoundaryViolationResult { violation_count: 0, violations: vec![] })` regardless
+  of input. The assertion always passes, and the test cannot detect any future regression
+  when the real boundary violation logic (deferred to Milestone 10) is wired up. This is
+  a structurally always-passing assertion that misleads reviewers into believing boundary
+  logic is exercised.
+- Severity: HIGH
+- Action: Mark the test `#[ignore]` with a comment referencing the stub and the milestone
+  that will complete the implementation, OR replace the assertion with a `TODO` comment
+  that explicitly acknowledges the stub, e.g.:
+  ```rust
+  // TODO(M10): compute_boundary_violations is a stub; rewrite this test with
+  // a concrete violation scenario once the real implementation ships.
+  assert_eq!(result.violation_count, 0); // trivially true against current stub
+  ```
+  Do not implement the missing logic to make the test non-trivial — tests follow code.
+
+---
+
+#### INTEGRITY: test_compute_boundary_violations_empty_spec also exercises the stub
+- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:53` (`test_compute_boundary_violations_empty_spec`)
+- Issue: Same stub root cause as above. An empty spec must always yield zero violations
+  in any complete implementation, so the assertion is semantically correct, but the test
+  cannot distinguish "stub returned 0" from "real logic returned 0 for an empty spec."
+  This is lower severity than the non-trivial spec case because the expected value (0)
+  is correct regardless of whether the spec is consulted.
 - Severity: LOW
-- Action: Delete `tests/boundary_lifecycle.rs`. The real test lives at
-  `crates/sdi-cli/tests/boundary_lifecycle.rs` and is unaffected.
+- Action: No change required to the assertion. Add a comment noting the stub limitation,
+  consistent with the HIGH finding above.
 
-#### NAMING: boundaries_stub.rs file name misrepresents current test content
-- File: `crates/sdi-cli/tests/boundaries_stub.rs`
-- Issue: All three tests in this file are substantive behavioral contracts — they capture
-  stdout/stderr, assert stdout emptiness, assert stderr non-emptiness, and (for ratify) verify
-  no `boundaries.yaml` is created. The `_stub` suffix signals to future readers that these are
-  scaffolding tests rather than canonical coverage, which could lead to them being overlooked
-  or replaced without preserving the behavioral assertions.
+---
+
+#### COVERAGE: normalize_and_hash tests do not pin the expected hash value
+- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:172` (`test_normalize_and_hash_deterministic`)
+         `bindings/sdi-wasm/tests/wasm_smoke.rs:191` (`normalize_hash_deterministic`)
+- Issue: Both tests verify only that the returned string is 64 characters and all-hex.
+  Neither asserts the concrete expected digest for the `"try_expression"` + empty-children
+  input. Rule 23 and KDD-19 state that `normalize_and_hash` must produce a byte-identical
+  digest across all platforms (WASM and native). Without a pinned expected value,
+  a regression from changing `FINGERPRINT_KEY` in `sdi-patterns::fingerprint` (Rule 19)
+  or from modifying the normalize algorithm in `crates/sdi-core/src/compute/normalize.rs`
+  would not be detected by these tests. The CI cross-platform grep of `CI_HASH:` output
+  checks same-run consistency, but not stability across code changes.
+- Severity: MEDIUM
+- Action: Compute the expected hash once (run `normalize_and_hash("try_expression", vec![])`
+  locally), record it as a constant in the test, and add:
+  ```rust
+  const EXPECTED_TRY_EXPRESSION_HASH: &str = "<64-char hex>";
+  assert_eq!(h1, EXPECTED_TRY_EXPRESSION_HASH);
+  ```
+  This makes the test a regression guard for the fingerprint key and algorithm.
+
+---
+
+#### NAMING: normalize_hash_deterministic lacks the test_ prefix used by all other test functions
+- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:191` (`normalize_hash_deterministic`)
+- Issue: All 15 other test functions in the file use a `test_` prefix
+  (e.g., `test_normalize_and_hash_deterministic`). The function at line 191 is named
+  `normalize_hash_deterministic`. The `#[wasm_bindgen_test]` macro still executes it,
+  so it is not dead, but the inconsistency reduces readability and may confuse future
+  contributors about whether the function is a test or a helper.
 - Severity: LOW
-- Action: Rename the file to `boundaries_no_snapshots.rs`. No test logic needs to change.
+- Action: Rename to `test_normalize_hash_deterministic_ci_output`.
 
-#### NAMING: show_format.rs uses .failure() where exit code 1 is the known contract
-- File: `crates/sdi-cli/tests/show_format.rs:162` (`show_no_snapshots_fails`)
-- Issue: `.assert().failure()` accepts any non-zero exit code. The corresponding test in
-  `exit_codes.rs:186` (`show_no_snapshots_exits_one`) correctly uses `.code(1)`. If `sdi show`
-  with no snapshots were to regress from exit 1 to exit 2 or 3, `show_format.rs` would
-  silently pass while `exit_codes.rs` would catch it. Having both tests diverge in strictness
-  for the same code path reduces confidence.
+---
+
+#### COVERAGE: no error-path tests for any exported function
+- File: `bindings/sdi-wasm/tests/wasm_smoke.rs` (whole file)
+- Issue: Every test exercises a happy path. None of the 16 tests verify that exported
+  functions return a `JsError` on invalid input. Examples of untested error paths:
+  - `compute_coupling_topology` / `detect_boundaries` with a node whose ID violates
+    `validate_node_id` (e.g., an absolute path) — should return `AnalysisError::InvalidNodeId`.
+  - `build_pattern_catalog` (called inside `assemble_snapshot`) with a 65-char or
+    non-hex fingerprint string — should return the `JsError` from `PatternFingerprint::from_hex`.
+  - `compute_delta` with a `JsValue` that is not a valid `Snapshot` JSON — should return
+    a deserialization error.
 - Severity: LOW
-- Action: Change `.failure()` to `.code(1)` at `show_format.rs:162`.
+- Action: Add at minimum one `#[wasm_bindgen_test]` that calls an exported function with
+  an invalid input and asserts the `Result` is `Err`. This validates that the WASM binding
+  error-conversion path (`JsError::new`) works end-to-end and does not panic.
 
-#### INTEGRITY: boundaries_comment_loss_warning.rs relies on hand-crafted Snapshot JSON
-- File: `crates/sdi-cli/tests/boundaries_comment_loss_warning.rs:26` (`minimal_snapshot_json`)
-- Issue: The helper builds a `Snapshot`-compatible JSON string by string interpolation, omitting
-  fields not required for the current `Snapshot` deserializer. `store::read_snapshots` calls
-  `serde_json::from_str::<Snapshot>` and silently skips malformed files (logs via `tracing::warn!`,
-  does not error). If a future `Snapshot` field is added without `#[serde(default)]`, the
-  hand-crafted JSON fails to deserialize; `infer_from_snapshots` returns empty proposals;
-  `run_ratify` exits early without calling `write_boundary_spec`; and the assertion
-  `stderr.contains("comments will be lost")` fails — with a message pointing to the test
-  assertion rather than the schema drift. The tester acknowledged this and explicitly deferred it.
-  All 580 tests currently pass, confirming the JSON is presently valid.
-- Severity: LOW (forward-looking fragility; tester deferred with justification)
-- Action: When Snapshot evolves, replace `minimal_snapshot_json` with a helper that constructs
-  a `Snapshot` value programmatically and serializes it via `serde_json::to_string`, eliminating
-  schema coupling. Deferred to a future refactor pass per tester note.
-
-#### COVERAGE: path_partition_entry_count_matches_graph_node_count elides the UTF-8 precondition
-- File: `crates/sdi-pipeline/tests/path_partition.rs:70`
-- Issue: The assertion `snap.path_partition.len() == snap.graph.node_count` is correct only
-  when every parsed file has a valid UTF-8 path. `compute_path_partition` (pipeline.rs:261-262)
-  silently drops nodes failing `path.to_str()`; those nodes remain in `graph.node_count`. On the
-  `simple-rust` fixture all paths are ASCII, so the assertion holds — but no comment documents
-  this precondition. The tester acknowledged and deferred this.
-- Severity: LOW (tester deferred with justification)
-- Action: Add a comment stating: "Holds for simple-rust (all ASCII paths). Non-UTF-8 paths are
-  silently dropped by compute_path_partition, so path_partition.len() < graph.node_count in that
-  case." No assertion change required for the current fixture.
-
-#### EXERCISE: path_partition_community_ids_are_valid uses partition.stability.keys() as proxy for all known communities
-- File: `crates/sdi-pipeline/tests/path_partition.rs:92`
-- Issue: `known_communities` is built from `snap.partition.stability.keys()`. Community IDs in
-  `path_partition` originate from `partition.assignments`, not `stability`. If a community
-  appears in `assignments` but not `stability` (e.g., a degenerate Leiden run producing a
-  community with no stability score), the assertion would produce a false failure unrelated to
-  the `comm_id as u32` cast it intends to guard. For the `simple-rust` fixture the two maps
-  are consistent, so the test passes correctly.
-- Severity: LOW
-- Action: Build `known_communities` from `snap.partition.assignments.values()` (the authoritative
-  source for which communities exist) rather than from `snap.partition.stability.keys()`. This
-  directly guards the numeric cast without coupling to the stability map structure.
-
-#### COVERAGE: no_color.rs check and trend tests may be trivially true when commands produce empty stdout
-- File: `crates/sdi-cli/tests/no_color.rs:43` (`no_color_env_suppresses_ansi_in_check`),
-         `crates/sdi-cli/tests/no_color.rs:63` (`no_color_env_suppresses_ansi_in_trend_insufficient_snapshots`)
-- Issue: Both tests assert `!has_ansi(&stdout)` on the stdout of commands that may produce no
-  stdout output in their default text format. `sdi check` with no prior snapshots and no
-  `--format json` might write its report to stderr only; `sdi trend` with zero snapshots writes
-  "not enough snapshots" to stderr (confirmed by `trend_format.rs`). If stdout is empty, the
-  `\x1b[` scan trivially passes regardless of whether ANSI suppression is working, making the
-  test a no-op rather than an active guard. The `no_color_env_suppresses_ansi_in_show` test does
-  not have this problem because `sdi show` definitively produces a snapshot summary on stdout.
-- Severity: LOW
-- Action: Add an assertion that stdout is non-empty before checking for ANSI codes, or switch to
-  testing commands that unconditionally produce stdout output in text mode (e.g., `sdi check` with
-  a prior snapshot and a breached threshold, or `sdi trend` with ≥2 snapshots).
+---
 
 ### Passing Items
 
-**Assertion Honesty — PASS.** No test asserts hard-coded magic values unconnected to
-implementation logic. `check_exits_ten_when_threshold_breached` uses `coupling_delta_rate = -1.0`
-and relies on `0.0 > -1.0` — the invariant is documented in the test comment and verified against
-`pipeline.rs` and `main.rs`. `config_error_exits_two` produces a real `ConfigError::MissingExpiresOnOverride`
-via the config loading path at `load.rs:101` before any subcommand dispatch. No `assertTrue(True)`
-or self-referential assertions found.
+**Assertion Honesty — PASS (except where noted).** The three primary assertions introduced
+by the tester — `compute_delta` self-delta coupling == `Some(0.0)`, coupling delta ≈ 0.2
+for densities 0.1→0.3, and coupling slope ≈ 0.2 for three linearly increasing snapshots —
+all derive their expected values from the test's own inputs and the documented implementation
+(`delta.rs:129`: `coupling_delta = Some(curr.graph.density - prev.graph.density)`;
+`trend.rs:106–107`: `mean_slope` over density values). No magic constants.
 
-**Test Weakening — PASS.** The one renamed test (`snapshot_exits_zero_on_all_unknown_languages`
-→ `snapshot_exits_three_on_all_unknown_languages`) is a STRENGTHENING: the old assertion
-`.success()` accepted the buggy pre-M11 exit-0 behavior; the new `.code(3)` enforces the
-Rule 15 / System Rule 7 contract, made possible by the matching coder fix in `pipeline.rs:142-150`
-and `main.rs:153-157`. The `no_color` rename is a name correction with unchanged assertion body.
-No assertion was broadened; no edge case was removed.
+**Test Weakening — PASS.** The audit context contains no prior version of this test file
+(it is NEW per the coder summary). No existing assertions were modified or removed.
 
-**Implementation Exercise — PASS.** All tests call real binaries via `assert_cmd` or real library
-functions (`write_boundary_spec`, `Pipeline::snapshot_with_mode`). No mocking of any internal.
-`path_partition.rs` exercises the private `compute_path_partition` helper via the only correct
-public seam (`Pipeline::snapshot_with_mode`). `write_boundary_spec.rs` calls the function
-directly and verifies disk state.
+**Implementation Exercise — PASS.** Every test calls a real `#[wasm_bindgen]` export.
+The conversion path (wrapper type → `to_core` → `sdi_core::*` → `from_core` → wrapper type)
+is exercised end-to-end for `compute_coupling_topology`, `detect_boundaries`,
+`compute_pattern_metrics`, `compute_thresholds_check`, `infer_boundaries`,
+`normalize_and_hash`, `assemble_snapshot`, `compute_delta`, and `compute_trend`. No internal
+dependencies are mocked.
 
-**Test Naming — PASS (with two LOW exceptions above).** All function names encode the scenario
-and expected outcome. No `test_1()` or `test_thing()` patterns present.
+**Test Naming — PASS (with one LOW exception above).** 15 of 16 functions follow the
+`test_<scenario>_<expected_outcome>` convention and name the scenario and expectation clearly.
 
-**Scope Alignment — PASS.** No orphaned imports. `PipelineError::NoGrammarsAvailable` exists in
-`sdi-pipeline/src/error.rs:14`. `write_boundary_spec` is public in `sdi-pipeline/src/store.rs:111`.
-`Pipeline::snapshot_with_mode` and `WriteMode::EphemeralForCheck` are public in
-`sdi-pipeline/src/pipeline.rs:127,35`. The deleted `.tekhton/test_dedup.fingerprint` is not
-referenced by any test under audit.
+**Scope Alignment — PASS.** All imports resolve against current code. The deleted
+`.tekhton/test_dedup.fingerprint` is not referenced. `WasmAssembleSnapshotInput.leiden_seed`
+(added this run) is exercised in `make_assemble_input` at line 233 (`leiden_seed: Some(42)`),
+consistent with the coder's change to `build_leiden_partition` using `leiden_seed` instead
+of a hardcoded value.
 
-**Test Isolation — PASS.** All CLI integration tests create their own `tempfile::TempDir`. The
-`write_boundary_spec.rs` tests create isolated `TempDir` instances with no shared state. No test
-reads `.tekhton/`, `.claude/`, build artifacts, or any mutable pipeline state file. The
-`path_partition.rs` tests use `WriteMode::EphemeralForCheck` — no snapshots are written to the
-fixture directory. (The partition cache write at `pipeline.rs:162` does touch the fixture's
-`.sdi/cache/` directory, but this is an idempotent pre-existing behavior shared across all
-pipeline tests and is not unique to M11.)
-
-**Prior HIGH/MEDIUM Findings Resolved — PASS.** All issues from the prior audit rework pass were
-addressed: `check_exits_ten_when_threshold_breached` and `config_error_exits_two` added to
-`exit_codes.rs`; `no_color_flag_suppresses_ansi_in_show` renamed to
-`default_show_output_has_no_ansi_codes`; `.failure()` replaced with `.code(1)` for `show` and
-`diff` tests in `exit_codes.rs`; `coupling_slope` assertion strengthened to `.as_f64().is_some()`;
-three check-test duplicates removed from `exit_codes.rs`.
+**Test Isolation — PASS.** All tests construct their own in-memory inputs via factory
+functions (`two_node_graph`, `default_leiden_cfg`, `make_assemble_input`). No test reads
+`.tekhton/` files, build artifacts, or any mutable project state. `wasm_smoke.rs` has
+no filesystem I/O.

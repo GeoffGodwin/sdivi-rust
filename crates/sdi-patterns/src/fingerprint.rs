@@ -39,6 +39,29 @@ impl PatternFingerprint {
         PatternFingerprint(bytes)
     }
 
+    /// Parses a [`PatternFingerprint`] from a 64-character lowercase hex string.
+    ///
+    /// Returns `None` if the string is not exactly 64 hex characters.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sdi_patterns::fingerprint::{fingerprint_node_kind, PatternFingerprint};
+    ///
+    /// let fp = fingerprint_node_kind("try_expression");
+    /// let hex = fp.to_hex();
+    /// let parsed = PatternFingerprint::from_hex(&hex).unwrap();
+    /// assert_eq!(fp, parsed);
+    /// ```
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        if hex.len() != 64 { return None; }
+        let mut bytes = [0u8; 32];
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()?;
+        }
+        Some(PatternFingerprint(bytes))
+    }
+
     /// Returns the raw digest bytes.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
@@ -134,5 +157,18 @@ mod tests {
     #[test]
     fn fingerprint_key_is_32_bytes() {
         assert_eq!(FINGERPRINT_KEY.len(), 32);
+    }
+
+    #[test]
+    fn from_hex_round_trips() {
+        let fp = fingerprint_node_kind("try_expression");
+        let parsed = PatternFingerprint::from_hex(&fp.to_hex()).unwrap();
+        assert_eq!(fp, parsed);
+    }
+
+    #[test]
+    fn from_hex_invalid_length_returns_none() {
+        assert!(PatternFingerprint::from_hex("abc").is_none());
+        assert!(PatternFingerprint::from_hex("").is_none());
     }
 }

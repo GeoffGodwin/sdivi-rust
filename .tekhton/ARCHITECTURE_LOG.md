@@ -13,3 +13,18 @@ Each entry captures why a structural change was made, preventing future develope
 - **Date**: 2026-04-30
 - **Rationale**: - ACP: Add `path_partition: BTreeMap<String, u32>` to `Snapshot` — ACCEPT. Backward-compatible (`serde(default, skip_serializing_if)`). Correctly populated in `sdi-pipeline`, never in `sdi-core` (WA
 - **Source**: Accepted ACP from pipeline run
+
+## ADL-3: Re-exporting inner types from sdi-core (Task: "M12")
+- **Date**: 2026-05-01
+- **Rationale**: - ACP: Re-exporting inner types from sdi-core — ACCEPT. Additive re-exports, WASM-safe, required by the KDD-12 architecture where `sdi-wasm` depends only on `sdi-core`. The corresponding CLAUDE.md u
+- **Source**: Accepted ACP from pipeline run
+
+## ADL-4: WASM wrapper types use serde_json round-trip conversion (Task: "M12")
+- **Date**: 2026-05-01
+- **Rationale**: - ACP: WASM wrapper types use serde_json round-trip conversion — ACCEPT. Internal to `sdi-wasm`; avoids ~200 lines of boilerplate `From` impls with no observable behavior difference to callers.
+- **Source**: Accepted ACP from pipeline run
+
+## ADL-5: wasm-pack --profile syntax (wasm-pack 0.12+) (Task: "M12")
+- **Date**: 2026-05-01
+- **Rationale**: - ACP: wasm-pack --profile syntax (wasm-pack 0.12+) — ACCEPT. Correct fix for the `--release` + `--profile` Cargo flag conflict; documented in build.sh and wasm.yml.
+- **Source**: Accepted ACP from pipeline run
