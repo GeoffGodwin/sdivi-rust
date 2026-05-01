@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.1.2] - 2026-05-01
+
+### Added
+- Implemented the full M15 change-coupling analyzer across all layers: (M15)
+
+### Added
+- Change-coupling analyzer wired up. New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdi_core::compute_change_coupling` exported through WASM. Schema stays `1.0`.
+
 ## [0.1.1] - 2026-05-01
 
 ### Added

@@ -17,12 +17,14 @@
 
 pub mod boundaries;
 pub mod cache;
+pub mod change_coupling;
 pub mod error;
 pub mod pipeline;
 pub mod store;
 pub mod time;
 
 pub use boundaries::{infer_from_snapshots, read_prior_partitions};
+pub use change_coupling::{collect_cochange_events, ChangeCouplingError};
 pub use error::PipelineError;
 pub use pipeline::{Pipeline, WriteMode};
 pub use time::current_timestamp;

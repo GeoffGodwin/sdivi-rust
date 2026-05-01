@@ -91,15 +91,8 @@ impl Serialize for PatternFingerprint {
 impl<'de> Deserialize<'de> for PatternFingerprint {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let hex: String = Deserialize::deserialize(d)?;
-        if hex.len() != 64 {
-            return Err(serde::de::Error::custom("expected 64-char hex fingerprint"));
-        }
-        let mut bytes = [0u8; 32];
-        for (i, b) in bytes.iter_mut().enumerate() {
-            *b = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
-                .map_err(|_| serde::de::Error::custom("invalid hex in fingerprint"))?;
-        }
-        Ok(PatternFingerprint(bytes))
+        Self::from_hex(&hex)
+            .ok_or_else(|| serde::de::Error::custom("expected 64-char ASCII hex fingerprint"))
     }
 }
 
@@ -170,5 +163,14 @@ mod tests {
     fn from_hex_invalid_length_returns_none() {
         assert!(PatternFingerprint::from_hex("abc").is_none());
         assert!(PatternFingerprint::from_hex("").is_none());
+    }
+
+    #[test]
+    fn serde_deserialize_non_ascii_returns_err() {
+        // 64-byte non-ASCII UTF-8 string should be rejected during deserialization, not panic
+        let s = "é".repeat(32); // é is 2 bytes each; 32 × 2 = 64 bytes but not 64 chars
+        let json = serde_json::to_string(&s).unwrap();
+        let result: Result<PatternFingerprint, _> = serde_json::from_str(&json);
+        assert!(result.is_err());
     }
 }

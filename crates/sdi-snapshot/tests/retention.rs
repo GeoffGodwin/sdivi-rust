@@ -29,6 +29,7 @@ fn snap_at(ts: &str) -> sdi_snapshot::Snapshot {
         None,
         ts,
         None,
+        None,
     )
 }
 

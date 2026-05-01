@@ -36,15 +36,11 @@ use refine::refine_partition;
 ///
 /// ```rust
 /// use sdi_detection::leiden::run_leiden;
-/// use sdi_detection::partition::{LeidenConfig, LeidenPartition};
-/// use sdi_graph::dependency_graph::build_dependency_graph;
-/// use sdi_parsing::feature_record::FeatureRecord;
-/// use std::path::PathBuf;
+/// use sdi_detection::partition::LeidenConfig;
+/// use sdi_graph::dependency_graph::build_dependency_graph_from_edges;
 ///
-/// let records: Vec<FeatureRecord> = vec![];
-/// let dg = build_dependency_graph(&records);
-/// let cfg = LeidenConfig::default();
-/// let p = run_leiden(&dg, &cfg, None);
+/// let dg = build_dependency_graph_from_edges(&[], &[]);
+/// let p = run_leiden(&dg, &LeidenConfig::default(), None);
 /// assert_eq!(p.community_count(), 0);
 /// ```
 pub fn run_leiden(
@@ -75,6 +71,41 @@ pub fn run_leiden(
         cfg.gamma,
     );
 
+    build_partition(dg, &leiden_graph, assignment, cfg.seed)
+}
+
+/// Runs Leiden with per-edge weights supplied via a `(min_idx, max_idx) → weight` map.
+///
+/// Edges not in `weight_map` get weight `1.0`. Pairs whose endpoints are not
+/// connected by an import edge are ignored (KDD-5: change-coupling is a weight
+/// modulation, not a new topology).
+pub fn run_leiden_with_weights(
+    dg: &DependencyGraph,
+    cfg: &LeidenConfig,
+    warm_start: Option<&LeidenPartition>,
+    weight_map: &BTreeMap<(usize, usize), f64>,
+) -> LeidenPartition {
+    let leiden_graph = LeidenGraph::from_dependency_graph_weighted(dg, weight_map);
+
+    if leiden_graph.n == 0 {
+        return LeidenPartition {
+            assignments: BTreeMap::new(),
+            stability: BTreeMap::new(),
+            modularity: 0.0,
+            seed: cfg.seed,
+        };
+    }
+
+    let mut rng = StdRng::seed_from_u64(cfg.seed);
+    let initial = initial_assignment_from_cache(warm_start, leiden_graph.n);
+    let assignment = leiden_recursive(
+        &leiden_graph,
+        initial,
+        &mut rng,
+        cfg.max_iterations,
+        &cfg.quality,
+        cfg.gamma,
+    );
     build_partition(dg, &leiden_graph, assignment, cfg.seed)
 }
 
@@ -192,11 +223,11 @@ fn best_neighbour_community(
     quality: &QualityFunction,
     gamma: f64,
 ) -> (usize, f64) {
-    // Accumulate edge counts per candidate community.
+    // Accumulate edge weights per candidate community.
     let mut k_in_per_comm: BTreeMap<usize, f64> = BTreeMap::new();
-    for &nbr in &graph.adj[node] {
+    for (idx, &nbr) in graph.adj[node].iter().enumerate() {
         let c = state.assignment[nbr];
-        *k_in_per_comm.entry(c).or_insert(0.0) += 1.0;
+        *k_in_per_comm.entry(c).or_insert(0.0) += graph.edge_weights[node][idx];
     }
 
     let mut best_comm = node; // default: singleton
@@ -267,4 +298,3 @@ fn build_partition(
 
     LeidenPartition { assignments, stability, modularity, seed }
 }
-

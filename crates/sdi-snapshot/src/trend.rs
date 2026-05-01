@@ -152,7 +152,7 @@ mod tests {
         };
         assemble_snapshot(
             graph, partition, PatternCatalog::default(),
-            PatternMetricsResult::default(), None, "T", None,
+            PatternMetricsResult::default(), None, "T", None, None,
         )
     }
 

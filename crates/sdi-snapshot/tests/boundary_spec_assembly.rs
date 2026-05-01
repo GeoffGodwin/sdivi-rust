@@ -52,6 +52,7 @@ fn with_boundary_spec_intent_divergence_is_some() {
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
+        None,
     );
 
     assert!(
@@ -80,6 +81,7 @@ fn boundary_count_matches_spec_length() {
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
+        None,
     );
 
     let info = snap.intent_divergence.unwrap();
@@ -104,6 +106,7 @@ fn violation_count_is_zero() {
         PatternMetricsResult::default(),
         Some(&spec),
         "2026-04-29T00:00:00Z",
+        None,
         None,
     );
 
@@ -130,6 +133,7 @@ fn empty_boundary_spec_sets_intent_divergence_with_zero_count() {
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
+        None,
     );
 
     let info = snap.intent_divergence.expect("intent_divergence must be Some even for empty spec");
@@ -155,6 +159,7 @@ fn intent_divergence_present_in_json_when_spec_given() {
         Some(&spec),
         "2026-04-29T00:00:00Z",
         None,
+        None,
     );
 
     let json = serde_json::to_string(&snap).unwrap();
@@ -178,6 +183,7 @@ fn intent_divergence_absent_from_json_when_no_spec() {
         PatternMetricsResult::default(),
         None,
         "2026-04-29T00:00:00Z",
+        None,
         None,
     );
 

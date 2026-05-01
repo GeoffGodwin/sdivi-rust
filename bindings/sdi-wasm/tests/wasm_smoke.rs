@@ -16,6 +16,7 @@ use sdi_wasm::types::{
     WasmNodeInput, WasmPatternInstanceInput, WasmPatternMetricsResult, WasmPriorPartition,
     WasmQualityFunction, WasmThresholdsInput,
 };
+use serde_wasm_bindgen;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_node);
 
@@ -233,6 +234,24 @@ fn make_assemble_input(density: f64, timestamp: &str) -> WasmAssembleSnapshotInp
         leiden_seed: Some(42),
         violation_count: None,
     }
+}
+
+/// `assemble_snapshot` with `violation_count` set produces a snapshot whose
+/// `intent_divergence` field carries the expected counts.
+#[wasm_bindgen_test]
+fn test_assemble_snapshot_with_violation_count_sets_intent_divergence() {
+    let mut input = make_assemble_input(0.25, "2026-05-01T00:00:00Z");
+    input.boundary_count = Some(3);
+    input.violation_count = Some(5);
+    let snap_js = assemble_snapshot(input).unwrap();
+    assert!(!snap_js.is_null());
+    let snap: sdi_core::Snapshot =
+        serde_wasm_bindgen::from_value(snap_js).expect("must deserialize as Snapshot");
+    let id = snap
+        .intent_divergence
+        .expect("intent_divergence must be Some when boundary_count is set");
+    assert_eq!(id.boundary_count, 3, "boundary_count must match input");
+    assert_eq!(id.violation_count, 5, "violation_count must match input");
 }
 
 /// `assemble_snapshot` returns a non-null JS object that `compute_delta` can

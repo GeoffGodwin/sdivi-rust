@@ -11,9 +11,11 @@
 //! ```
 
 pub mod assemble_types;
+pub mod change_coupling;
 pub mod types;
 mod exports;
 
+pub use change_coupling::*;
 pub use exports::*;
 
 /// Initialise WASM — installs the console_error_panic_hook so that Rust
@@ -37,9 +39,10 @@ export interface Snapshot {
   graph: GraphMetrics;
   partition: LeidenPartition;
   catalog: PatternCatalog;
-  pattern_metrics: PatternMetricsResult;
+  pattern_metrics: WasmPatternMetricsResult;
   intent_divergence?: IntentDivergenceInfo;
   path_partition?: Record<string, number>;
+  change_coupling?: ChangeCouplingResult;
 }
 export interface GraphMetrics {
   node_count: number;
@@ -53,10 +56,23 @@ export interface LeidenPartition {
   assignments: Record<string, number>;
   stability: Record<string, number>;
   modularity: number;
+  /** NOTE: Rust source is u64; JS number cannot exactly represent values above 2^53.
+      Default seed 42 is safe. Custom seeds must be <= Number.MAX_SAFE_INTEGER. */
   seed: number;
 }
 export type PatternCatalog = { entries: Record<string, Record<string, PatternStats>> };
 export interface PatternStats { count: number; locations: PatternLocation[]; }
 export interface PatternLocation { file: string; start_row: number; start_col: number; }
 export interface IntentDivergenceInfo { boundary_count: number; violation_count: number; }
+export interface ChangeCouplingResult {
+  pairs: CoChangePair[];
+  commits_analyzed: number;
+  distinct_files_touched: number;
+}
+export interface CoChangePair {
+  source: string;
+  target: string;
+  frequency: number;
+  cochange_count: number;
+}
 "#;

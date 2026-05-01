@@ -176,3 +176,23 @@ retention = 50   # 0 = unlimited
 
 Retention is enforced synchronously after each successful snapshot write. A
 failed write never removes an existing snapshot.
+
+## Change-coupling and weighted community detection
+
+Set `boundaries.weighted_edges = true` in `.sdi/config.toml` to have the
+Leiden community detection step use change-coupling frequencies as edge
+weights. Edges between files that frequently co-change are weighted by
+`1.0 + frequency`, pulling highly-coupled files into the same community.
+
+```toml
+[boundaries]
+weighted_edges = true
+
+[change_coupling]
+min_frequency = 0.6
+history_depth = 500
+```
+
+Note: files renamed in git register as separate delete/add events, which
+inflates the change-coupling signal for rename-heavy histories. This is by
+design for v0 (see `docs/migrating-from-sdi-py.md`).

@@ -52,7 +52,8 @@ pub use exit_code::ExitCode;
 // ── input type re-exports ──────────────────────────────────────────────────
 
 pub use input::{
-    BoundaryDefInput, BoundarySpecInput, DependencyGraphInput, EdgeInput, LeidenConfigInput,
+    BoundaryDefInput, BoundarySpecInput, ChangeCouplingConfigInput, CoChangeEventInput,
+    DependencyGraphInput, EdgeInput, LeidenConfigInput,
     NodeInput, NormalizeNode, PatternInstanceInput, PatternLocationInput, PriorPartition,
     QualityFunctionInput, ThresholdOverrideInput, ThresholdsInput, validate_node_id,
 };
@@ -62,9 +63,10 @@ pub use input::{
 pub use compute::boundaries::{
     BoundaryDetectionResult, BoundaryViolationResult, compute_boundary_violations, detect_boundaries,
 };
+pub use compute::change_coupling::compute_change_coupling;
 pub use compute::coupling::{CouplingTopologyResult, compute_coupling_topology};
 pub use compute::normalize::normalize_and_hash;
-pub use compute::patterns::compute_pattern_metrics;
+pub use compute::patterns::{compute_pattern_metrics, compute_pattern_metrics_from_catalog};
 pub use compute::thresholds::{
     AppliedOverrideInfo, ThresholdBreachInfo, ThresholdCheckResult, compute_thresholds_check,
 };
@@ -79,6 +81,7 @@ pub use sdi_snapshot::boundary_inference::{
     BoundaryInferenceResult, BoundaryProposal,
     PriorPartition as SnapshotPriorPartition,
 };
+pub use sdi_snapshot::change_coupling::{ChangeCouplingResult, CoChangePair};
 pub use sdi_snapshot::delta::DivergenceSummary;
 pub use sdi_snapshot::snapshot::{
     IntentDivergenceInfo, PatternMetricsResult, Snapshot, SNAPSHOT_VERSION,

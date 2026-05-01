@@ -131,3 +131,21 @@ The following proptest suites are permanent CI fixtures:
 Regression files are committed in `proptest-regressions/` subdirectories.
 If proptest shrinks a failing case, commit the resulting `.txt` file so the
 regression is checked on every subsequent CI run.
+
+## Change-coupling determinism
+
+`git log` output ordering is deterministic for a fixed `HEAD` ref. The
+`collect_cochange_events` function does not reorder events; it reverses
+the git log output (newest-first → oldest-first) so that
+`compute_change_coupling` operates on a consistent oldest-first slice.
+
+Cross-platform: git paths use forward slashes on all platforms in its
+internal representation. The `canonicalize_path` function strips any
+leading `./` and converts backslashes to forward slashes. Combined with
+`BTreeMap`-ordered output from `compute_change_coupling`, the
+`ChangeCouplingResult` is byte-identical on Linux, macOS, and Windows for
+the same repo state.
+
+Weighted Leiden verification against `leidenalg`'s weighted mode is
+out of scope for v0 — KDD-2's tolerance is partition quality, not
+bit-identity, and weighted-mode parity is best deferred to v0.x.

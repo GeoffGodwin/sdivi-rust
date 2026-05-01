@@ -39,6 +39,16 @@ pub fn print_snapshot(snapshot: &Snapshot) {
         println!("boundaries:        {}", id.boundary_count);
         println!("violations:        {}", id.violation_count);
     }
+    if let Some(ref cc) = snapshot.change_coupling {
+        if cc.pairs.is_empty() {
+            println!("change coupling:   0 pairs");
+        } else {
+            let top: Vec<String> = cc.pairs.iter().take(5)
+                .map(|p| format!("({}, {}): {:.2}", p.source, p.target, p.frequency))
+                .collect();
+            println!("change coupling:   {} pairs (top 5: {})", cc.pairs.len(), top.join("; "));
+        }
+    }
 }
 
 /// Prints the per-dimension divergence summary as a labeled table to stdout.

@@ -7,6 +7,8 @@ use sdi_detection::partition::LeidenPartition;
 use sdi_graph::metrics::GraphMetrics;
 use sdi_patterns::PatternCatalog;
 
+use crate::change_coupling::ChangeCouplingResult;
+
 /// Snapshot schema version emitted by sdi-rust.
 ///
 /// This constant is `"1.0"` for all sdi-rust output.  Bumping this value is a
@@ -96,7 +98,7 @@ pub struct PatternMetricsResult {
 /// let snap = assemble_snapshot(
 ///     graph, partition, PatternCatalog::default(),
 ///     PatternMetricsResult::default(), None,
-///     "2026-04-29T00:00:00Z", None,
+///     "2026-04-29T00:00:00Z", None, None,
 /// );
 /// assert_eq!(snap.snapshot_version, SNAPSHOT_VERSION);
 /// ```
@@ -131,6 +133,13 @@ pub struct Snapshot {
     /// inference from such snapshots yields no proposals.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub path_partition: BTreeMap<String, u32>,
+
+    /// Change-coupling analysis result.
+    ///
+    /// `None` when the repo has no git history or `history_depth = 0`.
+    /// `#[serde(default)]` ensures M14-era snapshots deserialize as `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_coupling: Option<ChangeCouplingResult>,
 }
 
 /// Assembles a [`Snapshot`] from pipeline stage outputs.
@@ -160,7 +169,7 @@ pub struct Snapshot {
 /// let snap = assemble_snapshot(
 ///     graph, partition, PatternCatalog::default(),
 ///     PatternMetricsResult::default(), None,
-///     "2026-04-29T00:00:00Z", Some("abc123"),
+///     "2026-04-29T00:00:00Z", Some("abc123"), None,
 /// );
 /// assert_eq!(snap.commit.as_deref(), Some("abc123"));
 /// ```
@@ -172,6 +181,7 @@ pub fn assemble_snapshot(
     boundary_spec: Option<&sdi_config::BoundarySpec>,
     timestamp: &str,
     commit: Option<&str>,
+    change_coupling: Option<ChangeCouplingResult>,
 ) -> Snapshot {
     let intent_divergence = boundary_spec.map(|spec| IntentDivergenceInfo {
         boundary_count: spec.boundaries.len(),
@@ -188,6 +198,7 @@ pub fn assemble_snapshot(
         pattern_metrics,
         intent_divergence,
         path_partition: BTreeMap::new(),
+        change_coupling,
     }
 }
 
@@ -239,7 +250,7 @@ mod tests {
     fn make_snap() -> Snapshot {
         assemble_snapshot(
             empty_graph(), empty_partition(), PatternCatalog::default(),
-            PatternMetricsResult::default(), None, "T", None,
+            PatternMetricsResult::default(), None, "T", None, None,
         )
     }
 
@@ -259,7 +270,7 @@ mod tests {
     fn commit_round_trips() {
         let snap = assemble_snapshot(
             empty_graph(), empty_partition(), PatternCatalog::default(),
-            PatternMetricsResult::default(), None, "T", Some("deadbeef"),
+            PatternMetricsResult::default(), None, "T", Some("deadbeef"), None,
         );
         assert_eq!(snap.commit.as_deref(), Some("deadbeef"));
     }

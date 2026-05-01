@@ -21,7 +21,7 @@ fn make_snap(density: f64, communities: usize) -> sdi_snapshot::snapshot::Snapsh
     };
     assemble_snapshot(
         graph, partition, PatternCatalog::default(),
-        PatternMetricsResult::default(), None, "2026-01-01T00:00:00Z", None,
+        PatternMetricsResult::default(), None, "2026-01-01T00:00:00Z", None, None,
     )
 }
 

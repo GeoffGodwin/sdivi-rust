@@ -28,6 +28,7 @@ fn empty_snap(ts: &str) -> sdi_snapshot::Snapshot {
         None,
         ts,
         None,
+        None,
     )
 }
 

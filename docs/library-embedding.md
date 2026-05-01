@@ -249,3 +249,31 @@ See the `bindings/sdi-wasm/README.md` for the npm package setup and full API.
 | Has its own parser | Yes | No |
 | Snapshot writes | Yes | No |
 | Use when | Rust CLI / CI tooling | WASM, agent runtimes, custom extractors |
+
+## Computing change-coupling from a foreign extractor
+
+If you have your own commit-history source (e.g., the VSCode git index in
+Meridian), supply a `Vec<CoChangeEventInput>` directly to
+`compute_change_coupling` without shelling out to `git log`:
+
+```rust
+use sdi_core::{compute_change_coupling, CoChangeEventInput, ChangeCouplingConfigInput};
+
+let events = vec![
+    CoChangeEventInput {
+        commit_sha: "abc123".to_string(),
+        commit_date: "2026-05-01T00:00:00Z".to_string(),
+        files: vec!["src/auth.rs".to_string(), "src/session.rs".to_string()],
+    },
+    // ... more events
+];
+
+let cfg = ChangeCouplingConfigInput { min_frequency: 0.6, history_depth: 500 };
+let result = compute_change_coupling(&events, &cfg)?;
+for pair in &result.pairs {
+    println!("{} ↔ {} @ {:.0}%", pair.source, pair.target, pair.frequency * 100.0);
+}
+```
+
+The same function is exported from `@geoffgodwin/sdi-wasm` as
+`compute_change_coupling`, making it callable from TypeScript consumers.

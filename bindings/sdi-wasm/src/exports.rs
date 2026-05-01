@@ -121,7 +121,7 @@ pub fn compute_trend(snapshots: JsValue, last_n: Option<u32>) -> Result<WasmTren
 /// Infer boundary proposals from a sequence of prior partitions.
 #[wasm_bindgen]
 pub fn infer_boundaries(
-    prior_partitions: Vec<WasmPriorPartition>,
+    prior_partitions: Vec<WasmSnapshotPriorPartition>,
     stability_threshold: u32,
 ) -> Result<WasmBoundaryInferenceResult, JsError> {
     let partitions: Vec<sdi_core::SnapshotPriorPartition> = prior_partitions
@@ -165,12 +165,13 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
         None,
         &input.timestamp,
         input.commit.as_deref(),
+        None,
     );
 
     if let Some(count) = input.boundary_count {
         snap.intent_divergence = Some(sdi_core::IntentDivergenceInfo {
             boundary_count: count as usize,
-            violation_count: input.violation_count.unwrap_or(0) as usize,
+            violation_count: input.violation_count.unwrap_or(0),
         });
     }
 
@@ -183,6 +184,8 @@ fn build_graph_metrics(input: &WasmAssembleSnapshotInput) -> sdi_core::GraphMetr
         edge_count: input.edge_count,
         density: input.density,
         cycle_count: input.cycle_count,
+        // top_hubs stores PathBuf internally; TS consumers see [string, number][].
+        // If GraphMetrics.top_hubs changes element type, update this conversion.
         top_hubs: input.top_hubs.iter()
             .map(|(id, deg)| (PathBuf::from(id), *deg))
             .collect(),

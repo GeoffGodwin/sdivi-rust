@@ -8,8 +8,9 @@
 use std::path::Path;
 
 use sdi_config::{BoundarySpec, Config};
+use sdi_core::input::ChangeCouplingConfigInput;
 use sdi_detection::warm_start::CACHE_FILENAME;
-use sdi_detection::{LeidenConfig, run_leiden};
+use sdi_detection::{LeidenConfig, run_leiden, run_leiden_with_weights};
 use sdi_graph::dependency_graph::build_dependency_graph;
 use sdi_graph::metrics::compute_metrics;
 use sdi_parsing::adapter::LanguageAdapter;
@@ -18,8 +19,6 @@ use sdi_patterns::build_catalog;
 use sdi_snapshot::{
     DivergenceSummary, Snapshot, assemble_snapshot, compute_delta, null_summary,
 };
-use sdi_snapshot::snapshot::PatternMetricsResult;
-
 use crate::cache::{load_cached_partition, save_cached_partition};
 pub use crate::time::current_timestamp;
 use crate::error::PipelineError;
@@ -154,11 +153,41 @@ impl Pipeline {
         let dg = build_dependency_graph(&records);
         let metrics = compute_metrics(&dg);
 
+        // ── Change-coupling analysis ─────────────────────────────────────
+        let cc_cfg = ChangeCouplingConfigInput {
+            min_frequency: self.config.change_coupling.min_frequency,
+            history_depth: self.config.change_coupling.history_depth,
+        };
+        let cc_events = crate::change_coupling::collect_cochange_events(
+            repo_root,
+            self.config.change_coupling.history_depth,
+            None,
+        ).unwrap_or_else(|e| {
+            tracing::warn!("change-coupling collection failed: {e}");
+            vec![]
+        });
+        // Only compute and store when there are actual commit events to analyze.
+        // None means "no git history" (not "analyzed but found nothing").
+        let change_coupling_result = if cc_events.is_empty() {
+            None
+        } else {
+            sdi_core::compute_change_coupling(&cc_events, &cc_cfg).ok()
+        };
+
         // ── Stage 3: Detection ───────────────────────────────────────────
         let cache_path = repo_root.join(".sdi").join(CACHE_FILENAME);
         let warm_partition = load_cached_partition(&cache_path);
         let leiden_cfg = LeidenConfig::from_sdi_config(&self.config);
-        let partition = run_leiden(&dg, &leiden_cfg, warm_partition.as_ref());
+        let partition = if self.config.boundaries.weighted_edges {
+            if let Some(ref ccr) = change_coupling_result {
+                let weight_map = build_edge_weight_map(&dg, ccr);
+                run_leiden_with_weights(&dg, &leiden_cfg, warm_partition.as_ref(), &weight_map)
+            } else {
+                run_leiden(&dg, &leiden_cfg, warm_partition.as_ref())
+            }
+        } else {
+            run_leiden(&dg, &leiden_cfg, warm_partition.as_ref())
+        };
         if let WriteMode::Persist = mode {
             save_cached_partition(&partition, &cache_path)
                 .map_err(PipelineError::SnapshotIo)?;
@@ -166,7 +195,7 @@ impl Pipeline {
 
         // ── Stage 4: Patterns ────────────────────────────────────────────
         let catalog = build_catalog(&records, &self.config.patterns);
-        let pattern_metrics = compute_pattern_metrics_from_catalog(&catalog);
+        let pattern_metrics = sdi_core::compute_pattern_metrics_from_catalog(&catalog);
 
         // ── Stage 5: Snapshot assembly ───────────────────────────────────
         let boundary_path = repo_root.join(&self.config.boundaries.spec_file);
@@ -181,6 +210,7 @@ impl Pipeline {
             boundary_spec.as_ref(),
             timestamp,
             commit,
+            change_coupling_result,
         );
         snapshot.path_partition = compute_path_partition(&dg, &snapshot.partition);
 
@@ -216,44 +246,23 @@ impl Pipeline {
     }
 }
 
-/// Builds [`PatternMetricsResult`] from a catalog using the same entropy logic
-/// as `sdi_core::compute_pattern_metrics`.
-fn compute_pattern_metrics_from_catalog(
-    catalog: &sdi_patterns::PatternCatalog,
-) -> PatternMetricsResult {
-    use sdi_patterns::compute_entropy;
-
-    let entropy_per_category: std::collections::BTreeMap<String, f64> = catalog
-        .entries
-        .iter()
-        .map(|(cat, stats)| (cat.clone(), compute_entropy(stats)))
-        .collect();
-
-    let total_entropy: f64 = entropy_per_category.values().sum();
-
-    let convention_drift_per_category: std::collections::BTreeMap<String, f64> = catalog
-        .entries
-        .iter()
-        .map(|(cat, stats)| {
-            let distinct = stats.len() as f64;
-            let total: f64 = stats.values().map(|s| s.count as f64).sum();
-            (cat.clone(), if total > 0.0 { distinct / total } else { 0.0 })
-        })
-        .collect();
-
-    let convention_drift = if convention_drift_per_category.is_empty() {
-        0.0
-    } else {
-        convention_drift_per_category.values().sum::<f64>()
-            / convention_drift_per_category.len() as f64
-    };
-
-    PatternMetricsResult {
-        entropy_per_category,
-        total_entropy,
-        convention_drift,
-        convention_drift_per_category,
+/// Builds a `(min_idx, max_idx) → weight` map for weighted Leiden from
+/// change-coupling pairs. Weight = `1.0 + frequency` (multiplicative).
+/// Only pairs whose both endpoints exist in `dg` produce entries.
+fn build_edge_weight_map(
+    dg: &sdi_graph::dependency_graph::DependencyGraph,
+    ccr: &sdi_snapshot::change_coupling::ChangeCouplingResult,
+) -> std::collections::BTreeMap<(usize, usize), f64> {
+    let mut map = std::collections::BTreeMap::new();
+    for pair in &ccr.pairs {
+        let sp = std::path::Path::new(&pair.source);
+        let tp = std::path::Path::new(&pair.target);
+        if let (Some(si), Some(ti)) = (dg.node_for_path(sp), dg.node_for_path(tp)) {
+            let key = if si < ti { (si, ti) } else { (ti, si) };
+            map.insert(key, 1.0 + pair.frequency);
+        }
     }
+    map
 }
 
 /// Builds a path→community mapping from a `DependencyGraph` and `LeidenPartition`.

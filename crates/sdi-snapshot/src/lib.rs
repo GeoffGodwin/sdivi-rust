@@ -5,6 +5,7 @@
 //! (tempfile + rename) to `.sdi/snapshots/` (requires `pipeline-records` feature).
 
 pub mod boundary_inference;
+pub mod change_coupling;
 pub mod delta;
 pub mod retention;
 pub mod snapshot;
@@ -12,6 +13,7 @@ pub mod store;
 pub mod trend;
 
 pub use boundary_inference::{infer_boundaries, BoundaryInferenceResult, PriorPartition};
+pub use change_coupling::{ChangeCouplingResult, CoChangePair};
 pub use delta::{compute_delta, null_summary, DivergenceSummary};
 pub use snapshot::{assemble_snapshot, IntentDivergenceInfo, PatternMetricsResult, Snapshot, SNAPSHOT_VERSION};
 pub use trend::{compute_trend, TrendResult};

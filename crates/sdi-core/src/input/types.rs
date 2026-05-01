@@ -140,6 +140,9 @@ pub struct LeidenConfigInput {
     pub iterations: usize,
     /// Quality function to optimise.
     pub quality: QualityFunctionInput,
+    /// Per-edge weights (`source < target` keys) for weighted Leiden. `None` = all weights 1.0.
+    #[serde(default)]
+    pub edge_weights: Option<BTreeMap<(String, String), f64>>,
 }
 
 impl Default for LeidenConfigInput {
@@ -149,6 +152,7 @@ impl Default for LeidenConfigInput {
             gamma: 1.0,
             iterations: 100,
             quality: QualityFunctionInput::Modularity,
+            edge_weights: None,
         }
     }
 }
@@ -178,7 +182,7 @@ pub struct PriorPartition {
     pub cluster_assignments: BTreeMap<String, u32>,
 }
 
-// ── Normalize input ───────────────────────────────────────────────────────────
+// ── Normalize input ──────────────────────────────────────────────────────────
 
 /// A node in the pattern AST subtree for [`crate::normalize_and_hash`].
 ///
@@ -197,8 +201,7 @@ pub struct NormalizeNode {
     pub children: Vec<NormalizeNode>,
 }
 
-// ── Threshold inputs ──────────────────────────────────────────────────────────
-
+// ── Threshold inputs ─────────────────────────────────────────────────────────
 /// Per-category threshold override for [`ThresholdsInput`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ThresholdOverrideInput {

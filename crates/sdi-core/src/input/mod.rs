@@ -4,8 +4,10 @@
 //! `compute_*` functions.  All are plain `serde` structs with no I/O, no
 //! tree-sitter, and no `std::time`.
 
+mod change_coupling_types;
 mod types;
 
+pub use change_coupling_types::{ChangeCouplingConfigInput, CoChangeEventInput};
 pub use types::{
     BoundaryDefInput, BoundarySpecInput, DependencyGraphInput, EdgeInput, LeidenConfigInput,
     NodeInput, NormalizeNode, PatternInstanceInput, PatternLocationInput, PriorPartition,

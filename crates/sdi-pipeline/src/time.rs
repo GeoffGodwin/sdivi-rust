@@ -37,3 +37,28 @@ fn unix_to_iso8601(secs: u64) -> String {
         time_secs / 3600, (time_secs % 3600) / 60, time_secs % 60,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::unix_to_iso8601;
+
+    #[test]
+    fn epoch() {
+        assert_eq!(unix_to_iso8601(0), "1970-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn y2k() {
+        assert_eq!(unix_to_iso8601(946684800), "2000-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn year_end_second() {
+        assert_eq!(unix_to_iso8601(1704067199), "2023-12-31T23:59:59Z");
+    }
+
+    #[test]
+    fn leap_day_2024() {
+        assert_eq!(unix_to_iso8601(1709164800), "2024-02-29T00:00:00Z");
+    }
+}

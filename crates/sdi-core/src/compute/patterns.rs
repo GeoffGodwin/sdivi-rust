@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::input::PatternInstanceInput;
+use sdi_patterns::PatternCatalog;
 use sdi_snapshot::snapshot::PatternMetricsResult;
 
 /// Computes pattern metrics from a slice of pattern instances.
@@ -72,6 +73,57 @@ pub fn compute_pattern_metrics(patterns: &[PatternInstanceInput]) -> PatternMetr
     let n_categories = by_category.len() as f64;
     let total_entropy: f64 = entropy_per_category.values().sum();
     let convention_drift = convention_drift_per_category.values().sum::<f64>() / n_categories;
+
+    PatternMetricsResult {
+        entropy_per_category,
+        total_entropy,
+        convention_drift,
+        convention_drift_per_category,
+    }
+}
+
+/// Computes pattern metrics from a pre-assembled [`PatternCatalog`].
+///
+/// Uses `sdi_patterns::compute_entropy` (normalized Shannon entropy) to keep
+/// entropy logic in one place across the pipeline and pure-compute paths.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdi_core::compute::patterns::compute_pattern_metrics_from_catalog;
+/// use sdi_core::PatternCatalog;
+///
+/// let catalog = PatternCatalog::default();
+/// let result = compute_pattern_metrics_from_catalog(&catalog);
+/// assert_eq!(result.total_entropy, 0.0);
+/// ```
+pub fn compute_pattern_metrics_from_catalog(catalog: &PatternCatalog) -> PatternMetricsResult {
+    use sdi_patterns::compute_entropy;
+
+    let entropy_per_category: BTreeMap<String, f64> = catalog
+        .entries
+        .iter()
+        .map(|(cat, stats)| (cat.clone(), compute_entropy(stats)))
+        .collect();
+
+    let total_entropy: f64 = entropy_per_category.values().sum();
+
+    let convention_drift_per_category: BTreeMap<String, f64> = catalog
+        .entries
+        .iter()
+        .map(|(cat, stats)| {
+            let distinct = stats.len() as f64;
+            let total: f64 = stats.values().map(|s| f64::from(s.count)).sum();
+            (cat.clone(), if total > 0.0 { distinct / total } else { 0.0 })
+        })
+        .collect();
+
+    let convention_drift = if convention_drift_per_category.is_empty() {
+        0.0
+    } else {
+        convention_drift_per_category.values().sum::<f64>()
+            / convention_drift_per_category.len() as f64
+    };
 
     PatternMetricsResult {
         entropy_per_category,

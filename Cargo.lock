@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-config"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "dirs",
@@ -963,7 +963,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "proptest",
@@ -980,7 +980,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-detection"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proptest",
  "rand",
@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-graph"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "petgraph",
  "sdi-config",
@@ -1012,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-go"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-java"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1030,7 +1030,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-javascript"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1039,7 +1039,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-python"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1048,7 +1048,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-rust"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-config",
  "sdi-parsing",
@@ -1059,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-lang-typescript"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-parsing",
  "tree-sitter",
@@ -1068,7 +1068,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-parsing"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "globset",
  "ignore",
@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-patterns"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake3",
  "globset",
@@ -1101,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-pipeline"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proptest",
  "sdi-config",
@@ -1121,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-rust"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sdi-cli",
  "sdi-core",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-snapshot"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake3",
  "proptest",
@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "sdi-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",

@@ -99,7 +99,20 @@ pub fn detect_boundaries(
         gamma: cfg.gamma,
     };
 
-    let partition = sdi_detection::run_leiden(&dg, &leiden_cfg, None);
+    let partition = if let Some(ref ew) = cfg.edge_weights {
+        let weight_map: std::collections::BTreeMap<(usize, usize), f64> = ew
+            .iter()
+            .filter_map(|((s, t), &w)| {
+                let si = *id_to_idx.get(s.as_str())?;
+                let ti = *id_to_idx.get(t.as_str())?;
+                let key = if si < ti { (si, ti) } else { (ti, si) };
+                Some((key, w))
+            })
+            .collect();
+        sdi_detection::run_leiden_with_weights(&dg, &leiden_cfg, None, &weight_map)
+    } else {
+        sdi_detection::run_leiden(&dg, &leiden_cfg, None)
+    };
 
     // Build cluster_assignments: NodeId → community ID.
     let cluster_assignments: BTreeMap<String, u32> = partition

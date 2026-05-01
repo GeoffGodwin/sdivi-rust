@@ -22,4 +22,5 @@ pub mod warm_start;
 
 pub use partition::{LeidenConfig, LeidenPartition, QualityFunction};
 pub use leiden::run_leiden;
+pub use leiden::run_leiden_with_weights;
 pub use warm_start::{initial_assignment_from_cache, CACHE_FILENAME};

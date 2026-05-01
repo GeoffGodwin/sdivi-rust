@@ -1,6 +1,6 @@
 # Security Notes
 
-Generated: 2026-05-01 12:56:50
+Generated: 2026-05-01 16:44:14
 
 ## Non-Blocking Findings (MEDIUM/LOW)
 - [MEDIUM] [category:A08] [.github/workflows/release.yml] fixable:yes — All third-party actions are pinned to version tags (`@v2`, `@v4`, `@stable`) rather than immutable SHA digests. A compromised action release or moved tag on `actions/checkout`, `Swatinem/rust-cache`, `softprops/action-gh-release`, or `rustsec/audit-check` could exfiltrate `CARGO_REGISTRY_TOKEN` or read build artifacts before the manual gate is reached. Fix: replace each `uses: owner/action@vN` with `uses: owner/action@<full-sha>  # vN` using the commit SHA for that tag.

@@ -65,6 +65,18 @@ pub struct WasmPriorPartition {
     pub cluster_assignments: BTreeMap<String, u32>,
 }
 
+/// A prior partition for [`infer_boundaries`] — mirrors [`sdi_core::SnapshotPriorPartition`].
+///
+/// Kept separate from [`WasmPriorPartition`] (used by [`detect_boundaries`]) so that
+/// future field additions to either Rust type produce a compile error here rather than
+/// a silent runtime serialization failure.
+#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmSnapshotPriorPartition {
+    /// node_id → community_id mapping.
+    pub cluster_assignments: BTreeMap<String, u32>,
+}
+
 // ── Pattern inputs ────────────────────────────────────────────────────────────
 
 /// Source location of a pattern instance.

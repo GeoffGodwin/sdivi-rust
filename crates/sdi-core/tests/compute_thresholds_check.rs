@@ -130,6 +130,10 @@ fn override_expiry_ignored_when_expired() {
     let s = summary(Some(3.0), None, None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(r.breached, "expired override must not prevent aggregate breach");
+    assert!(
+        !r.applied_overrides["error_handling"].active,
+        "expired override must be marked inactive in applied_overrides"
+    );
 }
 
 // ── Override wiring tests ─────────────────────────────────────────────────────

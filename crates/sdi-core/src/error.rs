@@ -31,4 +31,11 @@ pub enum AnalysisError {
         /// Human-readable reason.
         reason: String,
     },
+
+    /// A configuration value is invalid.
+    #[error("invalid configuration: {message}")]
+    InvalidConfig {
+        /// Human-readable description of the problem.
+        message: String,
+    },
 }
