@@ -51,6 +51,7 @@ pub struct IntentDivergenceInfo {
 ///     entropy_per_category: BTreeMap::new(),
 ///     total_entropy: 0.0,
 ///     convention_drift: 0.0,
+///     convention_drift_per_category: BTreeMap::new(),
 /// };
 /// assert_eq!(m.total_entropy, 0.0);
 /// ```
@@ -65,6 +66,12 @@ pub struct PatternMetricsResult {
     /// Defined as: for each category, `distinct_fingerprints / total_instances`,
     /// then average across all categories.  `0.0` when no instances exist.
     pub convention_drift: f64,
+    /// Per-category fraction of distinct fingerprints: `distinct / total` for each category.
+    ///
+    /// Source of truth for per-category override filtering in `compute_thresholds_check`.
+    /// The scalar `convention_drift` is the average of this map's values.
+    #[serde(default)]
+    pub convention_drift_per_category: BTreeMap<String, f64>,
 }
 
 /// A versioned snapshot of all pipeline stage outputs for one point in time.

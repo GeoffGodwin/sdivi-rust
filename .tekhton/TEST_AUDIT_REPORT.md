@@ -1,138 +1,60 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 1 file (`bindings/sdi-wasm/tests/wasm_smoke.rs`), 16 test functions
-Implementation files cross-referenced: `bindings/sdi-wasm/src/exports.rs`,
-`bindings/sdi-wasm/src/types.rs`, `crates/sdi-core/src/lib.rs`,
-`crates/sdi-core/src/compute/boundaries.rs`, `crates/sdi-core/src/compute/coupling.rs`,
-`crates/sdi-core/src/compute/thresholds.rs`, `crates/sdi-snapshot/src/delta.rs`,
-`crates/sdi-snapshot/src/trend.rs`, `crates/sdi-snapshot/src/boundary_inference.rs`,
-`crates/sdi-patterns/src/fingerprint.rs`.
+Tests audited: 3 files, 29 test functions (19 unit + 5 property + 5 integration)
+Verdict: PASS
 
-Verdict: CONCERNS
+Implementation files cross-referenced: `crates/sdi-core/src/compute/thresholds.rs`,
+`crates/sdi-snapshot/src/delta.rs`, `crates/sdi-snapshot/src/snapshot.rs`,
+`crates/sdi-core/src/compute/patterns.rs`.
 
 ---
 
 ### Findings
 
-#### INTEGRITY: test_compute_boundary_violations_with_spec asserts against a stub that always returns 0
-- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:61` (`test_compute_boundary_violations_with_spec`)
-- Issue: The test constructs a two-boundary spec (`core` / `data`) and a graph with an edge
-  lib.rs → models.rs, reasons about whether the edge is a violation, and asserts
-  `result.violation_count == 0`. However, `compute_boundary_violations` in
-  `crates/sdi-core/src/compute/boundaries.rs:224–236` is an explicit stub: the `spec`
-  parameter is named `_spec` and the function body always returns
-  `Ok(BoundaryViolationResult { violation_count: 0, violations: vec![] })` regardless
-  of input. The assertion always passes, and the test cannot detect any future regression
-  when the real boundary violation logic (deferred to Milestone 10) is wired up. This is
-  a structurally always-passing assertion that misleads reviewers into believing boundary
-  logic is exercised.
-- Severity: HIGH
-- Action: Mark the test `#[ignore]` with a comment referencing the stub and the milestone
-  that will complete the implementation, OR replace the assertion with a `TODO` comment
-  that explicitly acknowledges the stub, e.g.:
-  ```rust
-  // TODO(M10): compute_boundary_violations is a stub; rewrite this test with
-  // a concrete violation scenario once the real implementation ships.
-  assert_eq!(result.violation_count, 0); // trivially true against current stub
-  ```
-  Do not implement the missing logic to make the test non-trivial — tests follow code.
-
----
-
-#### INTEGRITY: test_compute_boundary_violations_empty_spec also exercises the stub
-- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:53` (`test_compute_boundary_violations_empty_spec`)
-- Issue: Same stub root cause as above. An empty spec must always yield zero violations
-  in any complete implementation, so the assertion is semantically correct, but the test
-  cannot distinguish "stub returned 0" from "real logic returned 0 for an empty spec."
-  This is lower severity than the non-trivial spec case because the expected value (0)
-  is correct regardless of whether the spec is consulted.
-- Severity: LOW
-- Action: No change required to the assertion. Add a comment noting the stub limitation,
-  consistent with the HIGH finding above.
-
----
-
-#### COVERAGE: normalize_and_hash tests do not pin the expected hash value
-- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:172` (`test_normalize_and_hash_deterministic`)
-         `bindings/sdi-wasm/tests/wasm_smoke.rs:191` (`normalize_hash_deterministic`)
-- Issue: Both tests verify only that the returned string is 64 characters and all-hex.
-  Neither asserts the concrete expected digest for the `"try_expression"` + empty-children
-  input. Rule 23 and KDD-19 state that `normalize_and_hash` must produce a byte-identical
-  digest across all platforms (WASM and native). Without a pinned expected value,
-  a regression from changing `FINGERPRINT_KEY` in `sdi-patterns::fingerprint` (Rule 19)
-  or from modifying the normalize algorithm in `crates/sdi-core/src/compute/normalize.rs`
-  would not be detected by these tests. The CI cross-platform grep of `CI_HASH:` output
-  checks same-run consistency, but not stability across code changes.
+#### COVERAGE: `prop_thresholds_with_overrides_pure` never exercises overrides and per-category deltas together
+- File: `crates/sdi-core/tests/prop_thresholds.rs:116`
+- Issue: `arb_summary()` always generates `None` for both `pattern_entropy_per_category_delta` and `convention_drift_per_category_delta`. Consequently `prop_thresholds_with_overrides_pure` only exercises `resolve_overrides` and the aggregate dimension checks — never the combination of "active override for category X + non-None delta for category X." The separate `prop_per_category_delta_pure` tests use `arb_thresholds_with_overrides()` but generate category strings independently; the probability of a randomly-generated category name in the delta map matching one in the override map is negligible (~0.02% per case at 500 runs), so the "override applies to exactly this category" path is almost never exercised by any property test. Unit tests cover this specific path (`active_override_raises_per_category_limit`, `active_override_blocks_per_category_breach`), but no property test verifies the combined behavior is referentially transparent.
 - Severity: MEDIUM
-- Action: Compute the expected hash once (run `normalize_and_hash("try_expression", vec![])`
-  locally), record it as a constant in the test, and add:
-  ```rust
-  const EXPECTED_TRY_EXPRESSION_HASH: &str = "<64-char hex>";
-  assert_eq!(h1, EXPECTED_TRY_EXPRESSION_HASH);
-  ```
-  This makes the test a regression guard for the fingerprint key and algorithm.
+- Action: Create an `arb_summary_with_categories(cats: Vec<String>)` helper that uses the supplied category names when building per-category delta maps, then pair it with `arb_thresholds_with_overrides()` using the same category pool so override-category collisions occur at usable frequency. Alternatively, add a dedicated property test that explicitly injects one known category into both the override map and the per-category delta map and asserts referential transparency.
 
 ---
 
-#### NAMING: normalize_hash_deterministic lacks the test_ prefix used by all other test functions
-- File: `bindings/sdi-wasm/tests/wasm_smoke.rs:191` (`normalize_hash_deterministic`)
-- Issue: All 15 other test functions in the file use a `test_` prefix
-  (e.g., `test_normalize_and_hash_deterministic`). The function at line 191 is named
-  `normalize_hash_deterministic`. The `#[wasm_bindgen_test]` macro still executes it,
-  so it is not dead, but the inconsistency reduces readability and may confuse future
-  contributors about whether the function is a test or a helper.
+#### NAMING: Two test names describe `compute_delta` behavior but exercise only `compute_thresholds_check`
+- File: `crates/sdi-core/tests/compute_thresholds_check.rs:253` (`category_present_in_curr_only_surfaces_positive_delta`)
+- File: `crates/sdi-core/tests/compute_thresholds_check.rs:269` (`category_present_in_prev_only_surfaces_negative_delta`)
+- Issue: Both names use framing ("category present in curr only", "category present in prev only") that describes `compute_delta`'s union-of-keys semantics (`delta.rs:189-201`). A reader expects an end-to-end test that builds two snapshots with differing category sets and verifies the delta values produced. Instead, both tests manually construct a `DivergenceSummary` with a pre-set delta and only call `compute_thresholds_check`. The assertions are correct for what the tests actually do (positive delta > global rate breaches; negative delta never breaches), but the names mislead about coverage scope.
 - Severity: LOW
-- Action: Rename to `test_normalize_hash_deterministic_ci_output`.
+- Action: Rename to `positive_per_category_delta_breaches_when_above_global_rate` and `negative_per_category_delta_never_breaches`. If end-to-end coverage of `compute_delta`'s curr-only / prev-only category semantics is also desired, add separate tests in `null_vs_zero.rs` that build two snapshots with differing category sets.
 
 ---
 
-#### COVERAGE: no error-path tests for any exported function
-- File: `bindings/sdi-wasm/tests/wasm_smoke.rs` (whole file)
-- Issue: Every test exercises a happy path. None of the 16 tests verify that exported
-  functions return a `JsError` on invalid input. Examples of untested error paths:
-  - `compute_coupling_topology` / `detect_boundaries` with a node whose ID violates
-    `validate_node_id` (e.g., an absolute path) — should return `AnalysisError::InvalidNodeId`.
-  - `build_pattern_catalog` (called inside `assemble_snapshot`) with a 65-char or
-    non-hex fingerprint string — should return the `JsError` from `PatternFingerprint::from_hex`.
-  - `compute_delta` with a `JsValue` that is not a valid `Snapshot` JSON — should return
-    a deserialization error.
+#### COVERAGE: `identical_snapshots_have_zero_deltas` omits `convention_drift_delta` assertion
+- File: `crates/sdi-snapshot/tests/null_vs_zero.rs:50`
+- Issue: The test asserts `coupling_delta`, `community_count_delta`, and `pattern_entropy_delta` are `Some(0.0)` / `Some(0)` for identical snapshots, but does not assert `convention_drift_delta`. `compute_delta` sets `convention_drift_delta = Some(curr.pattern_metrics.convention_drift - prev.pattern_metrics.convention_drift)`, which is `Some(0.0)` for identical snapshots. The omission leaves a gap in the null-vs-zero semantic contract for this field.
 - Severity: LOW
-- Action: Add at minimum one `#[wasm_bindgen_test]` that calls an exported function with
-  an invalid input and asserts the `Result` is `Err`. This validates that the WASM binding
-  error-conversion path (`JsError::new`) works end-to-end and does not panic.
+- Action: Add `assert_eq!(delta.convention_drift_delta, Some(0.0), "convention_drift_delta must be Some(0.0) for identical snapshots");` after the existing assertions in `identical_snapshots_have_zero_deltas`.
+
+---
+
+#### COVERAGE: `prop_per_category_delta_pure` "at most one breach" assertion is trivially satisfied
+- File: `crates/sdi-core/tests/prop_thresholds.rs:154`
+- Issue: The assertion `cat_breaches.len() <= 1` ("at most one breach per category per dimension") is trivially true because exactly one category is inserted into `pattern_entropy_per_category_delta`. The implementation iterates each category once in a `for (cat, &delta) in per_cat` loop, so duplicate breaches are structurally impossible for any input. The assertion therefore does not distinguish a correct implementation from a buggy one that emits zero breaches. The referential-transparency check immediately above it (JSON equality across two calls) is the test's real value; the `<= 1` assertion adds no additional signal.
+- Severity: LOW
+- Action: Replace `cat_breaches.len() <= 1` with a condition that verifies the expected breach count based on the delta and effective limit: breach occurs if and only if `delta > effective_rate` (where `effective_rate` is the per-category override rate if active, else the global rate). Alternatively, drop the redundant assertion and add a comment explaining that uniqueness is guaranteed by construction.
 
 ---
 
 ### Passing Items
 
-**Assertion Honesty — PASS (except where noted).** The three primary assertions introduced
-by the tester — `compute_delta` self-delta coupling == `Some(0.0)`, coupling delta ≈ 0.2
-for densities 0.1→0.3, and coupling slope ≈ 0.2 for three linearly increasing snapshots —
-all derive their expected values from the test's own inputs and the documented implementation
-(`delta.rs:129`: `coupling_delta = Some(curr.graph.density - prev.graph.density)`;
-`trend.rs:106–107`: `mean_slope` over density values). No magic constants.
+**INTEGRITY — PASS.** All assertions derive expected values from test inputs and documented implementation behavior. The `2.0` and `3.0` limit checks in `expired_override_falls_back_to_global_rate` and `convention_drift_expired_override_falls_back_to_global_rate` match the actual `ThresholdsInput::default()` global rates used in `thresholds.rs`. No hard-coded magic values, no tautological assertions, no always-passing assertions outside the trivially-true `<= 1` case noted above.
 
-**Test Weakening — PASS.** The audit context contains no prior version of this test file
-(it is NEW per the coder summary). No existing assertions were modified or removed.
+**WEAKENING — PASS.** The renamed stub tests (`override_not_wired_in_m08_base_rate_applies` → `active_override_raises_per_category_limit`; `base_rate_applies_regardless_of_override_state_m08` → `expired_override_falls_back_to_global_rate`) carry materially stronger assertions than the stubs they replaced. No existing assertion was removed or broadened.
 
-**Implementation Exercise — PASS.** Every test calls a real `#[wasm_bindgen]` export.
-The conversion path (wrapper type → `to_core` → `sdi_core::*` → `from_core` → wrapper type)
-is exercised end-to-end for `compute_coupling_topology`, `detect_boundaries`,
-`compute_pattern_metrics`, `compute_thresholds_check`, `infer_boundaries`,
-`normalize_and_hash`, `assemble_snapshot`, `compute_delta`, and `compute_trend`. No internal
-dependencies are mocked.
+**EXERCISE — PASS.** All three files call real implementation functions (`compute_thresholds_check`, `compute_delta`, `null_summary`, `assemble_snapshot`, `compute_pattern_metrics` via `PatternMetricsResult::default()`). No internal dependencies are mocked.
 
-**Test Naming — PASS (with one LOW exception above).** 15 of 16 functions follow the
-`test_<scenario>_<expected_outcome>` convention and name the scenario and expectation clearly.
+**SCOPE — PASS.** All imports and symbols (`DivergenceSummary`, `ThresholdsInput`, `ThresholdOverrideInput`, `null_summary`, `compute_delta`, `assemble_snapshot`, `PatternMetricsResult`) exist in the current implementation. No orphaned references to deleted or renamed symbols.
 
-**Scope Alignment — PASS.** All imports resolve against current code. The deleted
-`.tekhton/test_dedup.fingerprint` is not referenced. `WasmAssembleSnapshotInput.leiden_seed`
-(added this run) is exercised in `make_assemble_input` at line 233 (`leiden_seed: Some(42)`),
-consistent with the coder's change to `build_leiden_partition` using `leiden_seed` instead
-of a hardcoded value.
+**ISOLATION — PASS.** All three test files build their own fixture data via helper functions. No test reads mutable project files (`.tekhton/`, `.claude/`, build artifacts, config state).
 
-**Test Isolation — PASS.** All tests construct their own in-memory inputs via factory
-functions (`two_node_graph`, `default_leiden_cfg`, `make_assemble_input`). No test reads
-`.tekhton/` files, build artifacts, or any mutable project state. `wasm_smoke.rs` has
-no filesystem I/O.
+**NAMING — PASS (with LOW exceptions noted above).** All other test function names encode the scenario and expected outcome clearly.

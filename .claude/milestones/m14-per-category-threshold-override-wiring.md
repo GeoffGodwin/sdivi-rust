@@ -1,7 +1,7 @@
 #### Milestone 14: Per-Category Threshold Override Wiring
 <!-- milestone-meta
 id: "14"
-status: "pending"
+status: "done"
 -->
 
 

@@ -6,7 +6,6 @@
 //! functions directly.
 
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use sdi_config::{BoundarySpec, Config};
 use sdi_detection::warm_start::CACHE_FILENAME;
@@ -22,6 +21,7 @@ use sdi_snapshot::{
 use sdi_snapshot::snapshot::PatternMetricsResult;
 
 use crate::cache::{load_cached_partition, save_cached_partition};
+pub use crate::time::current_timestamp;
 use crate::error::PipelineError;
 use crate::store::{write_snapshot, enforce_retention};
 
@@ -231,21 +231,28 @@ fn compute_pattern_metrics_from_catalog(
 
     let total_entropy: f64 = entropy_per_category.values().sum();
 
-    let convention_drift = if catalog.entries.is_empty() {
+    let convention_drift_per_category: std::collections::BTreeMap<String, f64> = catalog
+        .entries
+        .iter()
+        .map(|(cat, stats)| {
+            let distinct = stats.len() as f64;
+            let total: f64 = stats.values().map(|s| s.count as f64).sum();
+            (cat.clone(), if total > 0.0 { distinct / total } else { 0.0 })
+        })
+        .collect();
+
+    let convention_drift = if convention_drift_per_category.is_empty() {
         0.0
     } else {
-        let sum: f64 = catalog.entries.values().map(|cat_stats| {
-            let distinct = cat_stats.len() as f64;
-            let total: f64 = cat_stats.values().map(|s| s.count as f64).sum();
-            if total > 0.0 { distinct / total } else { 0.0 }
-        }).sum();
-        sum / catalog.entries.len() as f64
+        convention_drift_per_category.values().sum::<f64>()
+            / convention_drift_per_category.len() as f64
     };
 
     PatternMetricsResult {
         entropy_per_category,
         total_entropy,
         convention_drift,
+        convention_drift_per_category,
     }
 }
 
@@ -268,30 +275,3 @@ fn compute_path_partition(
     map
 }
 
-/// Returns the current UTC time as an ISO 8601 string.
-pub fn current_timestamp() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    unix_to_iso8601(secs)
-}
-
-fn unix_to_iso8601(secs: u64) -> String {
-    let secs = secs as i64;
-    let days_since_epoch = secs / 86400;
-    let time_secs = secs % 86400;
-    let j = days_since_epoch + 2440588;
-    let f = j + 1401 + (((4 * j + 274277) / 146097) * 3) / 4 - 38;
-    let e = 4 * f + 3;
-    let g = (e % 1461) / 4;
-    let h = 5 * g + 2;
-    let day = (h % 153) / 5 + 1;
-    let month = (h / 153 + 2) % 12 + 1;
-    let year = e / 1461 - 4716 + (14 - month) / 12;
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, month, day,
-        time_secs / 3600, (time_secs % 3600) / 60, time_secs % 60,
-    )
-}

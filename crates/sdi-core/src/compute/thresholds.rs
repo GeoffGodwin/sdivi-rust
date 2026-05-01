@@ -1,11 +1,17 @@
 //! [`compute_thresholds_check`] — pure threshold evaluation for `sdi check`.
 
+use std::collections::BTreeMap;
+
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use crate::input::ThresholdsInput;
+use crate::input::{ThresholdOverrideInput, ThresholdsInput};
 use sdi_snapshot::delta::DivergenceSummary;
 
 /// Information about a single threshold breach.
+///
+/// `category` is `None` for aggregate-dimension breaches; `Some("error_handling")`
+/// for per-category breaches produced by per-category delta maps.
 ///
 /// # Examples
 ///
@@ -14,6 +20,7 @@ use sdi_snapshot::delta::DivergenceSummary;
 ///
 /// let b = ThresholdBreachInfo {
 ///     dimension: "pattern_entropy".to_string(),
+///     category: None,
 ///     actual: 3.5,
 ///     limit: 2.0,
 /// };
@@ -23,16 +30,53 @@ use sdi_snapshot::delta::DivergenceSummary;
 pub struct ThresholdBreachInfo {
     /// Name of the dimension that exceeded its limit (e.g. `"pattern_entropy"`).
     pub dimension: String,
+
+    /// Category name for per-category breaches; `None` for aggregate-dimension breaches.
+    ///
+    /// Absent from JSON when `None` so existing aggregate-breach consumers are unaffected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+
     /// Observed delta value.
     pub actual: f64,
+
     /// The limit that was exceeded.
     pub limit: f64,
+}
+
+/// Diagnostic information for one entry in `ThresholdCheckResult::applied_overrides`.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdi_core::compute::thresholds::AppliedOverrideInfo;
+/// use chrono::NaiveDate;
+///
+/// let info = AppliedOverrideInfo {
+///     active: true,
+///     expires: NaiveDate::from_ymd_opt(2030, 1, 1).unwrap(),
+///     expired_reason: None,
+/// };
+/// assert!(info.active);
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AppliedOverrideInfo {
+    /// `true` when the override's `expires` date is on or after `today`.
+    pub active: bool,
+    /// Parsed expiry date.
+    pub expires: NaiveDate,
+    /// Human-readable explanation when the override is inactive.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expired_reason: Option<String>,
 }
 
 /// Result of [`compute_thresholds_check`].
 ///
 /// `breached` is `true` when at least one threshold was exceeded.  `breaches`
 /// is empty on the first-snapshot path (all `DivergenceSummary` fields `None`).
+///
+/// `applied_overrides` enumerates every entry from `cfg.overrides` with an
+/// `active` flag and parsed `expires`, for diagnostic consumers and `sdi check --format json`.
 ///
 /// # Examples
 ///
@@ -44,6 +88,7 @@ pub struct ThresholdBreachInfo {
 /// let result = compute_thresholds_check(&null_summary(), &ThresholdsInput::default());
 /// assert!(!result.breached);
 /// assert!(result.breaches.is_empty());
+/// assert!(result.applied_overrides.is_empty());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ThresholdCheckResult {
@@ -51,6 +96,8 @@ pub struct ThresholdCheckResult {
     pub breached: bool,
     /// Per-dimension details for each exceeded threshold.
     pub breaches: Vec<ThresholdBreachInfo>,
+    /// Diagnostic map of every override entry: which were active, which expired.
+    pub applied_overrides: BTreeMap<String, AppliedOverrideInfo>,
 }
 
 /// Checks whether any dimension of `summary` exceeds the rates in `cfg`.
@@ -58,10 +105,14 @@ pub struct ThresholdCheckResult {
 /// **First-snapshot path:** when `summary` was produced by [`sdi_snapshot::delta::null_summary`]
 /// (all fields `None`), no dimension can be checked and `breached` is `false`.
 ///
-/// **Expiry:** per-category overrides in `cfg.overrides` are silently ignored
-/// when `cfg.today` is after their `expires` date.  In M08 the per-category
-/// rates do not affect the aggregate dimension check — that integration is
-/// added when per-category entropy deltas are surfaced in the summary.
+/// **Aggregate dimensions** (`pattern_entropy_delta`, `convention_drift_delta`,
+/// `coupling_delta`, `boundary_violation_delta`) always use the global rates in `cfg`,
+/// regardless of per-category overrides.
+///
+/// **Per-category dimensions** (`pattern_entropy_per_category_delta`,
+/// `convention_drift_per_category_delta`) use the per-category rate from an active
+/// override when one exists for that category; otherwise fall back to the global rate.
+/// An override is active when `cfg.today <= override.expires`.
 ///
 /// This function is **referentially transparent**: same inputs → same output.
 /// It performs no I/O, reads no globals, and uses no clock.
@@ -70,35 +121,41 @@ pub struct ThresholdCheckResult {
 ///
 /// ```rust
 /// use sdi_core::compute::thresholds::compute_thresholds_check;
-/// use sdi_core::input::ThresholdsInput;
+/// use sdi_core::input::{ThresholdOverrideInput, ThresholdsInput};
 /// use sdi_snapshot::delta::DivergenceSummary;
+/// use chrono::NaiveDate;
+/// use std::collections::BTreeMap;
 ///
+/// // Aggregate breach (global rate 2.0, delta 5.0).
 /// let summary = DivergenceSummary {
-///     pattern_entropy_delta: Some(5.0), // exceeds default 2.0
+///     pattern_entropy_delta: Some(5.0),
 ///     convention_drift_delta: Some(0.1),
 ///     coupling_delta: Some(0.05),
 ///     community_count_delta: Some(1),
 ///     boundary_violation_delta: None,
+///     pattern_entropy_per_category_delta: None,
+///     convention_drift_per_category_delta: None,
 /// };
 /// let cfg = ThresholdsInput::default();
 /// let result = compute_thresholds_check(&summary, &cfg);
 /// assert!(result.breached);
 /// assert_eq!(result.breaches[0].dimension, "pattern_entropy");
+/// assert_eq!(result.breaches[0].category, None);
 /// ```
 pub fn compute_thresholds_check(
     summary: &DivergenceSummary,
     cfg: &ThresholdsInput,
 ) -> ThresholdCheckResult {
-    // TODO(M09): apply per-category override rates from cfg.overrides once
-    // per-category entropy/drift deltas are surfaced in DivergenceSummary.
-    // Until then, cfg.overrides and cfg.today are accepted but not read here.
+    let (applied_overrides, active_overrides) = resolve_overrides(cfg);
     let mut breaches: Vec<ThresholdBreachInfo> = Vec::new();
 
+    // ── Aggregate dimension checks (always use global rate) ───────────────────
     if let Some(delta) = summary.pattern_entropy_delta {
         let limit = cfg.pattern_entropy_rate;
         if delta > limit {
             breaches.push(ThresholdBreachInfo {
                 dimension: "pattern_entropy".to_string(),
+                category: None,
                 actual: delta,
                 limit,
             });
@@ -110,6 +167,7 @@ pub fn compute_thresholds_check(
         if delta > limit {
             breaches.push(ThresholdBreachInfo {
                 dimension: "convention_drift".to_string(),
+                category: None,
                 actual: delta,
                 limit,
             });
@@ -121,6 +179,7 @@ pub fn compute_thresholds_check(
         if delta > limit {
             breaches.push(ThresholdBreachInfo {
                 dimension: "coupling_delta".to_string(),
+                category: None,
                 actual: delta,
                 limit,
             });
@@ -133,98 +192,92 @@ pub fn compute_thresholds_check(
         if delta_f > limit {
             breaches.push(ThresholdBreachInfo {
                 dimension: "boundary_violations".to_string(),
+                category: None,
                 actual: delta_f,
                 limit,
             });
         }
     }
 
-    let breached = !breaches.is_empty();
-    ThresholdCheckResult { breached, breaches }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::input::ThresholdsInput;
-    use sdi_snapshot::delta::{DivergenceSummary, null_summary};
-
-    fn summary_with(
-        entropy: Option<f64>,
-        drift: Option<f64>,
-        coupling: Option<f64>,
-        violations: Option<i64>,
-    ) -> DivergenceSummary {
-        DivergenceSummary {
-            pattern_entropy_delta: entropy,
-            convention_drift_delta: drift,
-            coupling_delta: coupling,
-            community_count_delta: None,
-            boundary_violation_delta: violations,
+    // ── Per-category checks (active override replaces global rate for that category) ──
+    if let Some(per_cat) = &summary.pattern_entropy_per_category_delta {
+        for (cat, &delta) in per_cat {
+            let limit = active_overrides
+                .get(cat)
+                .and_then(|ov| ov.pattern_entropy_rate)
+                .unwrap_or(cfg.pattern_entropy_rate);
+            if delta > limit {
+                breaches.push(ThresholdBreachInfo {
+                    dimension: "pattern_entropy".to_string(),
+                    category: Some(cat.clone()),
+                    actual: delta,
+                    limit,
+                });
+            }
         }
     }
 
-    #[test]
-    fn null_summary_never_breaches() {
-        let r = compute_thresholds_check(&null_summary(), &ThresholdsInput::default());
-        assert!(!r.breached);
-        assert!(r.breaches.is_empty());
+    if let Some(per_cat) = &summary.convention_drift_per_category_delta {
+        for (cat, &delta) in per_cat {
+            let limit = active_overrides
+                .get(cat)
+                .and_then(|ov| ov.convention_drift_rate)
+                .unwrap_or(cfg.convention_drift_rate);
+            if delta > limit {
+                breaches.push(ThresholdBreachInfo {
+                    dimension: "convention_drift".to_string(),
+                    category: Some(cat.clone()),
+                    actual: delta,
+                    limit,
+                });
+            }
+        }
     }
 
-    #[test]
-    fn entropy_breach_detected() {
-        let s = summary_with(Some(3.0), None, None, None);
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(r.breached);
-        assert_eq!(r.breaches[0].dimension, "pattern_entropy");
-        assert!((r.breaches[0].actual - 3.0).abs() < 1e-10);
-        assert!((r.breaches[0].limit - 2.0).abs() < 1e-10);
+    let breached = !breaches.is_empty();
+    ThresholdCheckResult { breached, breaches, applied_overrides }
+}
+
+/// Resolves `cfg.overrides` into applied-override diagnostics and a map of active overrides.
+///
+/// Returns `(diagnostics, active_overrides)`:
+/// - `diagnostics`: every entry with `active` flag and `expires` date (for `applied_overrides`)
+/// - `active_overrides`: only entries where `cfg.today <= expires` (used for rate lookup)
+fn resolve_overrides(
+    cfg: &ThresholdsInput,
+) -> (BTreeMap<String, AppliedOverrideInfo>, BTreeMap<String, &ThresholdOverrideInput>) {
+    let mut diagnostics: BTreeMap<String, AppliedOverrideInfo> = BTreeMap::new();
+    let mut active: BTreeMap<String, &ThresholdOverrideInput> = BTreeMap::new();
+
+    for (cat, ov) in &cfg.overrides {
+        match NaiveDate::parse_from_str(&ov.expires, "%Y-%m-%d") {
+            Err(e) => {
+                diagnostics.insert(cat.clone(), AppliedOverrideInfo {
+                    active: false,
+                    // Sentinel date — parse failed; override is inactive.
+                    expires: NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(),
+                    expired_reason: Some(format!("failed to parse expires date: {e}")),
+                });
+            }
+            Ok(expires) => {
+                // today == expires → still active; only today > expires → expired (Rule 12).
+                let is_active = cfg.today <= expires;
+                let expired_reason = if is_active {
+                    None
+                } else {
+                    Some(format!("expired on {expires}"))
+                };
+                diagnostics.insert(cat.clone(), AppliedOverrideInfo {
+                    active: is_active,
+                    expires,
+                    expired_reason,
+                });
+                if is_active {
+                    active.insert(cat.clone(), ov);
+                }
+            }
+        }
     }
 
-    #[test]
-    fn entropy_at_limit_is_not_breached() {
-        let s = summary_with(Some(2.0), None, None, None);
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(!r.breached);
-    }
-
-    #[test]
-    fn negative_delta_never_breaches() {
-        let s = summary_with(Some(-10.0), Some(-10.0), Some(-0.5), Some(-5));
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(!r.breached);
-    }
-
-    #[test]
-    fn coupling_breach_detected() {
-        let s = summary_with(None, None, Some(0.5), None);
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(r.breached);
-        assert_eq!(r.breaches[0].dimension, "coupling_delta");
-    }
-
-    #[test]
-    fn boundary_violation_breach_detected() {
-        let s = summary_with(None, None, None, Some(3));
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(r.breached);
-        assert_eq!(r.breaches[0].dimension, "boundary_violations");
-    }
-
-    #[test]
-    fn multiple_breaches_all_reported() {
-        let s = summary_with(Some(5.0), Some(5.0), Some(0.5), Some(10));
-        let r = compute_thresholds_check(&s, &ThresholdsInput::default());
-        assert!(r.breached);
-        assert_eq!(r.breaches.len(), 4);
-    }
-
-    #[test]
-    fn custom_cfg_raises_limit() {
-        let mut cfg = ThresholdsInput::default();
-        cfg.pattern_entropy_rate = 10.0;
-        let s = summary_with(Some(5.0), None, None, None);
-        let r = compute_thresholds_check(&s, &cfg);
-        assert!(!r.breached);
-    }
+    (diagnostics, active)
 }

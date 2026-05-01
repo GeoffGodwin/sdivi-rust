@@ -14,15 +14,23 @@ use sdi_snapshot::snapshot::PatternMetricsResult;
 /// - `total_entropy`: sum of per-category entropies.
 /// - `convention_drift`: for each category, `distinct_fingerprints / total_instances`,
 ///   averaged across all categories.  In `[0, 1]`; `0.0` when no instances.
+/// - `convention_drift_per_category`: per-category drift before averaging.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use sdi_core::compute::patterns::compute_pattern_metrics;
+/// use sdi_core::input::PatternInstanceInput;
 ///
-/// let result = compute_pattern_metrics(&[]);
+/// let patterns = &[PatternInstanceInput {
+///     fingerprint: "a".repeat(64),
+///     category: "error_handling".to_string(),
+///     node_id: "src/lib.rs".to_string(),
+///     location: None,
+/// }];
+/// let result = compute_pattern_metrics(patterns);
 /// assert_eq!(result.total_entropy, 0.0);
-/// assert_eq!(result.convention_drift, 0.0);
+/// assert!(result.convention_drift_per_category.contains_key("error_handling"));
 /// ```
 pub fn compute_pattern_metrics(patterns: &[PatternInstanceInput]) -> PatternMetricsResult {
     if patterns.is_empty() {
@@ -40,7 +48,7 @@ pub fn compute_pattern_metrics(patterns: &[PatternInstanceInput]) -> PatternMetr
     }
 
     let mut entropy_per_category: BTreeMap<String, f64> = BTreeMap::new();
-    let mut drift_sum = 0.0f64;
+    let mut convention_drift_per_category: BTreeMap<String, f64> = BTreeMap::new();
 
     for (category, fingerprints) in &by_category {
         let total: u64 = fingerprints.values().sum();
@@ -58,17 +66,18 @@ pub fn compute_pattern_metrics(patterns: &[PatternInstanceInput]) -> PatternMetr
         entropy_per_category.insert(category.to_string(), entropy);
 
         let distinct = fingerprints.len() as f64;
-        drift_sum += distinct / total_f;
+        convention_drift_per_category.insert(category.to_string(), distinct / total_f);
     }
 
     let n_categories = by_category.len() as f64;
     let total_entropy: f64 = entropy_per_category.values().sum();
-    let convention_drift = drift_sum / n_categories;
+    let convention_drift = convention_drift_per_category.values().sum::<f64>() / n_categories;
 
     PatternMetricsResult {
         entropy_per_category,
         total_entropy,
         convention_drift,
+        convention_drift_per_category,
     }
 }
 

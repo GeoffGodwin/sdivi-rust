@@ -41,6 +41,8 @@ fn first_snapshot_has_null_deltas() {
     assert!(s.coupling_delta.is_none());
     assert!(s.community_count_delta.is_none());
     assert!(s.boundary_violation_delta.is_none());
+    assert!(s.pattern_entropy_per_category_delta.is_none());
+    assert!(s.convention_drift_per_category_delta.is_none());
 }
 
 /// `compute_delta` of a snapshot against itself yields all Some(0) / Some(0.0).
@@ -90,6 +92,14 @@ fn null_summary_json_has_explicit_nulls() {
         json.contains("\"boundary_violation_delta\":null"),
         "boundary_violation_delta must be explicit null in JSON, got: {json}"
     );
+    assert!(
+        json.contains("\"pattern_entropy_per_category_delta\":null"),
+        "pattern_entropy_per_category_delta must be explicit null in JSON, got: {json}"
+    );
+    assert!(
+        json.contains("\"convention_drift_per_category_delta\":null"),
+        "convention_drift_per_category_delta must be explicit null in JSON, got: {json}"
+    );
 }
 
 /// Serializing a zero delta produces `0.0` (not `null`) for numeric fields.
@@ -106,5 +116,43 @@ fn zero_delta_not_null_in_json() {
     assert!(
         json.contains("\"coupling_delta\":0.0") || json.contains("\"coupling_delta\":0"),
         "coupling_delta must be 0.0 for identical snapshots, got: {json}"
+    );
+}
+
+/// Per-category delta fields serialize as non-null (empty object `{}`) for identical snapshots.
+///
+/// Both fields are `Some({})` for identical snapshots (empty maps, not zero),
+/// which is correct: the comparison ran, it just found no categories.
+#[test]
+fn per_category_delta_fields_not_null_for_identical_snapshots() {
+    let snap = identical_snap();
+    let delta = compute_delta(&snap, &snap);
+
+    assert!(
+        delta.pattern_entropy_per_category_delta.is_some(),
+        "pattern_entropy_per_category_delta must be Some for computed delta"
+    );
+    assert!(
+        delta.convention_drift_per_category_delta.is_some(),
+        "convention_drift_per_category_delta must be Some for computed delta"
+    );
+
+    let json = serde_json::to_string(&delta).unwrap();
+    assert!(
+        !json.contains("\"pattern_entropy_per_category_delta\":null"),
+        "pattern_entropy_per_category_delta must NOT be null for identical snapshots, got: {json}"
+    );
+    assert!(
+        !json.contains("\"convention_drift_per_category_delta\":null"),
+        "convention_drift_per_category_delta must NOT be null for identical snapshots, got: {json}"
+    );
+    // Both should serialize as empty objects (no categories in default snapshot).
+    assert!(
+        json.contains("\"pattern_entropy_per_category_delta\":{}"),
+        "pattern_entropy_per_category_delta must be {{}} for empty catalog, got: {json}"
+    );
+    assert!(
+        json.contains("\"convention_drift_per_category_delta\":{}"),
+        "convention_drift_per_category_delta must be {{}} for empty catalog, got: {json}"
     );
 }

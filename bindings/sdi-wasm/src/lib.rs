@@ -10,6 +10,7 @@
 //! const hash = normalize_and_hash('try_expression', []);
 //! ```
 
+pub mod assemble_types;
 pub mod types;
 mod exports;
 

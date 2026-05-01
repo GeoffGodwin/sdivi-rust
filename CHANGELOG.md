@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.1.1] - 2026-05-01
+
+### Added
+- Added `convention_drift_per_category: BTreeMap<String, f64>` to `PatternMetricsResult` (M14)
+
+### Added
+- **M14 — Per-category threshold override wiring**: `ThresholdsInput.overrides` and `ThresholdsInput.today` now actively filter per-category breaches against expiry. `PatternMetricsResult` gains `convention_drift_per_category: BTreeMap<String, f64>`. `DivergenceSummary` gains `pattern_entropy_per_category_delta` and `convention_drift_per_category_delta` (both `None` on the first-snapshot path). `ThresholdBreachInfo` gains `category: Option<String>` (absent for aggregate breaches). `ThresholdCheckResult` gains `applied_overrides: BTreeMap<String, AppliedOverrideInfo>` for diagnostic consumers. Snapshot schema stays `"1.0"` — all new fields are additive with `#[serde(default)]`.
 
 ## [0.1.0] - 2026-05-01
 

@@ -156,6 +156,47 @@ fn analyse_from_extractor(
 }
 ```
 
+### Supplying `today` and per-category threshold overrides
+
+Meridian-style callers that read override config from their own sources can wire
+`today` and `overrides` into `ThresholdsInput` before calling `compute_thresholds_check`.
+The function is clock-free — the caller owns the date.
+
+```rust
+use chrono::NaiveDate;
+use sdi_core::{
+    compute::thresholds::compute_thresholds_check,
+    input::{ThresholdOverrideInput, ThresholdsInput},
+    null_summary,
+};
+use std::collections::BTreeMap;
+
+fn check_with_overrides(today: NaiveDate) {
+    let mut overrides = BTreeMap::new();
+    overrides.insert("error_handling".to_string(), ThresholdOverrideInput {
+        pattern_entropy_rate: Some(5.0), // raised limit during migration
+        convention_drift_rate: None,
+        coupling_delta_rate: None,
+        boundary_violation_rate: None,
+        expires: "2026-09-30".to_string(),
+    });
+
+    let cfg = ThresholdsInput {
+        today,
+        overrides,
+        ..ThresholdsInput::default()
+    };
+
+    // summary would come from compute_delta(prev, curr) in a real caller.
+    let result = compute_thresholds_check(&null_summary(), &cfg);
+
+    // applied_overrides shows which overrides were active at evaluation time.
+    for (cat, info) in &result.applied_overrides {
+        println!("{cat}: active={} expires={}", info.active, info.expires);
+    }
+}
+```
+
 ### `normalize_and_hash` — canonical fingerprints for foreign extractors
 
 `normalize_and_hash(kind, children)` produces the same `blake3` digest in WASM

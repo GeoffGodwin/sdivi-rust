@@ -24,6 +24,8 @@ use crate::snapshot::Snapshot;
 /// let s = null_summary();
 /// assert!(s.pattern_entropy_delta.is_none());
 /// assert!(s.convention_drift_delta.is_none());
+/// assert!(s.pattern_entropy_per_category_delta.is_none());
+/// assert!(s.convention_drift_per_category_delta.is_none());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DivergenceSummary {
@@ -45,6 +47,20 @@ pub struct DivergenceSummary {
     ///
     /// `None` when either snapshot is missing `intent_divergence`.
     pub boundary_violation_delta: Option<i64>,
+
+    /// Per-category Shannon entropy delta (curr − prev), keyed by category name.
+    ///
+    /// `None` on the first-snapshot path (KDD-9).  Map keys are the union of
+    /// categories in `prev` and `curr`; missing-side values are treated as `0.0`.
+    #[serde(default)]
+    pub pattern_entropy_per_category_delta: Option<std::collections::BTreeMap<String, f64>>,
+
+    /// Per-category convention-drift delta (curr − prev), keyed by category name.
+    ///
+    /// `None` on the first-snapshot path (KDD-9).  Same union-of-keys semantics as
+    /// `pattern_entropy_per_category_delta`.
+    #[serde(default)]
+    pub convention_drift_per_category_delta: Option<std::collections::BTreeMap<String, f64>>,
 }
 
 /// Returns a [`DivergenceSummary`] with all fields `None`.
@@ -71,6 +87,8 @@ pub fn null_summary() -> DivergenceSummary {
         coupling_delta: None,
         community_count_delta: None,
         boundary_violation_delta: None,
+        pattern_entropy_per_category_delta: None,
+        convention_drift_per_category_delta: None,
     }
 }
 
@@ -139,13 +157,48 @@ pub fn compute_delta(prev: &Snapshot, curr: &Snapshot) -> DivergenceSummary {
         _ => None,
     };
 
+    let pattern_entropy_per_category_delta = Some(
+        delta_per_category(
+            &prev.pattern_metrics.entropy_per_category,
+            &curr.pattern_metrics.entropy_per_category,
+        )
+    );
+
+    let convention_drift_per_category_delta = Some(
+        delta_per_category(
+            &prev.pattern_metrics.convention_drift_per_category,
+            &curr.pattern_metrics.convention_drift_per_category,
+        )
+    );
+
     DivergenceSummary {
         pattern_entropy_delta,
         convention_drift_delta,
         coupling_delta,
         community_count_delta,
         boundary_violation_delta,
+        pattern_entropy_per_category_delta,
+        convention_drift_per_category_delta,
     }
+}
+
+/// Computes the per-category delta as `curr − prev` over the union of keys.
+///
+/// Categories present in only one snapshot are treated as `0.0` on the
+/// missing side, so a newly-introduced category surfaces as a positive delta.
+fn delta_per_category(
+    prev: &std::collections::BTreeMap<String, f64>,
+    curr: &std::collections::BTreeMap<String, f64>,
+) -> std::collections::BTreeMap<String, f64> {
+    let mut result = std::collections::BTreeMap::new();
+    for key in prev.keys().chain(curr.keys()) {
+        if !result.contains_key(key) {
+            let p = prev.get(key).copied().unwrap_or(0.0);
+            let c = curr.get(key).copied().unwrap_or(0.0);
+            result.insert(key.clone(), c - p);
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -186,6 +239,8 @@ mod tests {
         assert!(s.coupling_delta.is_none());
         assert!(s.community_count_delta.is_none());
         assert!(s.boundary_violation_delta.is_none());
+        assert!(s.pattern_entropy_per_category_delta.is_none());
+        assert!(s.convention_drift_per_category_delta.is_none());
     }
 
     #[test]
@@ -223,6 +278,8 @@ mod tests {
         assert!(json.contains("\"coupling_delta\":null"));
         assert!(json.contains("\"community_count_delta\":null"));
         assert!(json.contains("\"boundary_violation_delta\":null"));
+        assert!(json.contains("\"pattern_entropy_per_category_delta\":null"));
+        assert!(json.contains("\"convention_drift_per_category_delta\":null"));
     }
 
     #[test]

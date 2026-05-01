@@ -82,13 +82,26 @@ pub fn print_check(result: &ThresholdCheckResult, summary: &DivergenceSummary) {
     if result.breached {
         println!("check: FAILED — {} threshold(s) exceeded", result.breaches.len());
         for b in &result.breaches {
-            println!(
-                "  {}: {:.6} > {:.6} (limit)",
-                b.dimension, b.actual, b.limit
-            );
+            if let Some(cat) = &b.category {
+                println!("  {} [{}]: {:.6} > {:.6} (limit)", b.dimension, cat, b.actual, b.limit);
+            } else {
+                println!("  {}: {:.6} > {:.6} (limit)", b.dimension, b.actual, b.limit);
+            }
         }
     } else {
         println!("check: OK — all thresholds within limits");
+    }
+    if !result.applied_overrides.is_empty() {
+        println!();
+        println!("applied overrides:");
+        for (cat, info) in &result.applied_overrides {
+            if info.active {
+                println!("  {cat}: active (expires {})", info.expires);
+            } else {
+                let reason = info.expired_reason.as_deref().unwrap_or("expired");
+                println!("  {cat}: inactive — {reason}");
+            }
+        }
     }
     println!();
     print_divergence(summary);

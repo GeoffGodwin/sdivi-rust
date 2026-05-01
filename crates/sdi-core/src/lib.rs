@@ -65,7 +65,9 @@ pub use compute::boundaries::{
 pub use compute::coupling::{CouplingTopologyResult, compute_coupling_topology};
 pub use compute::normalize::normalize_and_hash;
 pub use compute::patterns::compute_pattern_metrics;
-pub use compute::thresholds::{ThresholdBreachInfo, ThresholdCheckResult, compute_thresholds_check};
+pub use compute::thresholds::{
+    AppliedOverrideInfo, ThresholdBreachInfo, ThresholdCheckResult, compute_thresholds_check,
+};
 
 // ── facade re-exports (sdi-snapshot) ──────────────────────────────────────
 

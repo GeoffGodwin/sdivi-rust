@@ -197,32 +197,71 @@ pub struct WasmDivergenceSummary {
     pub community_count_delta: Option<i64>,
     #[tsify(optional)]
     pub boundary_violation_delta: Option<i64>,
+    /// Per-category entropy delta; `None` on the first-snapshot path.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub pattern_entropy_per_category_delta: Option<BTreeMap<String, f64>>,
+    /// Per-category convention-drift delta; `None` on the first-snapshot path.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub convention_drift_per_category_delta: Option<BTreeMap<String, f64>>,
 }
 
 /// Pattern metrics output (also used as a snapshot sub-field).
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmPatternMetricsResult {
+    /// Shannon entropy per category.
     pub entropy_per_category: BTreeMap<String, f64>,
+    /// Sum of per-category entropies.
     pub total_entropy: f64,
+    /// Average `distinct / total` across all categories.
     pub convention_drift: f64,
+    /// Per-category `distinct / total` before averaging.
+    #[serde(default)]
+    pub convention_drift_per_category: BTreeMap<String, f64>,
 }
 
 /// A single threshold breach.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmThresholdBreachInfo {
+    /// Name of the dimension that exceeded its limit.
     pub dimension: String,
+    /// Category name for per-category breaches; absent for aggregate breaches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[tsify(optional)]
+    pub category: Option<String>,
+    /// Observed delta value.
     pub actual: f64,
+    /// The limit that was exceeded.
     pub limit: f64,
+}
+
+/// Diagnostic info for one entry in `WasmThresholdCheckResult::applied_overrides`.
+#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmAppliedOverrideInfo {
+    /// Whether the override was active (not expired) at evaluation time.
+    pub active: bool,
+    /// Expiry date as `"YYYY-MM-DD"`.
+    pub expires: String,
+    /// Human-readable explanation when inactive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[tsify(optional)]
+    pub expired_reason: Option<String>,
 }
 
 /// Output of [`compute_thresholds_check`].
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmThresholdCheckResult {
+    /// `true` when at least one threshold was exceeded.
     pub breached: bool,
+    /// Per-dimension details for each exceeded threshold.
     pub breaches: Vec<WasmThresholdBreachInfo>,
+    /// Diagnostic map of every override entry with `active` flag and `expires` date.
+    pub applied_overrides: BTreeMap<String, WasmAppliedOverrideInfo>,
 }
 
 /// A proposed boundary from [`infer_boundaries`].
@@ -257,43 +296,5 @@ pub struct WasmTrendResult {
     pub community_count_slope: Option<f64>,
 }
 
-// ── assemble_snapshot input ───────────────────────────────────────────────────
-
-/// Input to [`assemble_snapshot`].
-///
-/// Collects the outputs of the three primary compute functions plus metadata.
-#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmAssembleSnapshotInput {
-    /// Ordered node IDs (determines numeric partition indices).
-    pub node_ids: Vec<String>,
-    /// node_id → community_id (from `detect_boundaries`).
-    pub cluster_assignments: BTreeMap<String, u32>,
-    /// community_id (string) → internal density (from `detect_boundaries`).
-    pub internal_edge_density: BTreeMap<String, f64>,
-    pub modularity: f64,
-    pub node_count: usize,
-    pub edge_count: usize,
-    pub density: f64,
-    pub cycle_count: usize,
-    /// Top hub entries as `[node_id, out_degree]`.
-    pub top_hubs: Vec<(String, usize)>,
-    pub component_count: usize,
-    pub pattern_metrics: WasmPatternMetricsResult,
-    /// Raw pattern instances used to build the catalog (may be empty).
-    pub pattern_instances: Vec<WasmPatternInstanceInput>,
-    pub timestamp: String,
-    #[tsify(optional)]
-    pub commit: Option<String>,
-    /// Number of declared boundaries (sets intent_divergence when Some).
-    #[tsify(optional)]
-    pub boundary_count: Option<u32>,
-    /// Seed used for the Leiden run that produced `cluster_assignments`.
-    /// Defaults to 42 when absent (matches `LeidenConfigInput` default).
-    #[tsify(optional)]
-    pub leiden_seed: Option<u64>,
-    /// Number of boundary violations (from `compute_boundary_violations`).
-    /// When `Some`, sets `intent_divergence.violation_count` in the snapshot.
-    #[tsify(optional)]
-    pub violation_count: Option<u32>,
-}
+// ── assemble_snapshot input (moved to assemble_types.rs) ─────────────────────
+pub use crate::assemble_types::WasmAssembleSnapshotInput;

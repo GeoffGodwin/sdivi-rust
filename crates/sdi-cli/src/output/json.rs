@@ -36,7 +36,7 @@ pub fn print_divergence(summary: &DivergenceSummary) -> Result<()> {
 /// Prints `sdi check` result as pretty-printed JSON to stdout.
 ///
 /// JSON shape: `{ exit_code, exceeded: [string], summary: DivergenceSummary,
-/// applied_overrides: {} }` — stable contract for CI consumers (Seeds Forward).
+/// applied_overrides: { … } }` — stable contract for CI consumers (Seeds Forward).
 pub fn print_check(result: &ThresholdCheckResult, summary: &DivergenceSummary) -> Result<()> {
     let exit_code: i32 = if result.breached { 10 } else { 0 };
     let exceeded: Vec<&str> = result
@@ -48,7 +48,7 @@ pub fn print_check(result: &ThresholdCheckResult, summary: &DivergenceSummary) -
         "exit_code": exit_code,
         "exceeded": exceeded,
         "summary": summary,
-        "applied_overrides": {},
+        "applied_overrides": &result.applied_overrides,
     });
     let json = serde_json::to_string_pretty(&output)?;
     println!("{json}");

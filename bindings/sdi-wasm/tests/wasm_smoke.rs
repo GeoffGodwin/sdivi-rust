@@ -74,11 +74,8 @@ fn test_compute_boundary_violations_with_spec() {
         ],
     };
     let result = compute_boundary_violations(two_node_graph(), spec).unwrap();
-    // lib.rs → models.rs crosses from "core" to "data" which only allows imports FROM "core"
-    // The edge is FROM "core" (lib) TO "data" (models): not a violation of data's rule
-    // (data allows imports from core). The boundary violation is checked from the perspective
-    // of the source boundary's allow_imports_from declarations.
-    assert_eq!(result.violation_count, 0); // no violation: lib→models is allowed (no restriction on core outgoing)
+    // lib→models is allowed (data allows imports from core; no restriction on core outgoing).
+    assert_eq!(result.violation_count, 0);
 }
 
 #[wasm_bindgen_test]
@@ -118,6 +115,8 @@ fn test_compute_thresholds_check_no_breach() {
         coupling_delta: Some(0.05),
         community_count_delta: Some(0),
         boundary_violation_delta: None,
+        pattern_entropy_per_category_delta: None,
+        convention_drift_per_category_delta: None,
     };
     let cfg = WasmThresholdsInput {
         pattern_entropy_rate: 2.0,
@@ -225,6 +224,7 @@ fn make_assemble_input(density: f64, timestamp: &str) -> WasmAssembleSnapshotInp
             entropy_per_category: std::collections::BTreeMap::new(),
             total_entropy: 0.0,
             convention_drift: 0.0,
+            convention_drift_per_category: std::collections::BTreeMap::new(),
         },
         pattern_instances: vec![],
         timestamp: timestamp.into(),
