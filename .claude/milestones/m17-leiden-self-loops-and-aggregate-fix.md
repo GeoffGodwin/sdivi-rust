@@ -3,7 +3,7 @@
 
 <!-- milestone-meta
 id: "17"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Fix two correctness bugs in the recursive Leiden machinery that together produce the all-one-community collapse currently observed on the verify-leiden fixtures (`small_fixture_quality` returns `modularity = 0.0` against the leidenalg reference of `0.778`):

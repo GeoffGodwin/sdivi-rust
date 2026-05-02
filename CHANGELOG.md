@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.1.6] - 2026-05-02
+
+### Added
+- **`LeidenGraph` self-loops support** (`graph.rs`): Added `self_loops: Vec<f64>` field. (M17)
 
 ### Added
 
@@ -13,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SKILL.md` plus task-keyed sub-files (`cli.md`, `config.md`, `embedding.md`,
   `invariants.md`) so contributors and embedders using Claude get surgical SDIVI
   knowledge on demand instead of preloading `CLAUDE.md`.
+
+### Fixed
+
+- Leiden algorithm: `LeidenGraph` now supports self-loops (`self_loops` field).
+  `aggregate_network` correctly preserves intra-community weight as self-loops on
+  the aggregate super-nodes and no longer double-counts inter-community edges (the
+  prior code visited each undirected edge twice, once per endpoint).
+  `compute_modularity` and `compute_stability` now count self-loop weight as
+  internal community weight, as required by Traag et al. 2019.  Per-step
+  correctness verified by new aggregate-invariance unit tests; full algorithm
+  correctness (verify-leiden fixture gate) is gated by M18.
 
 ## [0.1.5] - 2026-05-01
 

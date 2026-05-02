@@ -11,6 +11,8 @@ pub(crate) fn compute_stability(graph: &LeidenGraph, assignment: &[usize]) -> BT
 
     for (i, &c) in assignment.iter().enumerate() {
         size[c] += 1;
+        // Self-loops are internal to node i's community.
+        inner[c] += graph.self_loops[i];
         for (idx, &j) in graph.adj[i].iter().enumerate() {
             if assignment[j] == c && j > i {
                 inner[c] += graph.edge_weights[i][idx];
@@ -25,6 +27,8 @@ pub(crate) fn compute_stability(graph: &LeidenGraph, assignment: &[usize]) -> BT
         }
         let n = size[c] as f64;
         let max_possible = n * (n - 1.0) / 2.0;
+        // max_possible is for non-self-loop pairs; self-loops add to the
+        // numerator without expanding the denominator.
         let s = if max_possible > 0.0 {
             inner[c] / max_possible
         } else {
@@ -36,7 +40,23 @@ pub(crate) fn compute_stability(graph: &LeidenGraph, assignment: &[usize]) -> BT
 }
 
 /// Computes overall modularity Q (weighted).
-pub(crate) fn compute_modularity(graph: &LeidenGraph, assignment: &[usize]) -> f64 {
+///
+/// Self-loop weight on node `i` contributes to `L_c` (internal edges of community
+/// `c = assignment[i]`) since a self-loop is always internal to its node's community.
+///
+/// # Examples
+///
+/// ```
+/// # use sdivi_detection::internal::{LeidenGraph, compute_modularity};
+/// // 2-node graph: cross-edge (0,1) weight 1.0, self-loops on both weight 0.5.
+/// let g = LeidenGraph::from_edges_weighted(2, &[(0,0,0.5),(1,1,0.5),(0,1,1.0)]);
+/// // Both in same community: Q = 0.
+/// assert!((compute_modularity(&g, &[0, 0])).abs() < 1e-9);
+/// // Each alone: Q = 0 (self-loops dominate, no community structure).
+/// assert!((compute_modularity(&g, &[0, 1])).abs() < 1e-9);
+/// ```
+#[doc(hidden)]
+pub fn compute_modularity(graph: &LeidenGraph, assignment: &[usize]) -> f64 {
     let m = graph.total_weight;
     if m == 0.0 {
         return 0.0;
@@ -47,6 +67,8 @@ pub(crate) fn compute_modularity(graph: &LeidenGraph, assignment: &[usize]) -> f
 
     for (i, &c) in assignment.iter().enumerate() {
         sigma[c] += graph.degree[i];
+        // Self-loops are always internal to node i's community.
+        inner[c] += graph.self_loops[i];
         for (idx, &j) in graph.adj[i].iter().enumerate() {
             if assignment[j] == c && j > i {
                 inner[c] += graph.edge_weights[i][idx];

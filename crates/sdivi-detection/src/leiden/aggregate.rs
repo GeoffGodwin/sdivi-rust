@@ -2,15 +2,26 @@
 
 use super::graph::LeidenGraph;
 
-pub(crate) struct AggregateResult {
+#[doc(hidden)]
+pub struct AggregateResult {
     pub graph: LeidenGraph,
     pub membership: Vec<Vec<usize>>,
 }
 
-pub(crate) fn aggregate_network(
-    graph: &LeidenGraph,
-    refined_partition: &[usize],
-) -> AggregateResult {
+/// Aggregates `graph` into a coarser graph where each community in
+/// `refined_partition` becomes a super-node.
+///
+/// **Correctness invariants:**
+/// - Intra-community cross-edges become self-loops on the super-node, preserving
+///   the strong intra-community pull that modularity depends on.
+/// - Each undirected cross-edge is visited once (upper-triangle walk), so
+///   inter-community edge weights are not double-counted.
+/// - Source node self-loops propagate to the aggregate super-node regardless of
+///   partition.
+///
+/// This function is `#[doc(hidden)]` public for integration-test plumbing only.
+#[doc(hidden)]
+pub fn aggregate_network(graph: &LeidenGraph, refined_partition: &[usize]) -> AggregateResult {
     let n = graph.n;
     let num_comms = refined_partition
         .iter()
@@ -24,19 +35,33 @@ pub(crate) fn aggregate_network(
         membership[comm].push(node);
     }
 
+    // edge_map accumulates both cross-edges (u,v with u<v) and self-loops (u,u).
     let mut edge_map: std::collections::BTreeMap<(usize, usize), f64> =
         std::collections::BTreeMap::new();
 
     for u in 0..n {
         let cu = refined_partition[u];
+
+        // Walk only the upper triangle (v > u) — each undirected cross-edge
+        // is visited exactly once, eliminating the prior 2× double-count.
         for (idx, &v) in graph.adj[u].iter().enumerate() {
+            if v < u {
+                continue;
+            }
             let cv = refined_partition[v];
             let w = graph.edge_weights[u][idx];
-            match cu.cmp(&cv) {
-                std::cmp::Ordering::Less => *edge_map.entry((cu, cv)).or_insert(0.0) += w,
-                std::cmp::Ordering::Greater => *edge_map.entry((cv, cu)).or_insert(0.0) += w,
-                std::cmp::Ordering::Equal => {}
+            if cu == cv {
+                // Intra-community: becomes a self-loop on super-node cu.
+                *edge_map.entry((cu, cu)).or_insert(0.0) += w;
+            } else {
+                let key = if cu < cv { (cu, cv) } else { (cv, cu) };
+                *edge_map.entry(key).or_insert(0.0) += w;
             }
+        }
+
+        // Source self-loops propagate to the aggregate super-node unchanged.
+        if graph.self_loops[u] > 0.0 {
+            *edge_map.entry((cu, cu)).or_insert(0.0) += graph.self_loops[u];
         }
     }
 

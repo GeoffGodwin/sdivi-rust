@@ -1,50 +1,107 @@
 # Coder Summary
-**Date:** 2026-05-01
-**Audit cycle:** post-M16 (non-blocking notes sweep)
-**Scope:** All 9 open items in `.tekhton/NON_BLOCKING_LOG.md` + simple blocker from prior reviewer report
-
----
-
 ## Status: COMPLETE
 
 ## What Was Implemented
 
-### Simple Blocker (reviewer report)
-- `crates/sdivi-core/src/compute/boundaries.rs` — removed unused `current`
-  parameter from `compute_historical_stability` and updated its call site.
-  This eliminates the `cargo clippy -- -D warnings` unused-variable error.
+- **`LeidenGraph` self-loops support** (`graph.rs`): Added `self_loops: Vec<f64>` field.
+  Changed `from_edges_weighted` to accumulate self-loops instead of dropping them.
+  Updated `degree[u]` to include `2 × self_loops[u]` (standard undirected convention).
+  Updated `total_weight` to use `cross_edge_total + self_loop_total` (not `degree.sum()/2`
+  which would double-count self-loops). Fixed `edge_weight(u, u)` to return `self_loops[u]`.
+  Added inline unit tests (5 tests).
 
-### Non-Blocking Notes — All 9 Items Resolved
+- **`aggregate_network` correctness fix** (`aggregate.rs`): Rewrote the inner edge
+  traversal to walk only the upper triangle (`v >= u`), visiting each undirected
+  cross-edge exactly once (fixes prior 2× double-count). Intra-community cross-edges
+  now emit self-loops on the aggregate super-node. Source node self-loops propagate to
+  the aggregate super-node regardless of partition.
 
-| # | File | Action |
-|---|------|--------|
-| 1 | `commit_extract.rs:81` — misleading `RefResolutionFailed` | Already fixed in prior run: `CommitDateParseFailed { sha, raw }` variant added and used. |
-| 2 | `commit_extract.rs:94-113` — `git archive` before tar check | Already fixed in prior run: tar `--version` check precedes `git archive` spawn. |
-| 3 | Security findings MEDIUM/LOW | Informational; handled by security pipeline. No code change. |
-| 4 | `sdivi-core/.../change_coupling.rs:96-100` — dead `else` branch | Already fixed in prior run: direct `(sorted_files[i].clone(), sorted_files[j].clone())`. |
-| 5 | `sdivi-pipeline/.../change_coupling.rs:101-103,123` — double empty-SHA guard | Already fixed in prior run: inner guard removed; single outer guard. |
-| 6 | `exports.rs:168` — `change_coupling: None` hardcoded | Tracked with TODO comment at exports.rs:160-162; MVP intentional. |
-| 7 | `types.rs:53-58` — `WasmLeidenConfigInput` no `edge_weights` | Tracked with INTENTIONAL GAP doc comment at types.rs:46-48 (ADL-4). |
-| 8 | `input/types.rs:145` — tuple-keyed map unserializable via serde_json | Already fixed in prior run: `edge_weights` uses `Option<BTreeMap<String, f64>>` with NUL-delimited keys. |
-| 9 | `change_coupling.rs:83` — `HashSet` vs `BTreeSet` convention | Already fixed in prior run: line 83 uses `BTreeSet`. |
+- **`ModularityState` self-loop awareness** (`modularity.rs`): `from_assignment` adds
+  `graph.self_loops[i]` to `inner_edges[c]` for each node (self-loops are always
+  internal to a node's own community). `remove_node` subtracts `graph.self_loops[node]`
+  from the old community's `inner_edges` and sets the singleton's `inner_edges[node]`
+  to `graph.self_loops[node]`. `add_node` clears the singleton slot and adds
+  `graph.self_loops[node]` to the new community.
+
+- **`compute_modularity` and `compute_stability`** (`quality.rs`): Both now add
+  `graph.self_loops[i]` to `inner[c]` per node, correctly counting self-loop weight
+  as internal community weight.
+
+- **Test plumbing** (`lib.rs`): Added `#[doc(hidden)] pub mod internal` re-exporting
+  `LeidenGraph`, `AggregateResult`, `aggregate_network`, and `compute_modularity` for
+  integration test access.
+
+- **New integration test file** (`tests/aggregate_invariance.rs`): Four hand-derived
+  test cases verifying aggregate structure (self-loops, no double-counting) plus
+  modularity invariance. One proptest property test with 256 cases.
+
+- **CHANGELOG.md** updated with M17 entry.
 
 ## Root Cause (bugs only)
-The simple blocker (`current` unused param) was introduced when dead code stubs
-referencing `current` were removed but the parameter itself was not cleaned up.
+
+Two correctness bugs in the Leiden recursive machinery:
+1. **`aggregate_network` dropped intra-community edges** — the `std::cmp::Ordering::Equal`
+   arm was a no-op, so any cross-edge within a community was silently discarded. These
+   edges must become self-loops on the aggregate super-node to preserve the strong
+   intra-community pull that modularity relies on.
+2. **`aggregate_network` double-counted inter-community edges** — the code iterated
+   `graph.adj[u]` for all u, visiting each undirected edge twice (once as (u,v) from u,
+   once as (v,u) from v). The fix: skip `v < u` in the inner loop (upper-triangle walk).
+
+Together these caused every graph to collapse to a single community after one
+aggregation step because the aggregate graph had zero edge weight, making the
+"merge all" partition optimal by default.
 
 ## Files Modified
-- `crates/sdivi-core/src/compute/boundaries.rs` — removed `current` param from
-  `compute_historical_stability`; updated call site at line 136
-- `.tekhton/NON_BLOCKING_LOG.md` — moved all 9 open items to Resolved
+
+- `crates/sdivi-detection/src/leiden/graph.rs` (MODIFIED) — self-loops support
+- `crates/sdivi-detection/src/leiden/aggregate.rs` (MODIFIED) — double-count fix + self-loops
+- `crates/sdivi-detection/src/leiden/modularity.rs` (MODIFIED) — self-loop awareness
+- `crates/sdivi-detection/src/leiden/quality.rs` (MODIFIED) — self-loop awareness
+- `crates/sdivi-detection/src/leiden/mod.rs` (MODIFIED) — module visibility for re-exports
+- `crates/sdivi-detection/src/lib.rs` (MODIFIED) — internal test helpers
+- `crates/sdivi-detection/tests/aggregate_invariance.rs` (NEW) — 4 hand-derived + 1 proptest
+- `CHANGELOG.md` (MODIFIED)
 
 ## Human Notes Status
-N/A — no Human Notes section in this task.
+
+No explicit Human Notes section in the milestone — all deliverables listed under
+Deliverables and Tests sections. All addressed.
+
+## Architecture Change Proposals
+
+**Adding `pub mod internal` to expose test plumbing**
+- **Current constraint**: `LeidenGraph`, `aggregate_network`, and `compute_modularity`
+  are `pub(crate)` — not accessible from integration tests in `tests/`
+- **What triggered this**: Milestone requires `tests/aggregate_invariance.rs` that
+  directly tests `compute_modularity` and `aggregate_network` invariance properties,
+  but these are internal types not reachable from integration tests otherwise
+- **Proposed change**: Added `#[doc(hidden)] pub mod internal` to `lib.rs` re-exporting
+  `LeidenGraph`, `aggregate_network`, `AggregateResult`, and `compute_modularity`.
+  Changed the items from `pub(crate)` to `pub` with `#[doc(hidden)]`. This is a
+  standard Rust pattern for test plumbing (used by serde, syn, etc.).
+- **Backward compatible**: Yes — no existing public items changed or removed
+- **ARCHITECTURE.md update needed**: No — test plumbing is not architectural
 
 ## Docs Updated
-None — no public-surface changes in this task. (`compute_historical_stability` is
-`pub(crate)` — not public API.)
 
-## Observed Issues (out of scope)
-- `crates/sdivi-config/src/thresholds.rs:46` — `validate_and_prune_overrides` is `pub(crate)` but never called; dead code warning (pre-existing).
-- `crates/sdivi-graph/src/dependency_graph.rs:9` — unused import `tracing::debug` (pre-existing).
-- `crates/sdivi-patterns/src/catalog.rs:6,8,10,11` — four unused imports (`Glob`, `GlobSet`, `GlobSetBuilder`, `PatternsConfig`, `fingerprint_node_kind`, `crate::queries`) (pre-existing).
+None — all changed types/functions are `#[doc(hidden)]` and not part of the stable
+user-facing API. `CHANGELOG.md` updated with the M17 bug-fix entry.
+
+## Files Modified (auto-detected)
+- `.claude/milestones/MANIFEST.cfg`
+- `.claude/milestones/m17-leiden-self-loops-and-aggregate-fix.md`
+- `.tekhton/CODER_SUMMARY.md`
+- `.tekhton/DRIFT_LOG.md`
+- `.tekhton/JR_CODER_SUMMARY.md`
+- `.tekhton/PREFLIGHT_REPORT.md`
+- `.tekhton/REVIEWER_REPORT.md`
+- `.tekhton/TESTER_REPORT.md`
+- `.tekhton/test_dedup.fingerprint`
+- `CHANGELOG.md`
+- `crates/sdivi-detection/src/leiden/aggregate.rs`
+- `crates/sdivi-detection/src/leiden/graph.rs`
+- `crates/sdivi-detection/src/leiden/mod.rs`
+- `crates/sdivi-detection/src/leiden/modularity.rs`
+- `crates/sdivi-detection/src/leiden/quality.rs`
+- `crates/sdivi-detection/src/lib.rs`

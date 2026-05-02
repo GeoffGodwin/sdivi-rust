@@ -1,116 +1,96 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 10 test functions
-
-- `crates/sdivi-pipeline/src/commit_extract.rs` — inline `#[cfg(test)] mod tests`: 7 unit tests
-  (`utc_passthrough`, `negative_offset_shifts_forward`, `positive_offset_shifts_back`,
-  `malformed_returns_none`, `positive_offset_crosses_day_boundary_backward`,
-  `negative_offset_crosses_day_boundary_forward`, `commit_date_parse_failed_when_date_unparseable`)
-- `crates/sdivi-pipeline/tests/commit_extract_security.rs` — 3 integration tests
-  (`resolve_ref_includes_double_dash_separator`, `stderr_truncation_prevents_information_leakage`,
-  `extract_commit_tree_succeeds_with_tar_flags`)
-
-Note: `.tekhton/ARCHITECTURE_LOG.md` and `.tekhton/NON_BLOCKING_LOG.md` are documentation
-files, not test files — audited for consistency with implementation, not for test quality.
-The three freshness-sample files (`tests/fixtures/high-entropy/src/lib.rs`,
-`tests/fixtures/high-entropy/src/state.rs`, `tests/fixtures/leiden-graphs/large/metadata.json`)
-are fixture data with no embedded test code; no issues found.
+Tests audited: 1 file, 6 test functions
+- `crates/sdivi-detection/tests/leiden_regression.rs` — 6 integration tests
+  (`two_disconnected_triangle_cliques_produce_two_communities`,
+  `two_disconnected_triangle_cliques_have_positive_modularity`,
+  `empty_graph_produces_zero_communities`, `single_node_produces_one_community`,
+  `two_isolated_nodes_produce_two_communities`, `run_leiden_is_deterministic`)
 
 Implementation files cross-referenced:
-- `crates/sdivi-pipeline/src/commit_extract.rs` (lines 40-68, 94-151, 155-161)
-- `crates/sdivi-core/src/compute/boundaries.rs` (lines 136, 152-169)
+- `crates/sdivi-detection/src/leiden/mod.rs`
+- `crates/sdivi-detection/src/leiden/graph.rs`
+- `crates/sdivi-detection/src/leiden/aggregate.rs`
+- `crates/sdivi-detection/src/leiden/modularity.rs`
+- `crates/sdivi-detection/src/leiden/quality.rs`
+- `crates/sdivi-detection/src/lib.rs`
 
-Deleted test file confirmed: `tests/historical_commit_lifecycle.rs` — intentional removal per
-audit context; no orphaned imports detected in remaining test files.
+Out-of-scope note: `crates/sdivi-detection/tests/aggregate_invariance.rs` (5 tests —
+4 hand-derived + 1 proptest) was authored by the coder this run and was not listed in
+the audit context.  A follow-up audit pass should cover it.
 
-Verdict: **CONCERNS**
+Verdict: **PASS**
 
 ---
 
 ### Findings
 
-#### INTEGRITY: Test suite was not executed — zero-run report
-- File: `.tekhton/TESTER_REPORT.md`
-- Issue: The report records "Passed: 0  Failed: 0" while carrying checkmarks for five
-  verified items. A count of zero for both pass and fail is mechanically impossible if any
-  test ran to completion — even a single panic or compile error would produce a non-zero
-  failed count. The 10 test functions across both test files under audit were never run.
-  Any assertion failures, compile errors, or wrong behaviors introduced in this cycle are
-  currently undetected.
-- Severity: HIGH
-- Action: Run `cargo test -p sdivi-pipeline` and record the actual pass/fail totals in
-  TESTER_REPORT.md before closing this cycle. Fix any failures before merging.
+#### COVERAGE: `compute_stability` self-loop path has no direct integration test
+- File: `crates/sdivi-detection/tests/leiden_regression.rs`:14-22 (module doc comment)
+- Issue: The M17 self-loop changes to `compute_stability` (`quality.rs` line 15:
+  `inner[c] += graph.self_loops[i]`) are `pub(crate)` and not re-exported via the
+  `internal` module, so the path cannot be reached directly from an integration test.
+  The tester documented this gap honestly in the file's module-level comment.
+  The `run_leiden_is_deterministic` and `two_disconnected_triangle_cliques_*` tests
+  exercise the same code path indirectly (they call `build_partition` → `compute_stability`),
+  but no test directly asserts that self-loop weight increases a community's stability
+  density.
+- Severity: LOW
+- Action: In a future milestone, add `compute_stability` to the `internal` re-export
+  block in `lib.rs` and add a targeted test verifying that a node with a self-loop
+  contributes non-zero stability to its community.  Not required for M17.
 
-#### SCOPE: NON_BLOCKING_LOG.md records two security fixes absent from the implementation
-- File: `.tekhton/NON_BLOCKING_LOG.md` (resolved item 3); `crates/sdivi-pipeline/src/commit_extract.rs:46,119-124`
-- Issue: The resolved entry states "(1) added `--` separator to `git rev-parse` at line 46"
-  and "(2) added `--no-absolute-filenames` flag to `tar` at line 120." Neither fix is present:
-  line 46 of `commit_extract.rs` reads `.args(["rev-parse", "--verify", reference])` with no
-  `--` separator, and the `tar` command (lines 119-124) contains only `.arg("-xC")` — no
-  `--no-absolute-filenames`. Only the third sub-item (the `truncate_stderr` helper) was
-  actually implemented. CODER_SUMMARY.md compounds the inconsistency by recording item 3 as
-  "No code change," which contradicts both the NON_BLOCKING_LOG.md entry and the presence
-  of `truncate_stderr` in the implementation. The audit trail is inaccurate on two counts.
-- Severity: HIGH
-- Action: Either (a) apply both missing security fixes (`--` separator in `resolve_ref_to_sha`
-  and `--no-absolute-filenames` in `extract_commit_tree`) and reopen the NON_BLOCKING_LOG.md
-  entry as truly fixed, or (b) correct the NON_BLOCKING_LOG.md entry to accurately reflect
-  that only `truncate_stderr` was applied and the `--` / `--no-absolute-filenames` items
-  remain open. Update CODER_SUMMARY.md to match whichever path is taken.
+### Rubric Detail
 
-#### EXERCISE: `resolve_ref_includes_double_dash_separator` may vacuously pass without the fix
-- File: `crates/sdivi-pipeline/tests/commit_extract_security.rs:7-31`
-- Issue: The test asserts that stderr does not contain "unknown option" when `--invalid-ref`
-  is passed to `resolve_ref_to_sha`. Git on most distributions treats `--invalid-ref` as a
-  revspec rather than a flag even when no `--` separator is present, so git produces output
-  like "fatal: not a valid object name" rather than "unknown option". The test would therefore
-  pass on a typical git installation regardless of whether `--` is present in the command —
-  making it unable to detect the absence of the fix it claims to verify.
-- Severity: MEDIUM
-- Action: Replace the "does not contain 'unknown option'" assertion with a direct inspection
-  of the spawned `git` command's argv (e.g., by exposing a test-only helper that returns the
-  argument list, or by constructing a mock git script that echoes its argv and verifying `--`
-  appears between `--verify` and the reference). Alternatively, leave the functional
-  assertion as-is and add an explicit comment acknowledging it does not prove the `--` is
-  present — only that git fails cleanly.
+1. **Assertion Honesty — PASS**
+   All six tests assert values derived from actual `run_leiden` outputs.
+   - `two_disconnected_triangle_cliques_produce_two_communities` compares
+     `community_count()` against 2 and verifies per-node community equality/inequality.
+     The value 2 is the analytically correct answer for two disconnected K3 graphs —
+     not a magic constant.
+   - `two_disconnected_triangle_cliques_have_positive_modularity` checks
+     `partition.modularity > 0.0`.  The inline comment correctly notes Q ≈ 0.5 for
+     two balanced disconnected triangles.  The `> 0.0` threshold is conservative but
+     honest and sufficient to distinguish the fixed (split) from the pre-fix (collapsed
+     single-community) result.
+   - The three degenerate-case tests (empty, single-node, two-isolated) assert the only
+     values those inputs can produce given the graph structure.
+   - `run_leiden_is_deterministic` compares two `LeidenPartition` values from identical
+     inputs; no reference partition is hard-coded.
 
-#### EXERCISE: `extract_commit_tree_succeeds_with_tar_flags` does not verify the security flag
-- File: `crates/sdivi-pipeline/tests/commit_extract_security.rs:109-152`
-- Issue: The test verifies that `extract_commit_tree` succeeds and `test.txt` is present in
-  the output directory. It does not verify that `--no-absolute-filenames` was passed to tar.
-  A comment in the test body explicitly acknowledges this gap ("A comprehensive security test
-  would construct a malicious tar with absolute paths"). Since `--no-absolute-filenames` is
-  also absent from the implementation (see SCOPE finding), the test currently validates a
-  correct-but-insecure extraction and reports it as a security fix verification.
-- Severity: MEDIUM
-- Action: If the `--no-absolute-filenames` fix is applied, also add a test that constructs a
-  synthetic tar archive with an absolute-path entry and verifies the file is not created
-  outside the target directory. If the flag is intentionally deferred, document the open risk
-  in the NON_BLOCKING_LOG.md rather than claiming it as fixed.
+2. **Edge Case Coverage — PASS**
+   - Empty graph (0 nodes, 0 edges)
+   - Single isolated node (no edges)
+   - Two isolated nodes (no edges between them)
+   - Primary regression case: two disconnected triangle cliques
+   - Determinism check across identical runs
+   Missing but out-of-scope for M17: warm-start path, weighted-edge path.
 
-#### NAMING: `commit_date_parse_failed_when_date_unparseable` does not test `commit_date_iso`
-- File: `crates/sdivi-pipeline/src/commit_extract.rs:237-245`
-- Issue: The test name implies it verifies that `commit_date_iso` returns a
-  `CommitDateParseFailed` error when git returns an unparseable date string. The body
-  only calls the private `normalize_to_utc` helper and asserts it returns `None`. The
-  public function `commit_date_iso` and its `ok_or_else(|| CommitDateParseFailed {...})`
-  mapping (line 87) are never exercised. The behavior the name promises is already partially
-  covered by `malformed_returns_none`; this test adds no distinct coverage.
-- Severity: MEDIUM
-- Action: Either rename the test to `normalize_to_utc_returns_none_for_bad_input` to match
-  what it actually does, or replace it with a test that calls `commit_date_iso` against a
-  git repo where the command succeeds but returns a malformed date (constructed via a
-  fake-git script in a tempdir), verifying the `CommitDateParseFailed` variant is returned.
+3. **Implementation Exercise — PASS**
+   Every test calls the real `run_leiden` function with real graph input from
+   `build_dependency_graph_from_edges`.  No mocking.  The primary regression test
+   (`two_disconnected_triangle_cliques_produce_two_communities`) drives execution
+   through the fixed `aggregate_network` code path (the intra-community edge → self-loop
+   conversion and the upper-triangle double-count fix).
 
-#### INTEGRITY: NON_BLOCKING_LOG.md and CODER_SUMMARY.md give inconsistent accounts of item 3
-- File: `.tekhton/NON_BLOCKING_LOG.md` (resolved item 3); `.tekhton/CODER_SUMMARY.md` (row 3)
-- Issue: NON_BLOCKING_LOG.md marks item 3 as "FIXED in sweep" and lists three specific code
-  changes. CODER_SUMMARY.md records the same item as "Informational; handled by security
-  pipeline. No code change." Both documents cannot be correct. The actual state (only
-  `truncate_stderr` was added) matches neither description exactly, creating an audit trail
-  that will mislead any future reviewer who reads only one of the two files.
-- Severity: MEDIUM
-- Action: Reconcile both documents so they agree on what was done. The NON_BLOCKING_LOG.md
-  entry should list only the sub-items that were actually implemented; CODER_SUMMARY.md
-  should reflect the actual file changes rather than "No code change."
+4. **Test Weakening Detection — N/A**
+   `leiden_regression.rs` is a new file (git status: `??`).  No prior test functions
+   were modified, removed, or had their assertions broadened.
+
+5. **Test Naming and Intent — PASS**
+   All six function names encode both the scenario and the expected outcome.  No
+   generic names (`test_1`, `test_thing`, etc.) present.
+
+6. **Scope Alignment — PASS**
+   All imports exist in the current codebase after M17 changes:
+   - `sdivi_detection::leiden::run_leiden` — re-exported at `lib.rs:23`
+   - `sdivi_detection::partition::LeidenConfig` — re-exported at `lib.rs:25`
+   - `sdivi_graph::dependency_graph::build_dependency_graph_from_edges` — present
+   The files deleted this run (`.tekhton/JR_CODER_SUMMARY.md`,
+   `.tekhton/test_dedup.fingerprint`) are not referenced by any test file under audit.
+
+7. **Test Isolation — PASS**
+   All fixture data is inline (integer ranges, string literals).  No test reads
+   `.tekhton/*`, `.claude/*`, snapshot files, build outputs, or any other mutable
+   project state.  No filesystem I/O; `tempfile` is not needed.

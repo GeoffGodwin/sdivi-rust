@@ -4,11 +4,11 @@
 //! quality functions.  The algorithm is single-threaded and fully deterministic
 //! given the same seed.
 
-mod aggregate;
+pub(crate) mod aggregate;
 mod cpm;
 pub(crate) mod graph;
 mod modularity;
-mod quality;
+pub(crate) mod quality;
 mod refine;
 
 use rand::rngs::StdRng;

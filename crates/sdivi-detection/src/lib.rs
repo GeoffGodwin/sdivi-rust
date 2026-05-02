@@ -24,3 +24,15 @@ pub use leiden::run_leiden;
 pub use leiden::run_leiden_with_weights;
 pub use partition::{LeidenConfig, LeidenPartition, QualityFunction};
 pub use warm_start::{initial_assignment_from_cache, CACHE_FILENAME};
+
+/// Internal test helpers — **not stable API**.
+///
+/// These re-exports exist solely for integration-test plumbing (e.g.
+/// `tests/aggregate_invariance.rs`).  They may be removed or renamed at any
+/// time; do not use them in production code.
+#[doc(hidden)]
+pub mod internal {
+    pub use crate::leiden::aggregate::{aggregate_network, AggregateResult};
+    pub use crate::leiden::graph::LeidenGraph;
+    pub use crate::leiden::quality::compute_modularity;
+}

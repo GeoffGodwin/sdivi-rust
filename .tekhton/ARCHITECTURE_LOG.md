@@ -38,3 +38,8 @@ Each entry captures why a structural change was made, preventing future develope
 - **Date**: 2026-05-01
 - **Rationale**: WASM bindings for `assemble_snapshot` hardcode `change_coupling: None` because `compute_change_coupling` is not yet exposed in the WASM API. This is an MVP limitation. Post-MVP, add `change_coupling` field to `WasmAssembleSnapshotInput` and expose `compute_change_coupling` as a WASM export. Tracked in `bindings/sdivi-wasm/src/exports.rs:160-162` with TODO comment.
 - **Source**: Non-blocking notes from post-M16 review cycle
+
+## ADL-8: pub mod internal (Task: "M17")
+- **Date**: 2026-05-02
+- **Rationale**: Standard Rust test-plumbing pattern (`#[doc(hidden)]` + explicit "not stable API" prose). Items are in `sdivi-detection`, not in `sdivi-core` (the API-stability boundary). Well-implemented: all re-exp
+- **Source**: Accepted ACP from pipeline run

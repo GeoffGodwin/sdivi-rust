@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-01
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -20,6 +20,8 @@
 - [2026-05-01 | "M12"] **`sdivi-core` now re-exports inner-crate types** (`GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint`). These were previously only reachable via internal crate paths. The re-exports are additive (backward-compatible) but widen the public surface of sdivi-core. Document in the "Module Boundaries" section of CLAUDE.md during M13 review.
 
 ## Unresolved Observations
+- [2026-05-02 | "M17"] `aggregate.rs:39` — `std::collections::BTreeMap` is imported via full path rather than a `use` statement at the top of the file. The rest of the codebase uses top-level `use` declarations. Cosmetic inconsistency, not a correctness issue.
+- [2026-05-02 | "M17"] `modularity.rs:add_node` comment — "When `to == node` this is immediately overwritten by the self-loop addition below" accurately describes `inner_edges` but is silent about the sigma_tot/size double-increment on the same code path. If someone later reads this comment expecting the singleton round-trip to be fully no-op, they may be confused.
 - [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.
 - [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/types.rs:46-48` — `WasmLeidenConfigInput` missing `edge_weights` tracked as ADL-4. Verify ADL-4 actually exists in the architecture log; if not, create the entry so the gap is formally tracked.
 - [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items are marked `[x]` (resolved) but items 3, 6, and 7 were deferred rather than fixed. The log offers no way to distinguish "resolved by fixing" from "resolved by deferring," which will obscure the true open count in future audits. Consider a `[deferred]` marker for clarity.
@@ -28,12 +30,3 @@
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
-- [RESOLVED 2026-05-01] `crates/sdivi-core/src/input/edge_weight.rs:14` — doc says `source < target` is required but the invariant is not enforced at runtime. `boundaries.rs:109` already normalises index order, so a mis-ordered single key still works. Only two keys mapping to the same edge pair would silently collide (last iteration wins in `BTreeMap::collect`). The doc is misleading — either enforce with a debug_assert or rewrite the doc to say "callers should canonicalise; detection normalises".
-- [RESOLVED 2026-05-01] Pre-existing compiler warnings not introduced by this task but noted by the coder as out-of-scope: unused `pub(crate) validate_and_prune_overrides` (`sdivi-config/src/thresholds.rs:46`), unused import `tracing::debug` (`sdivi-graph/src/dependency_graph.rs:9`), dead code in `sdivi-patterns/src/catalog.rs`. These are accumulating and worth a dedicated cleanup pass.
-- [RESOLVED 2026-05-01] `crates/sdivi-core/src/compute/boundaries.rs:174` — `let _ = &current_communities;` with comment "used for future extension" is dead code and a TODO stub that should live in the issue tracker, not the source.
-- [RESOLVED 2026-05-01] `commit_extract.rs:158-209` — `normalize_to_utc`, `calendar_to_epoch`, and `epoch_to_iso8601` are hand-rolled ISO 8601 + Proleptic Gregorian arithmetic. `sdivi-pipeline` already depends on `chrono` (via `sdivi-config`) with `default-features = false`; using `chrono::DateTime::parse_from_rfc3339` would eliminate ~50 lines of custom arithmetic with no WASM impact (pipeline is FS-bearing and not WASM-compatible). This is a simplification opportunity for a future cleanup pass, not a bug.
-- [RESOLVED 2026-05-01] `tests/historical_commit_lifecycle.rs` — workspace-level `tests/` placeholder is a comment-only file that explains why the real test lives under `crates/sdivi-cli/`. The comment is accurate but the file itself adds no value and will accumulate as noise if the pattern is repeated for future milestones.
-- [RESOLVED 2026-05-01] `[bindings/sdivi-wasm/src/types.rs vs crates/sdivi-core/src/input/types.rs]` — `WasmLeidenConfigInput` silently diverged from `LeidenConfigInput` in M15 (core gained `edge_weights`; WASM wrapper did not). The `to_core` deserialization silently defaults to `None`, so no crash, but the divergence will widen as fields are added without mirrored updates to the WASM wrapper.
-- [RESOLVED 2026-05-01] `[crates/sdivi-pipeline/src/change_coupling.rs:86-90]` — `parse_git_log_output` doc comment describes newline-separated filenames but the actual format is NUL-terminated (`-z` flag). The parsing logic is correct; the prose is wrong.
-- [RESOLVED 2026-05-01] `[crates/sdivi-detection/src/leiden/quality.rs:1]` — all other rewritten `leiden/` submodules have a `//!` module-level doc comment; `quality.rs` does not. Minor consistency gap.
-- [RESOLVED 2026-05-01] _(stays in DRIFT_LOG.md for next cycle)_ None. All 10 unresolved observations are addressed above.

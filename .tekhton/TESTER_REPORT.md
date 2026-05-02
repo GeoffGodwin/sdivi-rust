@@ -1,17 +1,11 @@
 ## Planned Tests
-- [x] Security fix: `git rev-parse` with `--` separator validation
-- [x] Security fix: `tar` with `--no-absolute-filenames` validation  
-- [x] Security fix: stderr truncation in error variants validation
-- [x] ADL-7 verification: change_coupling MVP gap tracking
-- [x] ADL-4 verification: WasmLeidenConfigInput edge_weights tracking
+- [x] `crates/sdivi-detection/tests/leiden_regression.rs` — end-to-end run_leiden two-cliques regression and ancillary guards
 
 ## Test Run Results
-Passed: 0  Failed: 0
+Passed: 6  Failed: 0
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-pipeline/src/commit_extract.rs` — security fixes verified in tests
-- [x] `.tekhton/ARCHITECTURE_LOG.md` — ADL-7 entry verified as present
-- [x] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items resolved and verified
+- [x] `crates/sdivi-detection/tests/leiden_regression.rs`
