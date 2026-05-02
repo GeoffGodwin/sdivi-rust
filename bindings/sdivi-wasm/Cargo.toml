@@ -15,10 +15,19 @@ sdivi-core          = { workspace = true }
 serde             = { workspace = true }
 serde_json        = { workspace = true }
 wasm-bindgen      = { workspace = true }
-tsify             = { workspace = true }
+tsify-next        = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 js-sys            = { workspace = true }
 console_error_panic_hook = { workspace = true }
+
+# `rand` (used transitively by sdivi-detection's seeded Leiden RNG) pulls in
+# getrandom 0.2 via rand_core. On wasm32 targets, getrandom 0.2 refuses to
+# compile unless its `js` feature is enabled — that feature routes its calls
+# through the JS Web Crypto API. We never actually invoke OsRng (sdivi-rust
+# always seeds StdRng explicitly from Config::random_seed per Rule 6/18) but
+# the function still has to link, so the feature has to be on.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }

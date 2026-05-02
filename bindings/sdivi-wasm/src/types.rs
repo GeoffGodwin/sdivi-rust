@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tsify::Tsify;
+use tsify_next::Tsify;
 
 /// A single node in a [`WasmDependencyGraphInput`].
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]

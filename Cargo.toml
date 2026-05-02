@@ -136,8 +136,13 @@ tempfile = ">=3.0, <3.20"   # <3.20 avoids getrandom 0.4 (edition2024) on Cargo 
 # Pinned per KDD-13; pre-1.0 crates require explicit version management.
 wasm-bindgen       = "0.2"
 wasm-bindgen-test  = "0.3"
-# tsify 0.4.x is pre-1.0; pinned in DRIFT_LOG.md — update deliberately.
-tsify              = { version = "0.4", features = ["js"] }
+# `tsify` 0.4.x is unmaintained since 2023 and incompatible with
+# wasm-bindgen ≥ 0.2.105 (missing ErasableGeneric / WasmDescribeVector
+# impls for derived types used as `Vec<T>` parameters). `tsify-next` is the
+# actively-maintained fork. We can't rename it via `package = "..."` — the
+# derive macro hardcodes `::tsify_next::...` paths. Source uses
+# `use tsify_next::Tsify;` directly.
+tsify-next         = { version = "0.5", features = ["js"] }
 serde-wasm-bindgen = "0.6"
 js-sys             = "0.3"
 console_error_panic_hook = "0.1"

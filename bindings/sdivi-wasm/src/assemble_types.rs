@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tsify::Tsify;
+use tsify_next::Tsify;
 
 use crate::types::{WasmPatternInstanceInput, WasmPatternMetricsResult};
 

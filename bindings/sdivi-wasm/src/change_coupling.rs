@@ -1,7 +1,7 @@
 //! WASM types and export for compute_change_coupling.
 
 use serde::{Deserialize, Serialize};
-use tsify::Tsify;
+use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 fn err(e: impl std::fmt::Display) -> JsError {
