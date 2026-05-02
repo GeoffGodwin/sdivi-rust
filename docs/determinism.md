@@ -20,6 +20,17 @@ The consequence: sorted output is part of the contract. JSON snapshots emit
 keys in lexicographic order. Foreign extractors feeding `DependencyGraphInput`
 do not need to pre-sort — the compute functions re-sort internally.
 
+## Refinement Tie-Break Rule
+
+When multiple candidate sub-communities have equal modularity gain during the
+Leiden refinement phase, the tie is broken by **smallest sub-community ID** (the
+`BTreeMap` over `(comm_id → k_in)` iterates in ascending key order, so the
+lowest-ID candidate wins). This produces deterministic output for a given seed
+but may select a different partition than leidenalg's random-selection rule
+(`exp(ΔQ/θ)` probability). The difference is within the 1 % modularity
+tolerance of the `verify-leiden` fixture suite. Faithful Traag-2019 random
+selection is filed as a future milestone.
+
 ## Seed Contract
 
 `Config::random_seed` (default `42`) controls the `StdRng` used by the Leiden

@@ -1,11 +1,11 @@
 ## Planned Tests
-- [x] `crates/sdivi-detection/tests/leiden_regression.rs` — end-to-end run_leiden two-cliques regression and ancillary guards
+- [x] `crates/sdivi-detection/tests/refinement.rs` — fix floating-point boundary margin in `well_connected_strong_connection_passes`; add `well_connected_size_s_zero_always_true`
 
 ## Test Run Results
-Passed: 6  Failed: 0
+Passed: 13  Failed: 0
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-detection/tests/leiden_regression.rs`
+- [x] `crates/sdivi-detection/tests/refinement.rs`

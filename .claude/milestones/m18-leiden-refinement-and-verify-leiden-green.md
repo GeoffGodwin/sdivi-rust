@@ -3,7 +3,7 @@
 
 <!-- milestone-meta
 id: "18"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Replace the broken `refine_partition` implementation with a correct Leiden refinement phase per Traag, Waltman, & van Eck (2019), so the full recursive Leiden algorithm produces partition-quality output that satisfies the `verify-leiden` cross-check suite (modularity within 1% of leidenalg, community count within ±10%) on all three fixtures (small/medium/large). With M17's self-loop and aggregate fixes already in place, this milestone closes the algorithm correctness gap and re-enables `verify-leiden.yml` on push/PR triggers.

@@ -2,106 +2,54 @@
 ## Status: COMPLETE
 
 ## What Was Implemented
-
-- **`LeidenGraph` self-loops support** (`graph.rs`): Added `self_loops: Vec<f64>` field.
-  Changed `from_edges_weighted` to accumulate self-loops instead of dropping them.
-  Updated `degree[u]` to include `2 × self_loops[u]` (standard undirected convention).
-  Updated `total_weight` to use `cross_edge_total + self_loop_total` (not `degree.sum()/2`
-  which would double-count self-loops). Fixed `edge_weight(u, u)` to return `self_loops[u]`.
-  Added inline unit tests (5 tests).
-
-- **`aggregate_network` correctness fix** (`aggregate.rs`): Rewrote the inner edge
-  traversal to walk only the upper triangle (`v >= u`), visiting each undirected
-  cross-edge exactly once (fixes prior 2× double-count). Intra-community cross-edges
-  now emit self-loops on the aggregate super-node. Source node self-loops propagate to
-  the aggregate super-node regardless of partition.
-
-- **`ModularityState` self-loop awareness** (`modularity.rs`): `from_assignment` adds
-  `graph.self_loops[i]` to `inner_edges[c]` for each node (self-loops are always
-  internal to a node's own community). `remove_node` subtracts `graph.self_loops[node]`
-  from the old community's `inner_edges` and sets the singleton's `inner_edges[node]`
-  to `graph.self_loops[node]`. `add_node` clears the singleton slot and adds
-  `graph.self_loops[node]` to the new community.
-
-- **`compute_modularity` and `compute_stability`** (`quality.rs`): Both now add
-  `graph.self_loops[i]` to `inner[c]` per node, correctly counting self-loop weight
-  as internal community weight.
-
-- **Test plumbing** (`lib.rs`): Added `#[doc(hidden)] pub mod internal` re-exporting
-  `LeidenGraph`, `AggregateResult`, `aggregate_network`, and `compute_modularity` for
-  integration test access.
-
-- **New integration test file** (`tests/aggregate_invariance.rs`): Four hand-derived
-  test cases verifying aggregate structure (self-loops, no double-counting) plus
-  modularity invariance. One proptest property test with 256 cases.
-
-- **CHANGELOG.md** updated with M17 entry.
+- Rewrote `refine.rs` with `RefinementState` struct, `apply_move`, `move_gain`, `well_connected`,
+  and corrected `refine_community` that uses real per-sub-community `sigma_tot` (not a count fudge)
+- Added `refine_partition`, `RefinementState`, `well_connected` to `internal` exports in `lib.rs`
+- Created `crates/sdivi-detection/tests/refinement.rs` with 12 tests:
+  - Unit: `from_partition_singleton_init_sigma_tot`, `from_partition_non_singleton_inner_edges`
+  - Unit: `apply_move_updates_sigma_tot_and_size`
+  - Unit: `well_connected_gamma_zero_always_true`, `well_connected_strong_connection_passes`, `well_connected_weak_connection_fails`
+  - Integration: `two_disconnected_groups_never_mix_after_refine`, `refine_preserves_coarse_community_boundary`, `refine_path_graph_boundary`
+  - Integration: `leiden_with_corrected_refine_gives_positive_modularity`
+  - Property: `prop_refine_does_not_increase_coarse_communities`, `prop_refine_modularity_does_not_decrease`
+- Added debug assertion in `mod.rs` for `leiden_recursive` (aggregate graph shrinks)
+- Updated `verify-leiden.yml`: added `milestones/**` to push branches (already had push/pull_request triggers)
+- Updated `CHANGELOG.md` with M18 entry including migration note for pre-M18 snapshots
+- Updated `.tekhton/DRIFT_LOG.md` with M17+M18 regression note
+- Updated `docs/determinism.md` with tie-break by BTreeMap iteration order note
 
 ## Root Cause (bugs only)
+`refine.rs:151` `best_candidate` used `count of v's neighbours in sub-community comm` as a
+fake `sigma_tot`, labelled "approximate sigma_tot for sub-comm." This caused the gain formula
+to reduce to roughly `k_in − degree·k_in/2m`, which is positive for almost every candidate.
+Refinement shuffled nodes randomly between sub-communities, producing a near-random refined
+partition that when aggregated caused the entire graph to collapse to one community (modularity ≈ 0).
 
-Two correctness bugs in the Leiden recursive machinery:
-1. **`aggregate_network` dropped intra-community edges** — the `std::cmp::Ordering::Equal`
-   arm was a no-op, so any cross-edge within a community was silently discarded. These
-   edges must become self-loops on the aggregate super-node to preserve the strong
-   intra-community pull that modularity relies on.
-2. **`aggregate_network` double-counted inter-community edges** — the code iterated
-   `graph.adj[u]` for all u, visiting each undirected edge twice (once as (u,v) from u,
-   once as (v,u) from v). The fix: skip `v < u` in the inner loop (upper-triangle walk).
-
-Together these caused every graph to collapse to a single community after one
-aggregation step because the aggregate graph had zero edge weight, making the
-"merge all" partition optimal by default.
+Fix: `RefinementState` tracks real `sigma_tot[c]` (sum of degrees in sub-community `c`),
+`inner_edges[c]`, and `size[c]`. `move_gain` uses `k_in_to - degree[node] * sigma_tot[to] / (2 * total_weight)`
+which matches `ModularityState::move_gain`. With correct gains, only positive-ΔQ moves are made,
+and the partition converges to well-separated communities.
 
 ## Files Modified
-
-- `crates/sdivi-detection/src/leiden/graph.rs` (MODIFIED) — self-loops support
-- `crates/sdivi-detection/src/leiden/aggregate.rs` (MODIFIED) — double-count fix + self-loops
-- `crates/sdivi-detection/src/leiden/modularity.rs` (MODIFIED) — self-loop awareness
-- `crates/sdivi-detection/src/leiden/quality.rs` (MODIFIED) — self-loop awareness
-- `crates/sdivi-detection/src/leiden/mod.rs` (MODIFIED) — module visibility for re-exports
-- `crates/sdivi-detection/src/lib.rs` (MODIFIED) — internal test helpers
-- `crates/sdivi-detection/tests/aggregate_invariance.rs` (NEW) — 4 hand-derived + 1 proptest
-- `CHANGELOG.md` (MODIFIED)
+- `crates/sdivi-detection/src/leiden/refine.rs` (MODIFIED) — complete rewrite: `RefinementState`,
+  `apply_move`, `move_gain`, `well_connected`, `refine_community`, `refine_partition`; 278 lines
+- `crates/sdivi-detection/src/leiden/mod.rs` (MODIFIED) — debug assertion in `leiden_recursive`; 297 lines
+- `crates/sdivi-detection/src/lib.rs` (MODIFIED) — export `refine_partition`, `well_connected`, `RefinementState` via `internal`; 39 lines
+- `crates/sdivi-detection/tests/refinement.rs` (NEW) — 12 unit/integration/property tests; 299 lines
+- `.github/workflows/verify-leiden.yml` (MODIFIED) — added `milestones/**` to push branches
+- `CHANGELOG.md` (MODIFIED) — M18 entry
+- `.tekhton/DRIFT_LOG.md` (MODIFIED) — M17+M18 regression note
+- `docs/determinism.md` (MODIFIED) — tie-break by BTreeMap order note
 
 ## Human Notes Status
-
-No explicit Human Notes section in the milestone — all deliverables listed under
-Deliverables and Tests sections. All addressed.
-
-## Architecture Change Proposals
-
-**Adding `pub mod internal` to expose test plumbing**
-- **Current constraint**: `LeidenGraph`, `aggregate_network`, and `compute_modularity`
-  are `pub(crate)` — not accessible from integration tests in `tests/`
-- **What triggered this**: Milestone requires `tests/aggregate_invariance.rs` that
-  directly tests `compute_modularity` and `aggregate_network` invariance properties,
-  but these are internal types not reachable from integration tests otherwise
-- **Proposed change**: Added `#[doc(hidden)] pub mod internal` to `lib.rs` re-exporting
-  `LeidenGraph`, `aggregate_network`, `AggregateResult`, and `compute_modularity`.
-  Changed the items from `pub(crate)` to `pub` with `#[doc(hidden)]`. This is a
-  standard Rust pattern for test plumbing (used by serde, syn, etc.).
-- **Backward compatible**: Yes — no existing public items changed or removed
-- **ARCHITECTURE.md update needed**: No — test plumbing is not architectural
+No explicit Human Notes section in milestone.
 
 ## Docs Updated
+- `docs/determinism.md` — added note that BTreeMap ascending iteration gives deterministic
+  smallest-ID tie-break for equal-gain candidates in both local-move and refinement phases.
 
-None — all changed types/functions are `#[doc(hidden)]` and not part of the stable
-user-facing API. `CHANGELOG.md` updated with the M17 bug-fix entry.
-
-## Files Modified (auto-detected)
-- `.claude/milestones/MANIFEST.cfg`
-- `.claude/milestones/m17-leiden-self-loops-and-aggregate-fix.md`
-- `.tekhton/CODER_SUMMARY.md`
-- `.tekhton/DRIFT_LOG.md`
-- `.tekhton/JR_CODER_SUMMARY.md`
-- `.tekhton/PREFLIGHT_REPORT.md`
-- `.tekhton/REVIEWER_REPORT.md`
-- `.tekhton/TESTER_REPORT.md`
-- `.tekhton/test_dedup.fingerprint`
-- `CHANGELOG.md`
-- `crates/sdivi-detection/src/leiden/aggregate.rs`
-- `crates/sdivi-detection/src/leiden/graph.rs`
-- `crates/sdivi-detection/src/leiden/mod.rs`
-- `crates/sdivi-detection/src/leiden/modularity.rs`
-- `crates/sdivi-detection/src/leiden/quality.rs`
-- `crates/sdivi-detection/src/lib.rs`
+## Observed Issues (out of scope)
+- `crates/sdivi-config/src/thresholds.rs:52` — `validate_and_prune_overrides` is `pub(crate)`
+  but only used within `#[cfg(test)]` blocks, triggering `dead_code` in `cargo clippy -D warnings`.
+  Pre-existing; not introduced by M18. Blocks `cargo clippy -p sdivi-detection -- -D warnings`
+  but not the full workspace clippy that excludes dead_code for test-only functions.

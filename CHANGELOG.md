@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.7] - 2026-05-02
+
+### Fixed
+
+- **Leiden refinement phase rewritten to use real per-sub-community Σ_tot** (M18). The previous
+  `best_candidate` in `refine.rs` used a count of the node's neighbours in a sub-community as a
+  fake sigma_tot, causing the gain formula to be almost always positive and producing a near-random
+  refined partition. With M17's aggregate fixes in place, this caused all nodes to collapse into
+  one community (modularity ≈ 0.0). The rewrite introduces `RefinementState` (tracking real
+  `sigma_tot`, `inner_edges`, `size`) and `well_connected` (γ-connectivity gate, v0 simplification
+  of Traag 2019 §2.2). All three verify-leiden fixtures (small/medium/large) now pass within
+  1 % modularity tolerance against `leidenalg`. The verify-leiden CI workflow is re-enabled on
+  push/PR with a 30-min job-level timeout safeguard.
+
+### Note for adopters
+
+  Snapshot `modularity` values for snapshots taken with pre-M18 sdivi-rust will differ from M18+
+  snapshots because the previous algorithm produced incorrect (collapsed) partitions. Deltas
+  spanning the M16→M18 boundary may show artificial "drift" that is purely an algorithm-correction
+  artefact. Recommendation: re-baseline at the M18 boundary or compare only M18-era snapshots.
+
+- Rewrote `refine.rs` with `RefinementState` struct, `apply_move`, `move_gain`, `well_connected`, (M18)
 ## [0.1.6] - 2026-05-02
 
 ### Added

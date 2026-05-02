@@ -35,4 +35,5 @@ pub mod internal {
     pub use crate::leiden::aggregate::{aggregate_network, AggregateResult};
     pub use crate::leiden::graph::LeidenGraph;
     pub use crate::leiden::quality::compute_modularity;
+    pub use crate::leiden::refine::{refine_partition, well_connected, RefinementState};
 }

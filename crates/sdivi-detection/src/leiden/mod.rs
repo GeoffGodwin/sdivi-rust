@@ -9,7 +9,7 @@ mod cpm;
 pub(crate) mod graph;
 mod modularity;
 pub(crate) mod quality;
-mod refine;
+pub(crate) mod refine;
 
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom as _;
@@ -136,8 +136,15 @@ fn leiden_recursive(
         } = aggregate_network(graph, &refined);
 
         if agg_graph.n >= graph.n {
-            break; // No compression — stop.
+            break; // No compression — refinement returned the identity partition.
         }
+
+        // Invariant: reaching here means refinement produced meaningful compression.
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            agg_graph.n < graph.n,
+            "agg.n must be < graph.n past the identity break"
+        );
 
         let agg_init = map_to_aggregate_init(&partition, &refined, agg_graph.n);
         let agg_result = leiden_recursive(&agg_graph, agg_init, rng, max_iter, quality, gamma);
@@ -164,11 +171,8 @@ fn local_move_phase(
 ) -> bool {
     let n = graph.n;
 
-    // Offset community IDs by n so they never collide with node indices used as
-    // singleton community IDs inside ModularityState::remove_node.  Without the
-    // offset, a node at index X that happens to share its ID with an existing
-    // community would corrupt that community's size counter when placed in its
-    // singleton slot, causing an underflow on a later remove_node call.
+    // Offset IDs by n to prevent collisions with ModularityState singleton IDs,
+    // avoiding size-counter underflow when a node index matches a community ID.
     let offset_partition: Vec<usize> = partition.iter().map(|&c| c + n).collect();
     let max_comm = offset_partition.iter().copied().max().unwrap_or(0) + 1;
 
@@ -182,17 +186,9 @@ fn local_move_phase(
     for &node in &order {
         let old_comm = state.assignment[node];
 
-        // Remove node from its community (updates sigma_tot, size, inner_edges).
         let _k_in_old = state.remove_node(graph, node);
+        let (best_comm, best_gain) = best_neighbour_community(graph, node, &state, quality, gamma);
 
-        // Find the best community to move `node` to.
-        let best = best_neighbour_community(graph, node, &state, quality, gamma);
-
-        let (best_comm, best_gain) = best;
-
-        // When best_gain > 1e-10, best_comm is always an offset community ID (>= n) and != node.
-        // best_comm defaults to `node` (< n) when no neighbour improves the gain; the
-        // best_gain threshold below prevents using that default.
         if best_gain > 1e-10 {
             state.add_node(graph, node, best_comm);
             any_moved = true;
@@ -207,7 +203,6 @@ fn local_move_phase(
         }
     }
 
-    // Write back assignments.
     *partition = state.assignment.clone();
     any_moved
 }

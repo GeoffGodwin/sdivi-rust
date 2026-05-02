@@ -1,96 +1,111 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 1 file, 6 test functions
-- `crates/sdivi-detection/tests/leiden_regression.rs` — 6 integration tests
-  (`two_disconnected_triangle_cliques_produce_two_communities`,
-  `two_disconnected_triangle_cliques_have_positive_modularity`,
-  `empty_graph_produces_zero_communities`, `single_node_produces_one_community`,
-  `two_isolated_nodes_produce_two_communities`, `run_leiden_is_deterministic`)
-
-Implementation files cross-referenced:
-- `crates/sdivi-detection/src/leiden/mod.rs`
-- `crates/sdivi-detection/src/leiden/graph.rs`
-- `crates/sdivi-detection/src/leiden/aggregate.rs`
-- `crates/sdivi-detection/src/leiden/modularity.rs`
-- `crates/sdivi-detection/src/leiden/quality.rs`
-- `crates/sdivi-detection/src/lib.rs`
-
-Out-of-scope note: `crates/sdivi-detection/tests/aggregate_invariance.rs` (5 tests —
-4 hand-derived + 1 proptest) was authored by the coder this run and was not listed in
-the audit context.  A follow-up audit pass should cover it.
-
-Verdict: **PASS**
+Tests audited: 1 file (`crates/sdivi-detection/tests/refinement.rs`), 13 test functions
+(12 authored by coder + 1 added by tester: `well_connected_size_s_zero_always_true`)
+Verdict: PASS
 
 ---
 
 ### Findings
 
-#### COVERAGE: `compute_stability` self-loop path has no direct integration test
-- File: `crates/sdivi-detection/tests/leiden_regression.rs`:14-22 (module doc comment)
-- Issue: The M17 self-loop changes to `compute_stability` (`quality.rs` line 15:
-  `inner[c] += graph.self_loops[i]`) are `pub(crate)` and not re-exported via the
-  `internal` module, so the path cannot be reached directly from an integration test.
-  The tester documented this gap honestly in the file's module-level comment.
-  The `run_leiden_is_deterministic` and `two_disconnected_triangle_cliques_*` tests
-  exercise the same code path indirectly (they call `build_partition` → `compute_stability`),
-  but no test directly asserts that self-loop weight increases a community's stability
-  density.
+#### NAMING: Test name describes a weaker invariant than what the body checks
+- File: `crates/sdivi-detection/tests/refinement.rs:267`
+- Issue: `prop_refine_does_not_increase_coarse_communities` implies the test verifies
+  that the count of coarse communities does not grow after refinement. The body actually
+  checks the subset invariant: for every pair of nodes that share a refined community,
+  they must also share a coarse community (`assert_eq!(coarse[i], coarse[j], ...)`).
+  The subset invariant is strictly stronger than a count claim. A reader consulting the
+  test by name will form an incorrect mental model of what property is covered.
 - Severity: LOW
-- Action: In a future milestone, add `compute_stability` to the `internal` re-export
-  block in `lib.rs` and add a targeted test verifying that a node with a self-loop
-  contributes non-zero stability to its community.  Not required for M17.
+- Action: Rename to `prop_refine_refined_communities_are_subsets_of_coarse_communities`.
+
+#### EXERCISE: Property test evaluates inconsistent graph representations
+- File: `crates/sdivi-detection/tests/refinement.rs:285`
+- Issue: `prop_refine_modularity_does_not_decrease` constructs two graphs from the same
+  raw edge list:
+    `g  = LeidenGraph::from_edges(n, &edges)`           — accumulates parallel edge weights
+    `dg = build_dependency_graph_from_edges(&paths, &edges)` — deduplicates via `contains_edge`
+  The proptest generator produces `(u % n, v % n)` pairs, which can contain duplicates.
+  When duplicates occur, `g.edge_weights` for that pair > 1.0 while `dg` stores 1.0.
+  Leiden runs on `dg`; both `q_baseline` and `q_leiden` are then computed on `g`. A
+  partition that is monotone-improving on `dg` is not guaranteed to be
+  monotone-improving when re-evaluated on the differently-weighted `g`. The 256-case
+  proptest run passed, but the test is comparing quantities from two structurally
+  different graphs without documenting or enforcing the assumption that they coincide.
+- Severity: LOW
+- Action: Before constructing either graph, deduplicate and sort the edge list
+  (`let mut edges = ...; edges.sort(); edges.dedup();`). This makes `g` and `dg`
+  topologically identical and the comparison meaningful.
+
+#### COVERAGE: Early-exit guards in `refine_partition` have no targeted tests
+- File: `crates/sdivi-detection/tests/refinement.rs` (no test covers these two paths)
+- Issue: `refine_partition` (`refine.rs:158`) returns `vec![]` immediately when
+  `graph.n == 0`. `refine_community` (`refine.rs:174`) skips coarse communities whose
+  `members.len() <= 1`. Every test in the audit set uses graphs with n ≥ 3 and coarse
+  communities of size ≥ 2, leaving both guards uncovered.
+- Severity: LOW
+- Action: Add two unit tests:
+  - `refine_empty_graph_returns_empty`: call `refine_partition` on
+    `LeidenGraph::from_edges(0, &[])` and assert the result is `vec![]`.
+  - `refine_all_singleton_coarse_is_identity`: use partition `(0..n).collect()`
+    so every coarse community has exactly one member; assert the refined output
+    equals the input (no movement possible within size-1 communities).
+
+---
 
 ### Rubric Detail
 
 1. **Assertion Honesty — PASS**
-   All six tests assert values derived from actual `run_leiden` outputs.
-   - `two_disconnected_triangle_cliques_produce_two_communities` compares
-     `community_count()` against 2 and verifies per-node community equality/inequality.
-     The value 2 is the analytically correct answer for two disconnected K3 graphs —
-     not a magic constant.
-   - `two_disconnected_triangle_cliques_have_positive_modularity` checks
-     `partition.modularity > 0.0`.  The inline comment correctly notes Q ≈ 0.5 for
-     two balanced disconnected triangles.  The `> 0.0` threshold is conservative but
-     honest and sufficient to distinguish the fixed (split) from the pre-fix (collapsed
-     single-community) result.
-   - The three degenerate-case tests (empty, single-node, two-isolated) assert the only
-     values those inputs can produce given the graph structure.
-   - `run_leiden_is_deterministic` compares two `LeidenPartition` values from identical
-     inputs; no reference partition is hard-coded.
+   All numeric literals (`6.0`, `3.0`, `2.0`, `1.0`) are directly derivable from
+   the graph topology (node degrees, edge counts) and the `well_connected` formula.
+   - `from_partition_non_singleton_inner_edges`: asserts `sigma_tot[0] == 6.0` (3 nodes
+     × degree 2 in a K3) and `inner_edges[0] == 3.0` (3 edges in K3). Both correct.
+   - `well_connected_*` tests: asserts compare against values computed by the same
+     formula as the implementation (`gamma * (sc - sc*sc/ss)`). The tester's
+     `threshold + 1e-9` fix is explicitly derived from the implementation formula, not
+     hard-coded.
+   No always-passing assertions or constants unconnected to implementation logic found.
 
 2. **Edge Case Coverage — PASS**
-   - Empty graph (0 nodes, 0 edges)
-   - Single isolated node (no edges)
-   - Two isolated nodes (no edges between them)
-   - Primary regression case: two disconnected triangle cliques
-   - Determinism check across identical runs
-   Missing but out-of-scope for M17: warm-start path, weighted-edge path.
+   - `well_connected_gamma_zero_always_true`: gamma == 0.0 short-circuit
+   - `well_connected_size_s_zero_always_true` (tester-added): size_s == 0 short-circuit
+   - `well_connected_strong_connection_passes`: k_in above threshold (pass)
+   - `well_connected_weak_connection_fails`: k_in below threshold (fail), two sub-cases
+   - `two_disconnected_groups_never_mix_after_refine`: no cross-edges between groups
+   - `refine_preserves_coarse_community_boundary`: one cross-edge, correct coarse split
+   - `refine_path_graph_boundary`: linear topology, weaker inter-community connectivity
+   - Property tests cover random n ∈ [3,8] and random edge sets
+   Gap: no test for empty graph or single-member coarse community (see COVERAGE finding).
 
 3. **Implementation Exercise — PASS**
-   Every test calls the real `run_leiden` function with real graph input from
-   `build_dependency_graph_from_edges`.  No mocking.  The primary regression test
-   (`two_disconnected_triangle_cliques_produce_two_communities`) drives execution
-   through the fixed `aggregate_network` code path (the intra-community edge → self-loop
-   conversion and the upper-triangle double-count fix).
+   All tests import and call real implementation code:
+   `RefinementState::from_partition`, `apply_move`, `move_gain`, `well_connected`,
+   `refine_partition`, and the full `run_leiden` pipeline. No mocking of any kind.
 
-4. **Test Weakening Detection — N/A**
-   `leiden_regression.rs` is a new file (git status: `??`).  No prior test functions
-   were modified, removed, or had their assertions broadened.
+4. **Test Weakening Detection — PASS**
+   The tester modified one test (`well_connected_strong_connection_passes`) and added
+   one test (`well_connected_size_s_zero_always_true`). The modification replaced a
+   literal `2.1` boundary comparison (which is not finitely representable in IEEE 754)
+   with `threshold + 1e-9` computed from the same formula as the implementation. This
+   is a strengthening of floating-point safety, not a weakening of the assertion.
+   The added test covers a previously untested early-return branch. No assertion was
+   removed or broadened.
 
-5. **Test Naming and Intent — PASS**
-   All six function names encode both the scenario and the expected outcome.  No
-   generic names (`test_1`, `test_thing`, etc.) present.
+5. **Test Naming and Intent — PASS (with NAMING finding above)**
+   11 of 13 test names encode both the scenario and the expected outcome. The one
+   exception is noted under the NAMING finding. No generic names (`test_1`, etc.).
 
 6. **Scope Alignment — PASS**
-   All imports exist in the current codebase after M17 changes:
+   All imported symbols are present in the current implementation:
+   - `sdivi_detection::internal::{compute_modularity, refine_partition, well_connected,
+     LeidenGraph, RefinementState}` — re-exported at `lib.rs:34-38`
    - `sdivi_detection::leiden::run_leiden` — re-exported at `lib.rs:23`
-   - `sdivi_detection::partition::LeidenConfig` — re-exported at `lib.rs:25`
+   - `sdivi_detection::partition::{LeidenConfig, QualityFunction}` — re-exported at `lib.rs:25`
    - `sdivi_graph::dependency_graph::build_dependency_graph_from_edges` — present
-   The files deleted this run (`.tekhton/JR_CODER_SUMMARY.md`,
-   `.tekhton/test_dedup.fingerprint`) are not referenced by any test file under audit.
+   The deleted `.tekhton/test_dedup.fingerprint` is not referenced by any test file.
 
 7. **Test Isolation — PASS**
-   All fixture data is inline (integer ranges, string literals).  No test reads
-   `.tekhton/*`, `.claude/*`, snapshot files, build outputs, or any other mutable
-   project state.  No filesystem I/O; `tempfile` is not needed.
+   All fixture data is constructed in-memory from integer literals, string literals, and
+   local `LeidenGraph::from_edges` calls. No test reads `.tekhton/*`, `.sdivi/*`,
+   build outputs, snapshot files, or any mutable project state. No filesystem I/O.

@@ -40,8 +40,12 @@ fn two_disconnected_triangle_cliques_produce_two_communities() {
     let paths: Vec<String> = (0..6).map(|i| format!("src/node{i}.rs")).collect();
     // Clique 1: nodes 0,1,2; clique 2: nodes 3,4,5; no cross-edges.
     let edges = vec![
-        (0, 1), (1, 2), (0, 2), // clique 1
-        (3, 4), (4, 5), (3, 5), // clique 2
+        (0, 1),
+        (1, 2),
+        (0, 2), // clique 1
+        (3, 4),
+        (4, 5),
+        (3, 5), // clique 2
     ];
     let dg = build_dependency_graph_from_edges(&paths, &edges);
     let cfg = LeidenConfig::default();
@@ -84,10 +88,7 @@ fn two_disconnected_triangle_cliques_produce_two_communities() {
 #[test]
 fn two_disconnected_triangle_cliques_have_positive_modularity() {
     let paths: Vec<String> = (0..6).map(|i| format!("src/node{i}.rs")).collect();
-    let edges = vec![
-        (0, 1), (1, 2), (0, 2),
-        (3, 4), (4, 5), (3, 5),
-    ];
+    let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
     let dg = build_dependency_graph_from_edges(&paths, &edges);
     let cfg = LeidenConfig::default();
 
@@ -138,17 +139,17 @@ fn two_isolated_nodes_produce_two_communities() {
     assert_eq!(partition.community_count(), 2);
     let ca = partition.community_of(0).expect("node 0 in partition");
     let cb = partition.community_of(1).expect("node 1 in partition");
-    assert_ne!(ca, cb, "two isolated nodes must be in different communities");
+    assert_ne!(
+        ca, cb,
+        "two isolated nodes must be in different communities"
+    );
 }
 
 /// Run is deterministic: same seed and graph always produce the same partition.
 #[test]
 fn run_leiden_is_deterministic() {
     let paths: Vec<String> = (0..6).map(|i| format!("src/node{i}.rs")).collect();
-    let edges = vec![
-        (0, 1), (1, 2), (0, 2),
-        (3, 4), (4, 5), (3, 5),
-    ];
+    let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
     let dg = build_dependency_graph_from_edges(&paths, &edges);
     let cfg = LeidenConfig::default();
 

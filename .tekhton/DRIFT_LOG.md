@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-01
-- Runs since audit: 2
+- Runs since audit: 3
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -19,7 +19,20 @@
 - [2026-05-01 | "M12"] **`wasm-bindgen 0.2.x` requires rustc ≥ 1.77** — This is within the project's 1.85.0 MSRV but breaks builds on older local toolchains. The local dev machine (1.75.0) cannot build `sdivi-wasm`; CI (1.85.0) is the canonical build path.
 - [2026-05-01 | "M12"] **`sdivi-core` now re-exports inner-crate types** (`GraphMetrics`, `LeidenPartition`, `PatternCatalog`, `PatternStats`, `PatternFingerprint`). These were previously only reachable via internal crate paths. The re-exports are additive (backward-compatible) but widen the public surface of sdivi-core. Document in the "Module Boundaries" section of CLAUDE.md during M13 review.
 
+## M18 Leiden Correctness Closure (2026-05-02)
+
+- [2026-05-02 | "M17 + M18"] **M17 + M18 closed the Leiden correctness regression that was hidden
+  by the absence of a modularity-asserting test outside `verify-leiden.yml`.** Pre-M17 partition
+  tests verified `community_count() >= 1` and structural properties only, missing the modularity=0
+  collapse caused by the fake sigma_tot in `refine.rs`. New regression gates: `prop_aggregate_modularity_invariance`
+  (M17) and the `verify-leiden` suite (M18, now CI-blocking). Going forward, every
+  `crates/sdivi-detection/**` change is gated by `verify-leiden.yml`; don't merge with verify-leiden
+  disabled or skipped.
+
 ## Unresolved Observations
+- [2026-05-02 | "M18"] `mod.rs:138-147` — The pattern `if condition { break; }` immediately followed by `debug_assert!(!condition)` appears only once in the codebase. If this pattern is adopted elsewhere for invariant documentation, a convention note in `CLAUDE.md` would help future contributors distinguish "normal early-return" from "invariant-documenting dead assert."
+- [2026-05-02 | "M18"] `refine.rs` — The `max_iter = 10` constant is a bare literal in `refine_community`. The local-move phase in `mod.rs` uses `cfg.max_iterations` passed down from `LeidenConfig`. Refinement's inner cap being a hardcoded literal (rather than a `LeidenConfig` field or named constant) is a mild inconsistency. No behaviour change needed for v0, but a `const MAX_REFINE_ITER: usize = 10;` at module scope would aid future tuning.
+- [2026-05-02 | "M18"] `refinement.rs:295` — `prop_assert!` tolerance is `1e-9`; elsewhere in the test suite the convention is `1e-12`. Both are far tighter than any practical FMA drift, so this is purely cosmetic.
 - [2026-05-02 | "M17"] `aggregate.rs:39` — `std::collections::BTreeMap` is imported via full path rather than a `use` statement at the top of the file. The rest of the codebase uses top-level `use` declarations. Cosmetic inconsistency, not a correctness issue.
 - [2026-05-02 | "M17"] `modularity.rs:add_node` comment — "When `to == node` this is immediately overwritten by the self-loop addition below" accurately describes `inner_edges` but is silent about the sigma_tot/size double-increment on the same code path. If someone later reads this comment expecting the singleton round-trip to be fully no-op, they may be confused.
 - [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.

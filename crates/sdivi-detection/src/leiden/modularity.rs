@@ -98,17 +98,3 @@ impl ModularityState {
         self.assignment[node] = to;
     }
 }
-
-/// Sums weights of edges from `node` to community `to`.
-pub(crate) fn edges_to_community(
-    graph: &LeidenGraph,
-    node: usize,
-    to: usize,
-    assignment: &[usize],
-) -> f64 {
-    graph.adj[node]
-        .iter()
-        .zip(graph.edge_weights[node].iter())
-        .filter_map(|(&nbr, &w)| if assignment[nbr] == to { Some(w) } else { None })
-        .sum()
-}
