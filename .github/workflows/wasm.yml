@@ -34,9 +34,11 @@ jobs:
 
       - name: Verify sdi-core has no forbidden deps on wasm32
         run: |
-          cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features 2>&1 | tee /tmp/tree.txt
+          # `-e normal,build` excludes dev-dependencies (proptest pulls tempfile via rusty-fork
+          # — that's a test-time dep and never reaches the published wasm bundle).
+          cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features -e normal,build 2>&1 | tee /tmp/tree.txt
           if grep -E "tree-sitter|walkdir|ignore|rayon|tempfile" /tmp/tree.txt; then
-            echo "FAIL: forbidden deps found in sdi-core wasm32 tree"
+            echo "FAIL: forbidden deps found in sdi-core wasm32 tree (normal+build edges)"
             exit 1
           fi
           echo "OK: no forbidden deps"
