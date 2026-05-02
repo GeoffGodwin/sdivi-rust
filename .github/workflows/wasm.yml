@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   WASM_PACK_VERSION: "0.13.1"
+  # Pin wasm-bindgen-cli to match the workspace's wasm-bindgen lib version
+  # (capped at <0.2.118 in Cargo.toml so the CLI builds on rustc 1.85).
+  WASM_BINDGEN_VERSION: "0.2.117"
   WASM_BUDGET_BYTES: "1258291"   # 1.2 MB
 
 jobs:
@@ -31,6 +34,17 @@ jobs:
 
       - name: Install wasm-pack
         run: cargo install wasm-pack --version ${{ env.WASM_PACK_VERSION }} --locked
+
+      # wasm-pack will install wasm-bindgen-cli on demand if it isn't on PATH,
+      # but it does so via `cargo install` *without* `--locked`, which lets
+      # the CLI's transitive deps (icu_collections, time, idna_adapter, …)
+      # resolve to versions whose MSRV is newer than ours. We sidestep that
+      # by using a prebuilt CLI binary downloaded by taiki-e/install-action.
+      # The version must match the wasm-bindgen lib version exactly.
+      - name: Install wasm-bindgen-cli (prebuilt, version-matched)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
 
       - name: Verify sdivi-core has no forbidden deps on wasm32
         run: |
