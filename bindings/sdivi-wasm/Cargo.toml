@@ -7,8 +7,11 @@ authors.workspace = true
 repository.workspace = true
 description = "WASM bindings for the Structural Divergence Indexer — wraps sdivi-core via wasm-bindgen + tsify"
 
+# `cdylib` is required for wasm-pack to produce a .wasm bundle; `rlib` is
+# required so integration tests in tests/*.rs can `use sdivi_wasm::*`.
+# Without `rlib`, wasm-pack test --node fails with E0432 "unresolved import".
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sdivi-core          = { workspace = true }

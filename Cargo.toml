@@ -134,8 +134,15 @@ tempfile = ">=3.0, <3.20"   # <3.20 avoids getrandom 0.4 (edition2024) on Cargo 
 
 # ── WASM / bindings ──────────────────────────────────────────────────────────
 # Pinned per KDD-13; pre-1.0 crates require explicit version management.
-wasm-bindgen       = "0.2"
-wasm-bindgen-test  = "0.3"
+#
+# wasm-bindgen-cli is installed by wasm-pack and must match the wasm-bindgen
+# library version. From 0.2.118+, wasm-bindgen-cli requires rustc 1.86; our
+# rust-toolchain.toml pins 1.85, so we cap wasm-bindgen at 0.2.117 to keep
+# the installable CLI compatible with the toolchain. js-sys and
+# wasm-bindgen-test ride on this; cargo will pick versions that satisfy the
+# pinned wasm-bindgen.
+wasm-bindgen       = ">=0.2, <0.2.118"
+wasm-bindgen-test  = ">=0.3, <0.3.50"
 # `tsify` 0.4.x is unmaintained since 2023 and incompatible with
 # wasm-bindgen ≥ 0.2.105 (missing ErasableGeneric / WasmDescribeVector
 # impls for derived types used as `Vec<T>` parameters). `tsify-next` is the
