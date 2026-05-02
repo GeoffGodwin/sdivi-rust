@@ -32,6 +32,12 @@ jobs:
   verify:
     name: Leiden quality cross-check
     runs-on: ubuntu-latest
+    # Cap the whole job at 30 min. The Leiden cross-check on the small/medium/
+    # large fixtures runs in well under 5 min locally; allow ~6× headroom
+    # for cold cargo cache and `pip install`. GitHub's default timeout is
+    # 6 hours, which has previously let runaway runs burn through billing
+    # quotas before anyone noticed.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -48,9 +54,12 @@ jobs:
 
       - name: Install leidenalg
         run: pip install leidenalg igraph
+        timeout-minutes: 5
 
       - name: Regenerate reference fixtures from leidenalg
         run: python tools/generate-leiden-fixtures.py --leiden
+        timeout-minutes: 5
 
       - name: Run Leiden verification tests
         run: cargo test -p sdivi-detection --features verify-leiden -- --nocapture
+        timeout-minutes: 15

@@ -14,6 +14,7 @@ jobs:
   test:
     name: Test (${{ matrix.os }} / ${{ matrix.toolchain }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +55,7 @@ jobs:
   doc:
     name: Docs (ubuntu / stable)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

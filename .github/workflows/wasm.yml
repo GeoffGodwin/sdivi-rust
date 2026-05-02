@@ -18,6 +18,7 @@ jobs:
   build:
     name: Build WASM (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +105,7 @@ jobs:
   cross-platform-hash:
     name: Cross-platform hash determinism check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: build
     steps:
       - name: Download linux hash

@@ -20,6 +20,7 @@ jobs:
   check-version:
     name: Verify version tag
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Check tag matches Cargo.toml
@@ -38,6 +39,7 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2
@@ -49,6 +51,7 @@ jobs:
     name: Build (${{ matrix.target }})
     needs: [check-version]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -126,6 +129,7 @@ jobs:
     name: Create GitHub Release
     needs: [build, audit]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -155,6 +159,7 @@ jobs:
     name: Publish to crates.io
     needs: [create-release]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: crates-io-publish
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -222,6 +227,7 @@ jobs:
     name: Publish @geoffgodwin/sdivi-wasm to npm
     needs: [create-release]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: npm-publish
     steps:
       - uses: actions/checkout@v4
