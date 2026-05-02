@@ -142,7 +142,11 @@ tempfile = ">=3.0, <3.20"   # <3.20 avoids getrandom 0.4 (edition2024) on Cargo 
 # wasm-bindgen-test ride on this; cargo will pick versions that satisfy the
 # pinned wasm-bindgen.
 wasm-bindgen       = ">=0.2, <0.2.118"
-wasm-bindgen-test  = ">=0.3, <0.3.50"
+# wasm-bindgen-test isn't tied to the CLI MSRV problem — let cargo pick
+# a version compatible with wasm-bindgen 0.2.117. The earlier <0.3.50 cap
+# resolved to 0.3.45, which predates the `run_in_node` configuration the
+# tests use.
+wasm-bindgen-test  = "0.3"
 # `tsify` 0.4.x is unmaintained since 2023 and incompatible with
 # wasm-bindgen ≥ 0.2.105 (missing ErasableGeneric / WasmDescribeVector
 # impls for derived types used as `Vec<T>` parameters). `tsify-next` is the

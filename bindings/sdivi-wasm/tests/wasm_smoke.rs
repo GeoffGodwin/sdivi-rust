@@ -8,7 +8,7 @@ use sdivi_wasm::types::{
     WasmAssembleSnapshotInput, WasmBoundaryDefInput, WasmBoundarySpecInput,
     WasmDependencyGraphInput, WasmDivergenceSummary, WasmEdgeInput, WasmLeidenConfigInput,
     WasmNodeInput, WasmPatternInstanceInput, WasmPatternMetricsResult, WasmPriorPartition,
-    WasmQualityFunction, WasmThresholdsInput,
+    WasmQualityFunction, WasmSnapshotPriorPartition, WasmThresholdsInput,
 };
 use sdivi_wasm::{
     assemble_snapshot, compute_boundary_violations, compute_coupling_topology, compute_delta,
@@ -18,7 +18,11 @@ use sdivi_wasm::{
 use serde_wasm_bindgen;
 use wasm_bindgen_test::wasm_bindgen_test;
 
-wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_node);
+// `wasm-pack test --node` selects Node as the test runner; that's also the
+// default when no `wasm_bindgen_test_configure!` macro call is present.
+// We don't call the macro because the explicit `run_in_node` token isn't
+// recognised by the wasm-bindgen-test version compatible with our
+// rustc 1.85 / wasm-bindgen 0.2.117 pin (it expects `run_in_browser` only).
 
 fn two_node_graph() -> WasmDependencyGraphInput {
     WasmDependencyGraphInput {
@@ -174,10 +178,14 @@ fn test_infer_boundaries_empty() {
 
 #[wasm_bindgen_test]
 fn test_infer_boundaries_with_stable_community() {
+    // infer_boundaries takes WasmSnapshotPriorPartition (the snapshot-shaped
+    // version with a `partition_id` field), not the leiden-flavoured
+    // WasmPriorPartition used by detect_boundaries. Distinct types are
+    // intentional — see the comment above WasmSnapshotPriorPartition.
     let mut assignments = std::collections::BTreeMap::new();
     assignments.insert("src/lib.rs".to_string(), 0u32);
     assignments.insert("src/models.rs".to_string(), 1u32);
-    let p = WasmPriorPartition {
+    let p = WasmSnapshotPriorPartition {
         cluster_assignments: assignments.clone(),
     };
     let result = infer_boundaries(vec![p.clone(), p.clone(), p], 2).unwrap();
