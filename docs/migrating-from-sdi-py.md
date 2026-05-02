@@ -99,11 +99,10 @@ sdi snapshot --commit "$(git rev-parse HEAD)"
 sdi check
 ```
 
-## Validating Results Against sdi-py
+## Comparing Results Against sdi-py
 
-The `tools/validate-against-bifl-tracker.sh` script (in the sdi-rust repo)
-runs sdi-rust against the bifl-tracker fixture at the same commits that sdi-py
-was validated against, and compares metrics within these tolerances:
+When validating sdi-rust output against an sdi-py baseline on the same repo at
+the same commit, expect the following metric tolerances:
 
 | Metric | Acceptable variance |
 |---|---|
@@ -112,7 +111,9 @@ was validated against, and compares metrics within these tolerances:
 | Pattern entropy | Within 5% |
 
 These tolerances exist because the native Leiden port (KDD-2) is verified for
-partition quality, not bit identity with the Python leidenalg library.
+partition quality, not bit identity with the Python `leidenalg` library. Pattern
+entropy can differ slightly because sdi-rust's tree-sitter normalisation rules
+are stricter than the Python POC's heuristic walk.
 
 ## YAML Comment Loss
 

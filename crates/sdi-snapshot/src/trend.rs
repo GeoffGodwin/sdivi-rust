@@ -41,7 +41,7 @@ pub struct TrendResult {
 ///
 /// The slope is the mean of per-interval deltas (a simple first-difference
 /// average rather than least-squares, which is sufficient for the CLI trend
-/// command and the bifl-tracker validation).
+/// command).
 ///
 /// Returns a [`TrendResult`] with all slope fields `None` when the window has
 /// fewer than two snapshots.

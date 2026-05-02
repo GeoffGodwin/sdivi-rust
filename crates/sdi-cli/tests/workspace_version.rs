@@ -1,6 +1,6 @@
 /// Tests verifying M13 metadata requirements:
-/// - Workspace version is 0.1.0
-/// - bindings/sdi-wasm/package.json version matches workspace version
+/// - Workspace `[workspace.package].version` is set to a 0.1.x semver
+/// - bindings/sdi-wasm/package.json version matches the workspace version
 /// - All published crates have `readme`, `keywords`, and `categories` fields
 /// - Coverage Gap 2 (REVIEWER_REPORT.md): sdi-wasm package.json declares
 ///   the expected artifact files (.wasm, .d.ts) so the npm dry-run is
@@ -30,14 +30,49 @@ fn read_crate_toml(crate_name: &str) -> String {
         .unwrap_or_else(|_| panic!("could not read Cargo.toml for {}", crate_name))
 }
 
+/// Extracts the value of the first `version = "x.y.z"` line in `[workspace.package]`.
+fn workspace_package_version() -> String {
+    let toml = read_workspace_cargo_toml();
+    let after_section = toml
+        .split("[workspace.package]")
+        .nth(1)
+        .expect("workspace Cargo.toml must contain a [workspace.package] section");
+    let line = after_section
+        .lines()
+        .find(|l| l.trim_start().starts_with("version"))
+        .expect("[workspace.package] must declare a version");
+    line.split('"')
+        .nth(1)
+        .expect("version line must be of the form: version = \"x.y.z\"")
+        .to_string()
+}
+
+/// Extracts the value of the first `"version": "x.y.z"` field in package.json.
+fn wasm_package_json_version() -> String {
+    let path = workspace_root()
+        .join("bindings")
+        .join("sdi-wasm")
+        .join("package.json");
+    let content = std::fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("could not read {}", path.display()));
+    let line = content
+        .lines()
+        .find(|l| l.trim_start().starts_with("\"version\""))
+        .expect("package.json must declare a version");
+    line.split('"')
+        .nth(3)
+        .expect("version line must be of the form: \"version\": \"x.y.z\"")
+        .to_string()
+}
+
 // ── Workspace version ─────────────────────────────────────────────────────
 
 #[test]
-fn workspace_version_is_0_1_0() {
-    let toml = read_workspace_cargo_toml();
+fn workspace_version_is_v0_semver() {
+    let v = workspace_package_version();
     assert!(
-        toml.contains("version = \"0.1.0\""),
-        "workspace Cargo.toml must set version = \"0.1.0\" for M13"
+        v.starts_with("0.1."),
+        "workspace [workspace.package] version must be a 0.1.x release for v0 (got {v:?})"
     );
 }
 
@@ -73,16 +108,12 @@ fn release_profile_has_abort_on_panic() {
 // ── WASM package.json version alignment (Coverage Gap 2) ─────────────────
 
 #[test]
-fn wasm_package_json_version_is_0_1_0() {
-    let path = workspace_root()
-        .join("bindings")
-        .join("sdi-wasm")
-        .join("package.json");
-    let content = std::fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("could not read {}", path.display()));
-    assert!(
-        content.contains("\"version\": \"0.1.0\""),
-        "sdi-wasm package.json version must be \"0.1.0\" to match workspace"
+fn wasm_package_json_version_matches_workspace() {
+    let workspace_v = workspace_package_version();
+    let wasm_v = wasm_package_json_version();
+    assert_eq!(
+        workspace_v, wasm_v,
+        "sdi-wasm package.json version ({wasm_v}) must match workspace version ({workspace_v}) — bump them together at release time"
     );
 }
 
