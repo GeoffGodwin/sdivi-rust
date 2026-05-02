@@ -1,3 +1,7 @@
+---
+title: Determinism
+---
+
 # Determinism in sdivi-rust
 
 sdivi-rust is a measurement instrument. Its core guarantee is that the same repo
@@ -66,7 +70,7 @@ Properties:
 
 ## normalize_and_hash for Foreign Extractors
 
-Callers that supply their own AST extractors (e.g. the Meridian consumer app,
+Callers that supply their own AST extractors (e.g. the consumer-app consumer app,
 WASM-mediated TS tools) **must** use `sdivi_core::normalize_and_hash` to produce
 fingerprints, not a custom hasher.
 

@@ -1,0 +1,9 @@
+source "https://rubygems.org"
+
+# GitHub Pages serves Jekyll via this gem. Pinning here lets contributors
+# preview the site locally with `bundle exec jekyll serve`.
+gem "github-pages", group: :jekyll_plugins
+
+group :jekyll_plugins do
+  gem "jekyll-relative-links"
+end

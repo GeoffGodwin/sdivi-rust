@@ -968,7 +968,7 @@ status: "done"
 - `bindings/sdivi-wasm/src/lib.rs` — re-export the extended `ThresholdsInput` / `ThresholdCheckResult` shape; tsify regenerates `.d.ts`. No new exports needed (the extension is on existing types).
 - `bindings/sdivi-wasm/tests/wasm_bindgen_thresholds.rs` (or equivalent) — smoke-test the new fields are visible from WASM.
 - `CHANGELOG.md` — entry as above.
-- `docs/library-embedding.md` — short addendum showing a Meridian-style caller supplying `today` and `overrides`.
+- `docs/library-embedding.md` — short addendum showing a consumer-app-style caller supplying `today` and `overrides`.
 
 **Acceptance criteria:**
 
@@ -1026,7 +1026,7 @@ status: "done"
 
 **Scope:** Implement the change-coupling computation that turns the existing `[change_coupling]` config block into a real analyzer. Walk the last `history_depth` commits via shell-out to `git log`, compute file-pair co-change frequencies, surface them in the snapshot, and feed them into Leiden as edge weights when `boundaries.weighted_edges = true`. Two-layer split: I/O lives in `sdivi-pipeline::change_coupling`; the math lives in `sdivi-core::compute_change_coupling` (pure, WASM-callable, foreign-extractor-friendly).
 
-**Why this milestone exists:** `ChangeCouplingConfig`, `boundaries.weighted_edges`, and the `[change_coupling]` block in `init`'s default config template are advertised features that no code currently reads. CLAUDE.md's `Config Architecture` table documents `min_frequency = 0.6` and `history_depth = 500` as if they did something. They don't. Shipping v0 with a documented-but-inert analyzer is worse than shipping v0 without it: it actively misleads embedders and adopters. This milestone makes the existing config surface load-bearing and gives Meridian (and any other consumer that may want temporal coupling later) a stable, pure-compute entry point that does not depend on the consumer having its own libgit2 or git binary in scope.
+**Why this milestone exists:** `ChangeCouplingConfig`, `boundaries.weighted_edges`, and the `[change_coupling]` block in `init`'s default config template are advertised features that no code currently reads. CLAUDE.md's `Config Architecture` table documents `min_frequency = 0.6` and `history_depth = 500` as if they did something. They don't. Shipping v0 with a documented-but-inert analyzer is worse than shipping v0 without it: it actively misleads embedders and adopters. This milestone makes the existing config surface load-bearing and gives consumer-app (and any other consumer that may want temporal coupling later) a stable, pure-compute entry point that does not depend on the consumer having its own libgit2 or git binary in scope.
 
 **Deliverables:**
 
@@ -1058,13 +1058,13 @@ status: "done"
   - Pipeline path: when `weighted_edges = true`, `Pipeline::snapshot` constructs the `edge_weights` map from `ChangeCouplingResult.pairs` and passes it through `LeidenConfigInput`.
 - **WASM exports:**
   - `bindings/sdivi-wasm/src/lib.rs` — export `compute_change_coupling`, `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`. tsify regenerates `.d.ts`.
-  - This is the Meridian-facing surface: a consumer with its own commit history walker (e.g., reading from the IDE's git index) supplies `Vec<CoChangeEventInput>` directly, no shell-out needed.
+  - This is the consumer-app-facing surface: a consumer with its own commit history walker (e.g., reading from the IDE's git index) supplies `Vec<CoChangeEventInput>` directly, no shell-out needed.
 - **CLI surface:**
   - `sdivi show` text output gains a `change coupling: <N> pairs (top 5: …)` line when `change_coupling` is `Some` and non-empty.
   - `sdivi show --format json` already serializes the full snapshot; the new field appears automatically.
   - No new CLI flags. `boundaries.weighted_edges` is the existing knob.
 - **Documentation:**
-  - `docs/library-embedding.md` — new section "Computing change-coupling from a foreign extractor" showing a Meridian-style consumer that supplies its own `CoChangeEventInput` slice (e.g., from VSCode's git extension) and calls `compute_change_coupling` directly via WASM.
+  - `docs/library-embedding.md` — new section "Computing change-coupling from a foreign extractor" showing a consumer-app-style consumer that supplies its own `CoChangeEventInput` slice (e.g., from VSCode's git extension) and calls `compute_change_coupling` directly via WASM.
   - `docs/cli-integration.md` — short note on `boundaries.weighted_edges` and how it interacts with Leiden communities.
   - `docs/determinism.md` — note that `git log` output ordering is deterministic for a fixed `HEAD`, and the canonical NodeId translation ensures cross-platform path equivalence (forward slashes, no `./`).
 - **CHANGELOG.md** entry: "Change-coupling analyzer wired up. New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdivi_core::compute_change_coupling` exported through WASM. Schema stays `1.0`."
@@ -1141,7 +1141,7 @@ status: "done"
 
 **Seeds Forward:**
 
-- `compute_change_coupling` taking `CoChangeEventInput` (string SHAs, string dates, string paths) is the contract Meridian relies on. Adding fields to `CoChangeEventInput` is additive. Removing fields is breaking and post-1.0.
+- `compute_change_coupling` taking `CoChangeEventInput` (string SHAs, string dates, string paths) is the contract consumer-app relies on. Adding fields to `CoChangeEventInput` is additive. Removing fields is breaking and post-1.0.
 - `boundaries.weighted_edges = true` is the lever for "use both structural and historical coupling for community detection." A future v0.x can introduce per-pair weight overrides for users who want to suppress noisy co-change signals.
 - The `LeidenConfigInput.edge_weights` shape is the precedent for future graph-edge-weighting features (test coupling, runtime trace coupling, etc.) — they all reduce to producing a `BTreeMap<(String, String), f64>` and feeding it through the same input shape.
 - M16 (`--commit REF`) reuses the same `git` shell-out pattern (`std::process::Command`, NUL-framing, repo-relative paths) and `change_coupling`'s `ending_at` parameter for "history ending at REF."
@@ -1160,7 +1160,7 @@ status: "done"
 
 **Scope:** Make `sdivi snapshot --commit REF` actually run the pipeline against the tree at REF. Today the flag is plumbed from CLI → `Pipeline::snapshot(commit)` → snapshot metadata as a label, but the parsing stage still reads the working tree, which is misleading. This milestone resolves REF to an immutable SHA, materializes the tree at REF in a tempdir via `git archive | tar -x`, runs the full pipeline against the tempdir, and labels the resulting snapshot with the resolved SHA and the commit's commit-date. M15's change-coupling analyzer is rewired to use `ending_at = REF` so historical snapshots get their proper historical context.
 
-**Why this milestone exists:** CLAUDE.md's "What Not to Build Yet" section currently states `sdivi snapshot --commit REF works for individual commits.` That is false today: only the snapshot's `commit` field is populated; the analyzed tree is still the working directory's. Two consequences: (1) historical backfill produces snapshots labeled with one commit but reflecting a different tree, which silently corrupts trend lines; (2) the documented one-shot historical analysis path is unusable, so users have no in-tool way to backfill. With M15 surfacing change-coupling per-snapshot, fixing `--commit REF` is now load-bearing for any consumer that wants accurate temporal data — including Meridian's "show me how this codebase looked at last month's release tag" use case. The change is small, the surface is contained, and shipping v0 with the documented-but-broken flag is an honesty problem more than a scope problem.
+**Why this milestone exists:** CLAUDE.md's "What Not to Build Yet" section currently states `sdivi snapshot --commit REF works for individual commits.` That is false today: only the snapshot's `commit` field is populated; the analyzed tree is still the working directory's. Two consequences: (1) historical backfill produces snapshots labeled with one commit but reflecting a different tree, which silently corrupts trend lines; (2) the documented one-shot historical analysis path is unusable, so users have no in-tool way to backfill. With M15 surfacing change-coupling per-snapshot, fixing `--commit REF` is now load-bearing for any consumer that wants accurate temporal data — including consumer-app's "show me how this codebase looked at last month's release tag" use case. The change is small, the surface is contained, and shipping v0 with the documented-but-broken flag is an honesty problem more than a scope problem.
 
 **Deliverables:**
 
@@ -1187,7 +1187,7 @@ status: "done"
   - `Pipeline::snapshot_with_mode` follows the same logic; `WriteMode::EphemeralForCheck` from M09 still applies (no snapshot persisted, no cache write).
 - **Documentation:**
   - `docs/cli-integration.md` — new section "Analyzing a historical commit" describing `sdivi snapshot --commit REF`, what the flag does, what gets persisted (the snapshot is a real persisted snapshot named after the commit-date timestamp), and the interaction with change-coupling history.
-  - `docs/library-embedding.md` — note that the pure-compute path (`sdivi-core`) does not need any of this — embedders that already have their own tree extraction (the consumer app, Meridian) call `compute_*` directly with whatever tree they have in hand. `--commit REF` is an `sdivi-pipeline` / CLI convenience.
+  - `docs/library-embedding.md` — note that the pure-compute path (`sdivi-core`) does not need any of this — embedders that already have their own tree extraction (the consumer app, consumer-app) call `compute_*` directly with whatever tree they have in hand. `--commit REF` is an `sdivi-pipeline` / CLI convenience.
   - `CLAUDE.md` — the line `Historical backfill UX — sdivi snapshot --commit REF works for individual commits. Batch backfill is unsupported; users script it.` in "What Not to Build Yet" remains accurate after this milestone (now genuinely so). The user is responsible for confirming the line still matches reality post-merge; no milestone-time edit.
 - **CHANGELOG.md** entry: "`sdivi snapshot --commit REF` now analyzes the actual tree at REF. The snapshot is labeled with the resolved SHA and the commit's commit-date (not wall-clock time). Change-coupling history is computed ending at REF. Pre-v0 callers relying on the prior label-only behavior must adjust."
 - **Error UX:**

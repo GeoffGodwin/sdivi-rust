@@ -50,7 +50,7 @@ status: "done"
 - `bindings/sdivi-wasm/src/lib.rs` — re-export the extended `ThresholdsInput` / `ThresholdCheckResult` shape; tsify regenerates `.d.ts`. No new exports needed (the extension is on existing types).
 - `bindings/sdivi-wasm/tests/wasm_bindgen_thresholds.rs` (or equivalent) — smoke-test the new fields are visible from WASM.
 - `CHANGELOG.md` — entry as above.
-- `docs/library-embedding.md` — short addendum showing a Meridian-style caller supplying `today` and `overrides`.
+- `docs/library-embedding.md` — short addendum showing a consumer-app-style caller supplying `today` and `overrides`.
 
 **Acceptance criteria:**
 

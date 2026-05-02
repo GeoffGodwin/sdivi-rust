@@ -1,3 +1,7 @@
+---
+title: Library embedding
+---
+
 # Library Embedding Guide
 
 sdivi-rust exposes two embedding paths:
@@ -13,16 +17,16 @@ sdivi-rust exposes two embedding paths:
 
 ```toml
 [dependencies]
-sdivi-pipeline = "0.0.14"
-sdivi-config   = "0.0.14"
+sdivi-pipeline = "0.1"
+sdivi-config   = "0.1"
 ```
 
 Add language adapters for the languages you want to analyse:
 
 ```toml
-sdivi-lang-rust       = "0.0.14"
-sdivi-lang-python     = "0.0.14"
-sdivi-lang-typescript = "0.0.14"
+sdivi-lang-rust       = "0.1"
+sdivi-lang-python     = "0.1"
+sdivi-lang-typescript = "0.1"
 ```
 
 ### Minimal embedder
@@ -92,7 +96,7 @@ pre-extracted data via `*Input` structs.
 
 ```toml
 [dependencies]
-sdivi-core = "0.0.14"
+sdivi-core = "0.1"
 ```
 
 For WASM targets, `sdivi-core` compiles without modification — it has no
@@ -100,7 +104,7 @@ For WASM targets, `sdivi-core` compiles without modification — it has no
 
 ### Consumer-app pattern
 
-This is the pattern used by Meridian, the first concrete consumer: the caller
+This is the pattern used by consumer-app, the first concrete consumer: the caller
 has its own AST extractors, computes `normalize_and_hash` per pattern node,
 and ships hashes + a dependency graph to `sdivi-core`.
 
@@ -158,7 +162,7 @@ fn analyse_from_extractor(
 
 ### Supplying `today` and per-category threshold overrides
 
-Meridian-style callers that read override config from their own sources can wire
+consumer-app-style callers that read override config from their own sources can wire
 `today` and `overrides` into `ThresholdsInput` before calling `compute_thresholds_check`.
 The function is clock-free — the caller owns the date.
 
@@ -258,7 +262,7 @@ out to `git` to resolve the ref, extracts the tree, and feeds it through
 (`sdivi-core`) do not need any of this machinery: they supply whatever source
 tree they have in hand directly to `compute_*` functions via `*Input` structs.
 
-For example, Meridian and other agent runtimes that maintain their own AST
+For example, consumer-app and other agent runtimes that maintain their own AST
 extractor simply call `sdivi_core::detect_boundaries`, `compute_pattern_metrics`,
 etc. with pre-extracted data. They own the tree-at-commit extraction
 themselves (e.g. via the VSCode git index or their own `git archive` wrapper)
@@ -267,7 +271,7 @@ and never call `Pipeline::snapshot` at all.
 ## Computing change-coupling from a foreign extractor
 
 If you have your own commit-history source (e.g., the VSCode git index in
-Meridian), supply a `Vec<CoChangeEventInput>` directly to
+consumer-app), supply a `Vec<CoChangeEventInput>` directly to
 `compute_change_coupling` without shelling out to `git log`:
 
 ```rust

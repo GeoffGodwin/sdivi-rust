@@ -1,3 +1,7 @@
+---
+title: CLI integration
+---
+
 # CLI Integration Guide
 
 This guide covers CI integration for `sdivi check`, the full exit-code reference,

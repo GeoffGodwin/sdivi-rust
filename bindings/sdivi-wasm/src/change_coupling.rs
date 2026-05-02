@@ -68,7 +68,7 @@ pub struct WasmChangeCouplingResult {
 
 /// Compute file-pair co-change frequencies from a list of commit events.
 ///
-/// Pure function — no I/O, no clock. Suitable for Meridian and other
+/// Pure function — no I/O, no clock. Suitable for consumer-app and other
 /// consumers that supply their own commit-history extractor.
 #[wasm_bindgen]
 pub fn compute_change_coupling(

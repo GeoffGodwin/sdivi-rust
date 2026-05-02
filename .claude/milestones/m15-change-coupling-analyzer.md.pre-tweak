@@ -7,7 +7,7 @@ status: "in_progress"
 
 **Scope:** Implement the change-coupling computation that turns the existing `[change_coupling]` config block into a real analyzer. Walk the last `history_depth` commits via shell-out to `git log`, compute file-pair co-change frequencies, surface them in the snapshot, and feed them into Leiden as edge weights when `boundaries.weighted_edges = true`. Two-layer split: I/O lives in `sdi-pipeline::change_coupling`; the math lives in `sdi-core::compute_change_coupling` (pure, WASM-callable, foreign-extractor-friendly).
 
-**Why this milestone exists:** `ChangeCouplingConfig`, `boundaries.weighted_edges`, and the `[change_coupling]` block in `init`'s default config template are advertised features that no code currently reads. CLAUDE.md's `Config Architecture` table documents `min_frequency = 0.6` and `history_depth = 500` as if they did something. They don't. Shipping v0 with a documented-but-inert analyzer is worse than shipping v0 without it: it actively misleads embedders and adopters. This milestone makes the existing config surface load-bearing and gives Meridian (and any other consumer that may want temporal coupling later) a stable, pure-compute entry point that does not depend on the consumer having its own libgit2 or git binary in scope.
+**Why this milestone exists:** `ChangeCouplingConfig`, `boundaries.weighted_edges`, and the `[change_coupling]` block in `init`'s default config template are advertised features that no code currently reads. CLAUDE.md's `Config Architecture` table documents `min_frequency = 0.6` and `history_depth = 500` as if they did something. They don't. Shipping v0 with a documented-but-inert analyzer is worse than shipping v0 without it: it actively misleads embedders and adopters. This milestone makes the existing config surface load-bearing and gives consumer-app (and any other consumer that may want temporal coupling later) a stable, pure-compute entry point that does not depend on the consumer having its own libgit2 or git binary in scope.
 
 **Deliverables:**
 
@@ -38,13 +38,13 @@ status: "in_progress"
   - Pipeline path: when `weighted_edges = true`, `Pipeline::snapshot` constructs the `edge_weights` map from `ChangeCouplingResult.pairs` and passes it through `LeidenConfigInput`.
 - **WASM exports:**
   - `bindings/sdi-wasm/src/lib.rs` — export `compute_change_coupling`, `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`. tsify regenerates `.d.ts`.
-  - This is the Meridian-facing surface: a consumer with its own commit history walker (e.g., reading from the IDE's git index) supplies `Vec<CoChangeEventInput>` directly, no shell-out needed.
+  - This is the consumer-app-facing surface: a consumer with its own commit history walker (e.g., reading from the IDE's git index) supplies `Vec<CoChangeEventInput>` directly, no shell-out needed.
 - **CLI surface:**
   - `sdi show` text output gains a `change coupling: <N> pairs (top 5: …)` line when `change_coupling` is `Some` and non-empty.
   - `sdi show --format json` already serializes the full snapshot; the new field appears automatically.
   - No new CLI flags. `boundaries.weighted_edges` is the existing knob.
 - **Documentation:**
-  - `docs/library-embedding.md` — new section "Computing change-coupling from a foreign extractor" showing a Meridian-style consumer that supplies its own `CoChangeEventInput` slice (e.g., from VSCode's git extension) and calls `compute_change_coupling` directly via WASM.
+  - `docs/library-embedding.md` — new section "Computing change-coupling from a foreign extractor" showing a consumer-app-style consumer that supplies its own `CoChangeEventInput` slice (e.g., from VSCode's git extension) and calls `compute_change_coupling` directly via WASM.
   - `docs/cli-integration.md` — short note on `boundaries.weighted_edges` and how it interacts with Leiden communities.
   - `docs/determinism.md` — note that `git log` output ordering is deterministic for a fixed `HEAD`, and the canonical NodeId translation ensures cross-platform path equivalence (forward slashes, no `./`).
 - **CHANGELOG.md** entry: "Change-coupling analyzer wired up. New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdi_core::compute_change_coupling` exported through WASM. Schema stays `1.0`."
@@ -117,7 +117,7 @@ status: "in_progress"
 
 **Seeds Forward:**
 
-- `compute_change_coupling` taking `CoChangeEventInput` (string SHAs, string dates, string paths) is the contract Meridian relies on. Adding fields to `CoChangeEventInput` is additive. Removing fields is breaking and post-1.0.
+- `compute_change_coupling` taking `CoChangeEventInput` (string SHAs, string dates, string paths) is the contract consumer-app relies on. Adding fields to `CoChangeEventInput` is additive. Removing fields is breaking and post-1.0.
 - `boundaries.weighted_edges = true` is the lever for "use both structural and historical coupling for community detection." A future v0.x can introduce per-pair weight overrides for users who want to suppress noisy co-change signals.
 - The `LeidenConfigInput.edge_weights` shape is the precedent for future graph-edge-weighting features (test coupling, runtime trace coupling, etc.) — they all reduce to producing a `BTreeMap<(String, String), f64>` and feeding it through the same input shape.
 - M16 (`--commit REF`) reuses the same `git` shell-out pattern (`std::process::Command`, NUL-framing, repo-relative paths) and `change_coupling`'s `ending_at` parameter for "history ending at REF."

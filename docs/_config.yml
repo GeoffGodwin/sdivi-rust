@@ -1,0 +1,23 @@
+title: sdivi-rust
+description: Structural Divergence Indexer. A measurement instrument that tracks how fast the structure of a codebase is changing.
+theme: jekyll-theme-cayman
+github:
+  repository_url: https://github.com/geoffgodwin/sdivi-rust
+  repository_nwo: geoffgodwin/sdivi-rust
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: false
+include:
+  - CHANGELOG.md
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"

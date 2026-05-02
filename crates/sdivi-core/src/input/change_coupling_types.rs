@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// A single commit event for change-coupling analysis.
 ///
 /// Supplied by the caller (either from `sdivi-pipeline`'s `git log` shell-out
-/// or from a foreign extractor such as the Meridian VSCode git index reader).
+/// or from a foreign extractor such as the consumer-app VSCode git index reader).
 ///
 /// # Examples
 ///

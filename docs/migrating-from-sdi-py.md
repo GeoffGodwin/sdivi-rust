@@ -1,3 +1,7 @@
+---
+title: Migrating from sdi-py
+---
+
 # Migrating from sdi-py to sdivi-rust
 
 ## Overview
