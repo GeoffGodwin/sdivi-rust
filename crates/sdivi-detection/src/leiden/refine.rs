@@ -16,6 +16,8 @@ use rand::seq::SliceRandom as _;
 use super::graph::LeidenGraph;
 use crate::partition::QualityFunction;
 
+const MAX_REFINE_ITER: usize = 10;
+
 /// Per-sub-community statistics for the refinement phase.
 ///
 /// Mirrors `ModularityState` but uses singleton initialisation (each node
@@ -204,7 +206,7 @@ fn refine_community(
     let mut order: Vec<usize> = members.to_vec();
     order.shuffle(rng);
 
-    let max_iter = 10;
+    let max_iter = MAX_REFINE_ITER;
     for _ in 0..max_iter {
         let mut moved = false;
         for &node in &order {

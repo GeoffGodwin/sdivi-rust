@@ -1,5 +1,7 @@
 //! Network aggregation phase of the Leiden algorithm.
 
+use std::collections::BTreeMap;
+
 use super::graph::LeidenGraph;
 
 #[doc(hidden)]
@@ -36,8 +38,7 @@ pub fn aggregate_network(graph: &LeidenGraph, refined_partition: &[usize]) -> Ag
     }
 
     // edge_map accumulates both cross-edges (u,v with u<v) and self-loops (u,u).
-    let mut edge_map: std::collections::BTreeMap<(usize, usize), f64> =
-        std::collections::BTreeMap::new();
+    let mut edge_map: BTreeMap<(usize, usize), f64> = BTreeMap::new();
 
     for u in 0..n {
         let cu = refined_partition[u];

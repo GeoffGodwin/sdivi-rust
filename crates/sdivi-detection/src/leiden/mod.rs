@@ -139,7 +139,7 @@ fn leiden_recursive(
             break; // No compression — refinement returned the identity partition.
         }
 
-        // Invariant: reaching here means refinement produced meaningful compression.
+        // Always true past the identity break above; kept as an invariant marker.
         #[cfg(debug_assertions)]
         debug_assert!(
             agg_graph.n < graph.n,

@@ -83,7 +83,10 @@ impl ModularityState {
     pub fn add_node(&mut self, graph: &LeidenGraph, node: usize, to: usize) {
         // Clear the singleton slot that node is leaving.  When `to == node`
         // this is immediately overwritten by the self-loop addition below,
-        // producing the correct singleton value.
+        // producing the correct singleton value. The double-increment of
+        // `sigma_tot[node]` and `size[node]` is benign because each node is
+        // visited exactly once per `local_move_phase` pass, so the stale
+        // slot is never read again in the same iteration.
         self.inner_edges[node] = 0.0;
         for (idx, &nbr) in graph.adj[node].iter().enumerate() {
             if self.assignment[nbr] == to {

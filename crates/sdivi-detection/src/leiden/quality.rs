@@ -27,8 +27,12 @@ pub(crate) fn compute_stability(graph: &LeidenGraph, assignment: &[usize]) -> BT
         }
         let n = size[c] as f64;
         let max_possible = n * (n - 1.0) / 2.0;
-        // max_possible is for non-self-loop pairs; self-loops add to the
-        // numerator without expanding the denominator.
+        // max_possible counts only non-self-loop pairs; self-loop weight in
+        // `inner[c]` is not bounded by it, so stability > 1.0 is theoretically
+        // possible on graphs with self-loops.  In practice this never occurs
+        // here because `build_partition` always calls `compute_stability` on a
+        // `LeidenGraph` built from a `DependencyGraph`, which has no self-loops
+        // (`self_loops[i] == 0.0` for every node).
         let s = if max_possible > 0.0 {
             inner[c] / max_possible
         } else {

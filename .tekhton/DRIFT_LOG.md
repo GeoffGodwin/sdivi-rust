@@ -1,8 +1,8 @@
 # Drift Log
 
 ## Metadata
-- Last audit: 2026-05-01
-- Runs since audit: 3
+- Last audit: 2026-05-02
+- Runs since audit: 1
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -30,16 +30,20 @@
   disabled or skipped.
 
 ## Unresolved Observations
-- [2026-05-02 | "M18"] `mod.rs:138-147` — The pattern `if condition { break; }` immediately followed by `debug_assert!(!condition)` appears only once in the codebase. If this pattern is adopted elsewhere for invariant documentation, a convention note in `CLAUDE.md` would help future contributors distinguish "normal early-return" from "invariant-documenting dead assert."
-- [2026-05-02 | "M18"] `refine.rs` — The `max_iter = 10` constant is a bare literal in `refine_community`. The local-move phase in `mod.rs` uses `cfg.max_iterations` passed down from `LeidenConfig`. Refinement's inner cap being a hardcoded literal (rather than a `LeidenConfig` field or named constant) is a mild inconsistency. No behaviour change needed for v0, but a `const MAX_REFINE_ITER: usize = 10;` at module scope would aid future tuning.
-- [2026-05-02 | "M18"] `refinement.rs:295` — `prop_assert!` tolerance is `1e-9`; elsewhere in the test suite the convention is `1e-12`. Both are far tighter than any practical FMA drift, so this is purely cosmetic.
-- [2026-05-02 | "M17"] `aggregate.rs:39` — `std::collections::BTreeMap` is imported via full path rather than a `use` statement at the top of the file. The rest of the codebase uses top-level `use` declarations. Cosmetic inconsistency, not a correctness issue.
-- [2026-05-02 | "M17"] `modularity.rs:add_node` comment — "When `to == node` this is immediately overwritten by the self-loop addition below" accurately describes `inner_edges` but is silent about the sigma_tot/size double-increment on the same code path. If someone later reads this comment expecting the singleton round-trip to be fully no-op, they may be confused.
-- [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.
-- [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/types.rs:46-48` — `WasmLeidenConfigInput` missing `edge_weights` tracked as ADL-4. Verify ADL-4 actually exists in the architecture log; if not, create the entry so the gap is formally tracked.
-- [2026-05-01 | "Address all 9 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items are marked `[x]` (resolved) but items 3, 6, and 7 were deferred rather than fixed. The log offers no way to distinguish "resolved by fixing" from "resolved by deferring," which will obscure the true open count in future audits. Consider a `[deferred]` marker for clarity.
-- [2026-05-01 | "architect audit"] *(stays in DRIFT_LOG.md for next cycle)* None. All 9 (10 items counting stale sub-items) unresolved observations from the drift log are addressed above.
+- [2026-05-02 | "architect audit"] Stays in `NON_BLOCKING_LOG.md` for a future cycle.
+- [2026-05-02 | "architect audit"] `quality.rs:compute_stability` — stability > 1.0 with self-loops (M17, NON_BLOCKING_LOG item 5). The code path is inert: `build_partition` always calls `compute_stability` on the original `LeidenGraph` constructed from a `DependencyGraph`, which has no self-loops (`self_loops[i] == 0.0` always). No v0 behaviour change needed. Revisit if `compute_stability` is ever exposed for aggregate-level introspection.
+- [2026-05-02 | "architect audit"] `refine.rs:150` — `#[doc(hidden)]` on a function that also has a full `///` doc block (M18, NON_BLOCKING_LOG item 2). Confirmed correct: the pattern is consistent with `aggregate_network` and `LeidenGraph`; the hidden-doc + full-doc combination is the established codebase pattern for test-plumbing internal re-exports.
+- [2026-05-02 | "architect audit"] `refine.rs:26` — `RefinementState` is `pub` rather than `pub(crate)` (M18, NON_BLOCKING_LOG item 3). Confirmed intentional: the `internal` module re-export requires `pub`; the pattern matches `LeidenGraph` and `AggregateResult`. No change.
 
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
+- [RESOLVED 2026-05-02] `mod.rs:138-147` — The pattern `if condition { break; }` immediately followed by `debug_assert!(!condition)` appears only once in the codebase. If this pattern is adopted elsewhere for invariant documentation, a convention note in `CLAUDE.md` would help future contributors distinguish "normal early-return" from "invariant-documenting dead assert."
+- [RESOLVED 2026-05-02] `refine.rs` — The `max_iter = 10` constant is a bare literal in `refine_community`. The local-move phase in `mod.rs` uses `cfg.max_iterations` passed down from `LeidenConfig`. Refinement's inner cap being a hardcoded literal (rather than a `LeidenConfig` field or named constant) is a mild inconsistency. No behaviour change needed for v0, but a `const MAX_REFINE_ITER: usize = 10;` at module scope would aid future tuning.
+- [RESOLVED 2026-05-02] `refinement.rs:295` — `prop_assert!` tolerance is `1e-9`; elsewhere in the test suite the convention is `1e-12`. Both are far tighter than any practical FMA drift, so this is purely cosmetic.
+- [RESOLVED 2026-05-02] `aggregate.rs:39` — `std::collections::BTreeMap` is imported via full path rather than a `use` statement at the top of the file. The rest of the codebase uses top-level `use` declarations. Cosmetic inconsistency, not a correctness issue.
+- [RESOLVED 2026-05-02] `modularity.rs:add_node` comment — "When `to == node` this is immediately overwritten by the self-loop addition below" accurately describes `inner_edges` but is silent about the sigma_tot/size double-increment on the same code path. If someone later reads this comment expecting the singleton round-trip to be fully no-op, they may be confused.
+- [RESOLVED 2026-05-02] `bindings/sdivi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.
+- [RESOLVED 2026-05-02] `bindings/sdivi-wasm/src/types.rs:46-48` — `WasmLeidenConfigInput` missing `edge_weights` tracked as ADL-4. Verify ADL-4 actually exists in the architecture log; if not, create the entry so the gap is formally tracked.
+- [RESOLVED 2026-05-02] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items are marked `[x]` (resolved) but items 3, 6, and 7 were deferred rather than fixed. The log offers no way to distinguish "resolved by fixing" from "resolved by deferring," which will obscure the true open count in future audits. Consider a `[deferred]` marker for clarity.
+- [RESOLVED 2026-05-02] *(stays in DRIFT_LOG.md for next cycle)* None. All 9 (10 items counting stale sub-items) unresolved observations from the drift log are addressed above.

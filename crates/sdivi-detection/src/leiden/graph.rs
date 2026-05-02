@@ -168,7 +168,6 @@ impl LeidenGraph {
     ///
     /// When `u == v`, returns the self-loop weight `self_loops[u]`.
     /// For cross-edges, `adj[u]` is sorted so this uses binary search — O(log degree(u)).
-    #[allow(dead_code)] // utility method for testing
     pub fn edge_weight(&self, u: usize, v: usize) -> f64 {
         if u == v {
             return self.self_loops[u];
