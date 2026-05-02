@@ -1,6 +1,6 @@
-# Determinism in sdi-rust
+# Determinism in sdivi-rust
 
-sdi-rust is a measurement instrument. Its core guarantee is that the same repo
+sdivi-rust is a measurement instrument. Its core guarantee is that the same repo
 state + the same config always produces the same snapshot. This document
 describes how that guarantee is implemented and what its limits are.
 
@@ -14,7 +14,7 @@ Specifically:
 - `PatternCatalog.entries: BTreeMap<String, BTreeMap<String, PatternStats>>`
 - `Snapshot` fields containing per-file or per-category data
 - The `path_partition: BTreeMap<String, u32>` in `Snapshot`
-- All `*Input` structs in `sdi-core::input`
+- All `*Input` structs in `sdivi-core::input`
 
 The consequence: sorted output is part of the contract. JSON snapshots emit
 keys in lexicographic order. Foreign extractors feeding `DependencyGraphInput`
@@ -25,12 +25,12 @@ do not need to pre-sort — the compute functions re-sort internally.
 `Config::random_seed` (default `42`) controls the `StdRng` used by the Leiden
 community-detection algorithm. The seed travels through:
 
-1. `Config::random_seed` → `LeidenConfig::seed` (set in `LeidenConfig::from_sdi_config`)
+1. `Config::random_seed` → `LeidenConfig::seed` (set in `LeidenConfig::from_sdivi_config`)
 2. `LeidenConfig::seed` → `StdRng::seed_from_u64(seed)` at the start of each Leiden run
 3. The `seed` is recorded in `LeidenPartition.seed` and in the snapshot JSON
 
 **Invariant:** same seed + same graph → bit-identical partition assignment.
-This is property-tested in `crates/sdi-detection/tests/proptest_seeded.rs`.
+This is property-tested in `crates/sdivi-detection/tests/proptest_seeded.rs`.
 
 **For WASM callers:** pass `LeidenConfigInput { seed: 42, .. }` explicitly.
 Do not rely on the default if reproducibility across runs matters.
@@ -38,7 +38,7 @@ Do not rely on the default if reproducibility across runs matters.
 ## Pattern Fingerprints
 
 Pattern fingerprints use `blake3` with a fixed key constant (`FINGERPRINT_KEY`
-in `sdi-patterns::fingerprint`, re-exported as `sdi_core::FINGERPRINT_KEY`).
+in `sdivi-patterns::fingerprint`, re-exported as `sdivi_core::FINGERPRINT_KEY`).
 
 `normalize_and_hash(kind, children)` performs a depth-first canonical walk:
 
@@ -56,7 +56,7 @@ Properties:
 ## normalize_and_hash for Foreign Extractors
 
 Callers that supply their own AST extractors (e.g. the Meridian consumer app,
-WASM-mediated TS tools) **must** use `sdi_core::normalize_and_hash` to produce
+WASM-mediated TS tools) **must** use `sdivi_core::normalize_and_hash` to produce
 fingerprints, not a custom hasher.
 
 **NodeId canonicalization rule:** node IDs must be repo-relative UNIX paths
@@ -64,8 +64,8 @@ with forward slashes and no leading `./` or `/`. Use `validate_node_id` to
 validate before submitting to `compute_*`.
 
 ```rust
-use sdi_core::{normalize_and_hash, validate_node_id};
-use sdi_core::input::NormalizeNode;
+use sdivi_core::{normalize_and_hash, validate_node_id};
+use sdivi_core::input::NormalizeNode;
 
 let child = NormalizeNode { kind: "identifier".into(), children: vec![] };
 let fp = normalize_and_hash("call_expression", &[child]);
@@ -75,7 +75,7 @@ let fp = normalize_and_hash("call_expression", &[child]);
 
 ## FMA and Cross-Platform Floating-Point
 
-sdi-rust does not bit-guarantee floating-point results across platforms. The
+sdivi-rust does not bit-guarantee floating-point results across platforms. The
 Leiden modularity objective (`Q`) uses floating-point arithmetic; the compiler
 may emit FMA instructions on x86_64 and aarch64 that round differently from
 non-FMA code.
@@ -94,7 +94,7 @@ real adopter requires cross-platform bit identity.
 
 ## Pure-Function Guarantee
 
-Every `sdi_core::compute_*` function is referentially transparent:
+Every `sdivi_core::compute_*` function is referentially transparent:
 
 | Function | Guarantee |
 |---|---|
@@ -123,10 +123,10 @@ The following proptest suites are permanent CI fixtures:
 
 | Test | Crate | What it validates |
 |---|---|---|
-| `prop_test_leiden_seeded` | `sdi-detection` | Same seed → same partition |
-| `prop_delta_referentially_transparent` | `sdi-snapshot` | `compute_delta` is pure |
-| `prop_test_normalize_and_hash_stable` | `sdi-patterns` | Same node → same fingerprint |
-| `prop_test_compute_thresholds_check_pure` | `sdi-core` | Thresholds check is pure |
+| `prop_test_leiden_seeded` | `sdivi-detection` | Same seed → same partition |
+| `prop_delta_referentially_transparent` | `sdivi-snapshot` | `compute_delta` is pure |
+| `prop_test_normalize_and_hash_stable` | `sdivi-patterns` | Same node → same fingerprint |
+| `prop_test_compute_thresholds_check_pure` | `sdivi-core` | Thresholds check is pure |
 
 Regression files are committed in `proptest-regressions/` subdirectories.
 If proptest shrinks a failing case, commit the resulting `.txt` file so the

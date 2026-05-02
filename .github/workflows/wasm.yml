@@ -32,25 +32,25 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --version ${{ env.WASM_PACK_VERSION }} --locked
 
-      - name: Verify sdi-core has no forbidden deps on wasm32
+      - name: Verify sdivi-core has no forbidden deps on wasm32
         run: |
           # `-e normal,build` excludes dev-dependencies (proptest pulls tempfile via rusty-fork
           # — that's a test-time dep and never reaches the published wasm bundle).
-          cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features -e normal,build 2>&1 | tee /tmp/tree.txt
+          cargo tree -p sdivi-core --target wasm32-unknown-unknown --no-default-features -e normal,build 2>&1 | tee /tmp/tree.txt
           if grep -E "tree-sitter|walkdir|ignore|rayon|tempfile" /tmp/tree.txt; then
-            echo "FAIL: forbidden deps found in sdi-core wasm32 tree (normal+build edges)"
+            echo "FAIL: forbidden deps found in sdivi-core wasm32 tree (normal+build edges)"
             exit 1
           fi
           echo "OK: no forbidden deps"
 
       - name: Build WASM bundle (release-wasm profile)
-        working-directory: bindings/sdi-wasm
+        working-directory: bindings/sdivi-wasm
         run: wasm-pack build --target bundler --profile release-wasm
 
       - name: Check bundle size
-        working-directory: bindings/sdi-wasm/pkg
+        working-directory: bindings/sdivi-wasm/pkg
         run: |
-          SIZE=$(wc -c < sdi_wasm_bg.wasm)
+          SIZE=$(wc -c < sdivi_wasm_bg.wasm)
           echo "Bundle size: ${SIZE} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
           if [ "$SIZE" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
             echo "FAIL: .wasm exceeds 1.2 MB budget (${SIZE} bytes)"
@@ -59,7 +59,7 @@ jobs:
           echo "OK: within budget"
 
       - name: Capture normalize_and_hash output for cross-platform check
-        working-directory: bindings/sdi-wasm
+        working-directory: bindings/sdivi-wasm
         run: |
           wasm-pack test --node -- --test normalize_hash_deterministic 2>&1 | tee /tmp/hash_out.txt || true
           # Extract the CI_HASH line from test output if present
@@ -74,12 +74,12 @@ jobs:
           if-no-files-found: warn
 
       - name: Run WASM smoke tests (Node)
-        working-directory: bindings/sdi-wasm
+        working-directory: bindings/sdivi-wasm
         run: wasm-pack test --node
 
       - name: Dry-run npm publish (tagged releases only)
         if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: bindings/sdi-wasm/pkg
+        working-directory: bindings/sdivi-wasm/pkg
         run: npm publish --dry-run --access public
 
   cross-platform-hash:

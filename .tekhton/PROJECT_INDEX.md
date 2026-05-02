@@ -1,11 +1,11 @@
-# PROJECT_INDEX.md — sdi-rust
+# PROJECT_INDEX.md — sdivi-rust
 
 <!-- Last-Scan: 2026-04-28T18:19:59Z -->
 <!-- Scan-Commit: 62812b6 -->
 <!-- File-Count: 2 -->
 <!-- Total-Lines: 42 -->
 
-**Project:** sdi-rust
+**Project:** sdivi-rust
 **Scanned:** 2026-04-28T18:19:59Z
 **Files:** 2 | **Lines:** 42
 

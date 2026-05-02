@@ -1,10 +1,10 @@
 /**
- * binding_node.ts — consumer-app-shaped usage of @geoffgodwin/sdi-wasm.
+ * binding_node.ts — consumer-app-shaped usage of @geoffgodwin/sdivi-wasm.
  *
  * Demonstrates the init-then-call pattern.  In real use the caller supplies
  * extracted graph/pattern data; here we use a small inline fixture.
  *
- * Run (after `wasm-pack build --target bundler --release` in bindings/sdi-wasm):
+ * Run (after `wasm-pack build --target bundler --release` in bindings/sdivi-wasm):
  *   npx tsx examples/binding_node.ts
  */
 import init, {
@@ -14,7 +14,7 @@ import init, {
   compute_delta,
   assemble_snapshot,
   normalize_and_hash,
-} from '@geoffgodwin/sdi-wasm';
+} from '@geoffgodwin/sdivi-wasm';
 
 // Types are available from the generated .d.ts — no manual interface needed.
 

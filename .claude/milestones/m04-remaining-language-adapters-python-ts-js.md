@@ -8,15 +8,15 @@ status: "done"
 **Scope:** Implement `LanguageAdapter` for the five remaining default languages. Each in its own crate behind a Cargo feature flag. Compile-time grammar linking. Per-language test fixture.
 
 **Deliverables:**
-- `sdi-lang-python`, `sdi-lang-typescript`, `sdi-lang-javascript`, `sdi-lang-go`, `sdi-lang-java` crates each with feature gate and `tree-sitter-<lang>` build dep
+- `sdivi-lang-python`, `sdivi-lang-typescript`, `sdivi-lang-javascript`, `sdivi-lang-go`, `sdivi-lang-java` crates each with feature gate and `tree-sitter-<lang>` build dep
 - Default workspace feature set enables all six languages (matching sdi-py)
 - Per-language minimal fixture under `tests/fixtures/simple-<lang>/`
 - Multi-language fixture `tests/fixtures/multi-language/` with Python + TypeScript files
 - Language detection by extension wired in the file walker
 
 **Files to create or modify:**
-- `crates/sdi-lang-{python,typescript,javascript,go,java}/{Cargo.toml,build.rs,src/lib.rs}`
-- `crates/sdi-parsing/src/walker.rs` (extension → adapter dispatch table)
+- `crates/sdivi-lang-{python,typescript,javascript,go,java}/{Cargo.toml,build.rs,src/lib.rs}`
+- `crates/sdivi-parsing/src/walker.rs` (extension → adapter dispatch table)
 - `tests/fixtures/simple-{python,typescript,javascript,go,java}/`
 - `tests/fixtures/multi-language/`
 
@@ -30,7 +30,7 @@ status: "done"
 **Tests:**
 - `tests/full_pipeline.rs` extended: parse each `simple-<lang>/` fixture
 - `tests/multi_language.rs`: parse multi-language fixture, assert per-language record counts
-- `crates/sdi-parsing/tests/grammar_missing.rs`: build with only `lang-rust`, parse a Python file, assert skip-with-warning behavior
+- `crates/sdivi-parsing/tests/grammar_missing.rs`: build with only `lang-rust`, parse a Python file, assert skip-with-warning behavior
 
 **Watch For:**
 - `tree-sitter-typescript` ships two grammars (TSX and TS) — pick one per `.ts` vs `.tsx` extension. Document the choice

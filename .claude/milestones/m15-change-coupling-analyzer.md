@@ -7,24 +7,24 @@ status: "done"
 <!-- PM-tweaked: 2026-05-01 -->
 
 
-**Scope:** Implement the change-coupling computation that turns the existing `[change_coupling]` config block into a real analyzer. Walk the last `history_depth` commits via shell-out to `git log`, compute file-pair co-change frequencies, surface them in the snapshot, and feed them into Leiden as edge weights when `boundaries.weighted_edges = true`. Two-layer split: I/O lives in `sdi-pipeline::change_coupling`; the math lives in `sdi-core::compute_change_coupling` (pure, WASM-callable, foreign-extractor-friendly).
+**Scope:** Implement the change-coupling computation that turns the existing `[change_coupling]` config block into a real analyzer. Walk the last `history_depth` commits via shell-out to `git log`, compute file-pair co-change frequencies, surface them in the snapshot, and feed them into Leiden as edge weights when `boundaries.weighted_edges = true`. Two-layer split: I/O lives in `sdivi-pipeline::change_coupling`; the math lives in `sdivi-core::compute_change_coupling` (pure, WASM-callable, foreign-extractor-friendly).
 
 **Why this milestone exists:** `ChangeCouplingConfig`, `boundaries.weighted_edges`, and the `[change_coupling]` block in `init`'s default config template are advertised features that no code currently reads. CLAUDE.md's `Config Architecture` table documents `min_frequency = 0.6` and `history_depth = 500` as if they did something. They don't. Shipping v0 with a documented-but-inert analyzer is worse than shipping v0 without it: it actively misleads embedders and adopters. This milestone makes the existing config surface load-bearing and gives Meridian (and any other consumer that may want temporal coupling later) a stable, pure-compute entry point that does not depend on the consumer having its own libgit2 or git binary in scope.
 
 **Deliverables:**
 
-- **Pure-compute entry point in `sdi-core`:**
+- **Pure-compute entry point in `sdivi-core`:**
   - `compute_change_coupling(events: &[CoChangeEventInput], cfg: &ChangeCouplingConfigInput) -> ChangeCouplingResult` — given an ordered list of commit-events (each carrying the set of paths touched by that commit), produces the set of file-pair frequencies that meet `min_frequency`. Pure, referentially transparent, no I/O, no clock.
   - Algorithm: for each commit, enumerate every unordered pair of paths in the commit's `files`; increment a per-pair counter; divide each pair's count by `commits_analyzed`; emit pairs whose frequency `>= min_frequency` **and whose `cochange_count >= 2`** (a single co-occurrence is not change coupling — it may be a coincidence of the same initial commit creating both files). [PM: Added the `cochange_count >= 2` guard to match the stated unit-test behaviour "single commit → no pairs (a pair requires two distinct commits)." Without this guard, a single commit touching `{a, b}` produces frequency `1.0`, which passes any `min_frequency` filter. The guard makes the test case and the algorithm consistent.]
   - Pairs are ordered by `(source, target)` lexicographically with `source < target`; output is a `Vec<CoChangePair>` sorted by `(source, target)` for byte-identical determinism.
   - `commits_analyzed = min(events.len(), cfg.history_depth as usize)`. The function operates on the trailing window: events are assumed oldest-first; the last `history_depth` are the analyzed window.
-- **New input/output types in `sdi-core::input`:**
+- **New input/output types in `sdivi-core::input`:**
   - `CoChangeEventInput { commit_sha: String, commit_date: String, files: Vec<String> }` — `commit_date` is ISO-8601 (`YYYY-MM-DDTHH:MM:SSZ`); `files` are canonical NodeIds (validated via the existing `validate_node_id`).
-  - `ChangeCouplingConfigInput { min_frequency: f64, history_depth: u32 }` — mirrors `sdi-config::ChangeCouplingConfig` with serde-and-tsify derives. `min_frequency` validated `[0.0, 1.0]` at the entry point; out-of-range returns `AnalysisError::InvalidConfig`.
+  - `ChangeCouplingConfigInput { min_frequency: f64, history_depth: u32 }` — mirrors `sdivi-config::ChangeCouplingConfig` with serde-and-tsify derives. `min_frequency` validated `[0.0, 1.0]` at the entry point; out-of-range returns `AnalysisError::InvalidConfig`.
   - `ChangeCouplingResult { pairs: Vec<CoChangePair>, commits_analyzed: u32, distinct_files_touched: u32 }`. [PM: `distinct_files_touched` is the count of unique path strings that appear in at least one of the analyzed commit events (i.e., `HashSet`-collect `files` across the trailing `commits_analyzed` events, then `.len()`). This was not defined in the original.]
   - `CoChangePair { source: String, target: String, frequency: f64, cochange_count: u32 }` — `source < target` lexicographically; `frequency = cochange_count / commits_analyzed`.
-- **I/O entry point in `sdi-pipeline`:**
-  - `crates/sdi-pipeline/src/change_coupling.rs` — `collect_cochange_events(repo_root: &Path, history_depth: u32, ending_at: Option<&str>) -> Result<Vec<CoChangeEventInput>, ChangeCouplingError>`. Shells out to `git log --no-pager -z --name-only --format=%x00COMMIT%x00%H%x00%cI%x00 -n <history_depth> [<ending_at>]`. Parses NUL-separated output into events. Translates paths to canonical NodeId form (forward slashes, repo-relative, no leading `./`).
+- **I/O entry point in `sdivi-pipeline`:**
+  - `crates/sdivi-pipeline/src/change_coupling.rs` — `collect_cochange_events(repo_root: &Path, history_depth: u32, ending_at: Option<&str>) -> Result<Vec<CoChangeEventInput>, ChangeCouplingError>`. Shells out to `git log --no-pager -z --name-only --format=%x00COMMIT%x00%H%x00%cI%x00 -n <history_depth> [<ending_at>]`. Parses NUL-separated output into events. Translates paths to canonical NodeId form (forward slashes, repo-relative, no leading `./`).
   - `ending_at = None` defaults to `HEAD`. `M16` will pass a resolved SHA when `--commit REF` is in play.
   - Returns `Ok(vec![])` if the repo has no `.git/` (Rule 16-style: missing input is normal), with a stderr `tracing::info!` line — never an error.
   - Returns a structured `ChangeCouplingError` for malformed `git log` output or non-zero exit (other than the "no git" path).
@@ -37,41 +37,41 @@ status: "done"
   - No new `DivergenceSummary` field for v0 — change-coupling is a descriptive snapshot dimension, not a threshold-gated one. (The existing `coupling_delta_rate` continues to gate graph density, not change-coupling.)
 - **Leiden input shape:**
   - `LeidenConfigInput` gains `edge_weights: Option<BTreeMap<(String, String), f64>>` — `None` (default) means "all weights = 1.0" (existing behavior); `Some(map)` means "use the supplied weights, defaulting to 1.0 for unlisted edges". `BTreeMap` keys are `(source, target)` with `source < target`. `#[serde(default)]`.
-  - `detect_boundaries` (existing in `sdi-core`) feeds the optional weights into the petgraph edge weights at graph-construction time. The existing Leiden algorithm already operates on weighted edges (graph density, modularity calculations); this surfaces the existing capability through the input shape.
+  - `detect_boundaries` (existing in `sdivi-core`) feeds the optional weights into the petgraph edge weights at graph-construction time. The existing Leiden algorithm already operates on weighted edges (graph density, modularity calculations); this surfaces the existing capability through the input shape.
   - Pipeline path: when `weighted_edges = true`, `Pipeline::snapshot` constructs the `edge_weights` map from `ChangeCouplingResult.pairs` and passes it through `LeidenConfigInput`.
 - **WASM exports:**
-  - `bindings/sdi-wasm/src/lib.rs` — export `compute_change_coupling`, `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`. tsify regenerates `.d.ts`.
+  - `bindings/sdivi-wasm/src/lib.rs` — export `compute_change_coupling`, `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`. tsify regenerates `.d.ts`.
   - This is the Meridian-facing surface: a consumer with its own commit history walker (e.g., reading from the IDE's git index) supplies `Vec<CoChangeEventInput>` directly, no shell-out needed.
 - **CLI surface:**
-  - `sdi show` text output gains a `change coupling: <N> pairs (top 5: …)` line when `change_coupling` is `Some` and non-empty.
-  - `sdi show --format json` already serializes the full snapshot; the new field appears automatically.
+  - `sdivi show` text output gains a `change coupling: <N> pairs (top 5: …)` line when `change_coupling` is `Some` and non-empty.
+  - `sdivi show --format json` already serializes the full snapshot; the new field appears automatically.
   - No new CLI flags. `boundaries.weighted_edges` is the existing knob.
 - **Documentation:**
   - `docs/library-embedding.md` — new section "Computing change-coupling from a foreign extractor" showing a Meridian-style consumer that supplies its own `CoChangeEventInput` slice (e.g., from VSCode's git extension) and calls `compute_change_coupling` directly via WASM.
   - `docs/cli-integration.md` — short note on `boundaries.weighted_edges` and how it interacts with Leiden communities.
   - `docs/determinism.md` — note that `git log` output ordering is deterministic for a fixed `HEAD`, and the canonical NodeId translation ensures cross-platform path equivalence (forward slashes, no `./`).
-- **CHANGELOG.md** entry: "Change-coupling analyzer wired up. New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdi_core::compute_change_coupling` exported through WASM. Schema stays `1.0`."
+- **CHANGELOG.md** entry: "Change-coupling analyzer wired up. New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdivi_core::compute_change_coupling` exported through WASM. Schema stays `1.0`."
 
 **Migration Impact:** [PM: Added this section. The snapshot schema stays `"1.0"` and the new field is `#[serde(default)]`, so M14-era snapshots deserialize with `change_coupling = None` without any error. No config migration is required. The `boundaries.weighted_edges` key was already present in the schema (previously inert); after this milestone it becomes load-bearing, which changes its observable behaviour but not its type or default value (`false`). Users who had `weighted_edges = true` in their config before M15 will now see Leiden receive modified edge weights on their next snapshot run; they should be aware their community partition may shift.]
 
 **Files to create or modify:**
 
-- **New:** `crates/sdi-pipeline/src/change_coupling.rs` (`collect_cochange_events`, `ChangeCouplingError`).
-- **New:** `crates/sdi-core/src/compute/change_coupling.rs` (`compute_change_coupling`).
-- **New (or extend `crates/sdi-core/src/input/types.rs`):** add `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`.
-- **Modify:** `crates/sdi-core/src/input/types.rs` — extend `LeidenConfigInput` with `edge_weights: Option<BTreeMap<(String, String), f64>>`.
-- **Modify:** `crates/sdi-core/src/compute/boundaries.rs` (or wherever `detect_boundaries` lives) — feed `edge_weights` into the petgraph edge weights.
-- **Modify:** `crates/sdi-snapshot/src/snapshot.rs` — add `change_coupling: Option<ChangeCouplingResult>` to `Snapshot`. Update `assemble_snapshot` to take the new field.
-- **Modify:** `crates/sdi-pipeline/src/pipeline.rs` — call `collect_cochange_events`, call `compute_change_coupling`, populate `Snapshot.change_coupling`, wire edge weights into Leiden when `weighted_edges = true`.
-- **Modify:** `crates/sdi-pipeline/src/lib.rs` — re-export `change_coupling` module.
-- **Modify:** `crates/sdi-cli/src/output/text.rs`, `crates/sdi-cli/src/output/json.rs` — surface change-coupling in `sdi show`.
-- **Modify:** `bindings/sdi-wasm/src/lib.rs` — export the new compute function and types.
-- **Modify:** `bindings/sdi-wasm/Cargo.toml` — no new deps; tsify handles the `.d.ts`.
+- **New:** `crates/sdivi-pipeline/src/change_coupling.rs` (`collect_cochange_events`, `ChangeCouplingError`).
+- **New:** `crates/sdivi-core/src/compute/change_coupling.rs` (`compute_change_coupling`).
+- **New (or extend `crates/sdivi-core/src/input/types.rs`):** add `CoChangeEventInput`, `ChangeCouplingConfigInput`, `ChangeCouplingResult`, `CoChangePair`.
+- **Modify:** `crates/sdivi-core/src/input/types.rs` — extend `LeidenConfigInput` with `edge_weights: Option<BTreeMap<(String, String), f64>>`.
+- **Modify:** `crates/sdivi-core/src/compute/boundaries.rs` (or wherever `detect_boundaries` lives) — feed `edge_weights` into the petgraph edge weights.
+- **Modify:** `crates/sdivi-snapshot/src/snapshot.rs` — add `change_coupling: Option<ChangeCouplingResult>` to `Snapshot`. Update `assemble_snapshot` to take the new field.
+- **Modify:** `crates/sdivi-pipeline/src/pipeline.rs` — call `collect_cochange_events`, call `compute_change_coupling`, populate `Snapshot.change_coupling`, wire edge weights into Leiden when `weighted_edges = true`.
+- **Modify:** `crates/sdivi-pipeline/src/lib.rs` — re-export `change_coupling` module.
+- **Modify:** `crates/sdivi-cli/src/output/text.rs`, `crates/sdivi-cli/src/output/json.rs` — surface change-coupling in `sdivi show`.
+- **Modify:** `bindings/sdivi-wasm/src/lib.rs` — export the new compute function and types.
+- **Modify:** `bindings/sdivi-wasm/Cargo.toml` — no new deps; tsify handles the `.d.ts`.
 - **New tests:**
-  - `crates/sdi-core/tests/compute_change_coupling.rs` — pure unit tests, including determinism, sort order, and `min_frequency` filtering.
-  - `crates/sdi-pipeline/tests/change_coupling_git.rs` — integration test against a tempdir git repo with a known commit history (set up in-test via `std::process::Command::new("git")` calls).
+  - `crates/sdivi-core/tests/compute_change_coupling.rs` — pure unit tests, including determinism, sort order, and `min_frequency` filtering.
+  - `crates/sdivi-pipeline/tests/change_coupling_git.rs` — integration test against a tempdir git repo with a known commit history (set up in-test via `std::process::Command::new("git")` calls).
   - `tests/change_coupling_lifecycle.rs` (workspace-level) — end-to-end: snapshot a fixture, assert `Snapshot.change_coupling` is `Some` with expected pairs.
-  - `crates/sdi-detection/tests/leiden_weighted_edges.rs` — assert that `weighted_edges = true` with a non-trivial weight map produces a different community partition than `false` on the same graph (or the same partition with higher modularity — either is acceptance).
+  - `crates/sdivi-detection/tests/leiden_weighted_edges.rs` — assert that `weighted_edges = true` with a non-trivial weight map produces a different community partition than `false` on the same graph (or the same partition with higher modularity — either is acceptance).
 - **Test fixture:** `tests/fixtures/change-coupling-history/` — a small git fixture (built by a setup script under `target/test-fixtures` like the existing `evolving/` fixture) with 10 commits exercising known co-change pairs. The setup script lives in `tools/build-test-fixtures.sh`; the integration test invokes it before running. The fixture is **not** checked in as a git repo (no nested `.git/`); the script reconstructs it from a manifest.
 - **Modify:** `tools/validate-against-bifl-tracker.sh` (M11 harness) — extend to assert `Snapshot.change_coupling` is `Some` for the bifl-tracker baselines (it has plenty of history). Tolerance: existing per-dimension tolerances unchanged; the new field is asserted to be non-empty but its content is not gated against sdi-py baselines (sdi-py's change-coupling implementation may not have shipped, and KDD-1 says clean break on snapshots anyway).
 - **Modify:** `CHANGELOG.md`, `docs/library-embedding.md`, `docs/cli-integration.md`, `docs/determinism.md`.
@@ -82,14 +82,14 @@ status: "done"
 - `compute_change_coupling` is pure: same `events` + same `cfg` produces a byte-identical `ChangeCouplingResult` (proptest covers this).
 - A repo with no `.git/` directory produces a snapshot with `change_coupling = None` and no warning to stderr beyond a `tracing::info!` line.
 - A repo with `history_depth = 0` produces `change_coupling = Some(ChangeCouplingResult { pairs: vec![], commits_analyzed: 0, distinct_files_touched: 0 })` (zero-history is *not* the same as "no git" — the user explicitly disabled the analyzer).
-- `cargo build -p sdi-core --target wasm32-unknown-unknown --no-default-features` succeeds; `cargo tree -p sdi-core --target wasm32-unknown-unknown --no-default-features` shows zero entries for shell-out crates, `git2`, `gix`, `walkdir`, `ignore`, `rayon`, `tempfile`.
-- `bindings/sdi-wasm` test imports `compute_change_coupling` from the bundled `.wasm` and produces the same result as the native call for the same `CoChangeEventInput` slice.
+- `cargo build -p sdivi-core --target wasm32-unknown-unknown --no-default-features` succeeds; `cargo tree -p sdivi-core --target wasm32-unknown-unknown --no-default-features` shows zero entries for shell-out crates, `git2`, `gix`, `walkdir`, `ignore`, `rayon`, `tempfile`.
+- `bindings/sdivi-wasm` test imports `compute_change_coupling` from the bundled `.wasm` and produces the same result as the native call for the same `CoChangeEventInput` slice.
 - `boundaries.weighted_edges = true` against the change-coupling fixture produces a Leiden partition whose modularity is **not less than** the unweighted-baseline modularity (equality is acceptable; degradation is a regression).
 - The existing M11 bifl-tracker harness still passes within the documented tolerances on per-dimension metrics.
 - `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
 - `cargo test --workspace` passes including doctests.
 - `snapshot_version` remains `"1.0"`.
-- [PM: `sdi show` (text format) against a snapshot with a non-empty `change_coupling` field prints a line matching the pattern `change coupling: <N> pairs (top 5: …)` to stdout and nothing to stderr for that field. Verified by `assert_cmd` in the CLI exit-code test suite.]
+- [PM: `sdivi show` (text format) against a snapshot with a non-empty `change_coupling` field prints a line matching the pattern `change coupling: <N> pairs (top 5: …)` to stdout and nothing to stderr for that field. Verified by `assert_cmd` in the CLI exit-code test suite.]
 
 **Tests:**
 
@@ -97,7 +97,7 @@ status: "done"
 - Unit (filter): three pairs with frequencies 0.8, 0.6, 0.4 against `min_frequency = 0.6` → exactly two pairs survive, sorted lexicographically (both also have `cochange_count >= 2` in the fixture).
 - Property: `prop_test_change_coupling_deterministic` — randomly generated `Vec<CoChangeEventInput>` × random `cfg` produces stable output.
 - Property: `prop_test_change_coupling_pair_ordering` — emitted pairs are always sorted with `source < target`.
-- Integration (git): `crates/sdi-pipeline/tests/change_coupling_git.rs` — tempdir repo, 5 commits with known file touches, `collect_cochange_events` returns the expected `Vec<CoChangeEventInput>`.
+- Integration (git): `crates/sdivi-pipeline/tests/change_coupling_git.rs` — tempdir repo, 5 commits with known file touches, `collect_cochange_events` returns the expected `Vec<CoChangeEventInput>`.
 - Integration (path canonicalization): a fixture with a path containing a space and a Unicode character round-trips correctly through the `git log -z` parser and through `validate_node_id`.
 - Integration (Leiden weighted): synthetic graph with known partition under unweighted Leiden, weighted Leiden produces a different (or higher-modularity) partition with a known weight map.
 - Integration (no-git): a tempdir without `.git/` produces `change_coupling = None`.

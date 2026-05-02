@@ -3,7 +3,7 @@
 // workspace root because the root Cargo.toml has no [package] section.
 //
 // The actual integration test is compiled from:
-//   crates/sdi-parsing/tests/full_pipeline.rs
+//   crates/sdivi-parsing/tests/full_pipeline.rs
 //
 // This file is kept here as a layout placeholder per CLAUDE.md conventions.
 // Added in Milestone 3 (Parsing Stage with One Language Adapter — Rust).

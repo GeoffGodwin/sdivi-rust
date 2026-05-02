@@ -11,9 +11,9 @@ env:
   WASM_PACK_VERSION: "0.13.1"
 
 # Publish order (milestone 13):
-#   sdi-config → sdi-parsing → sdi-lang-* → sdi-graph → sdi-detection
-#   → sdi-patterns → sdi-snapshot → sdi-core → sdi-pipeline → sdi-cli → sdi-rust
-# npm: @geoffgodwin/sdi-wasm (depends only on sdi-core; published separately)
+#   sdivi-config → sdivi-parsing → sdivi-lang-* → sdivi-graph → sdivi-detection
+#   → sdivi-patterns → sdivi-snapshot → sdivi-core → sdivi-pipeline → sdivi-cli → sdivi-rust
+# npm: @geoffgodwin/sdivi-wasm (depends only on sdivi-core; published separately)
 
 jobs:
   # ── Verify tag matches workspace version ──────────────────────────────────
@@ -56,28 +56,28 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             cross: false
-            bin: sdi
-            artifact: sdi-x86_64-unknown-linux-gnu
+            bin: sdivi
+            artifact: sdivi-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             cross: true
-            bin: sdi
-            artifact: sdi-aarch64-unknown-linux-gnu
+            bin: sdivi
+            artifact: sdivi-aarch64-unknown-linux-gnu
           - os: macos-13
             target: x86_64-apple-darwin
             cross: false
-            bin: sdi
-            artifact: sdi-x86_64-apple-darwin
+            bin: sdivi
+            artifact: sdivi-x86_64-apple-darwin
           - os: macos-latest
             target: aarch64-apple-darwin
             cross: false
-            bin: sdi
-            artifact: sdi-aarch64-apple-darwin
+            bin: sdivi
+            artifact: sdivi-aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             cross: false
-            bin: sdi.exe
-            artifact: sdi-x86_64-pc-windows-msvc.exe
+            bin: sdivi.exe
+            artifact: sdivi-x86_64-pc-windows-msvc.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -94,11 +94,11 @@ jobs:
 
       - name: Build with cross
         if: matrix.cross
-        run: cross build --release -p sdi-cli --target ${{ matrix.target }}
+        run: cross build --release -p sdivi-cli --target ${{ matrix.target }}
 
       - name: Build native
         if: "!matrix.cross"
-        run: cargo build --release -p sdi-cli --target ${{ matrix.target }}
+        run: cargo build --release -p sdivi-cli --target ${{ matrix.target }}
 
       - name: Stage binary (Unix)
         if: runner.os != 'Windows'
@@ -163,63 +163,63 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Publish sdi-config
-        run: cargo publish -p sdi-config
+      - name: Publish sdivi-config
+        run: cargo publish -p sdivi-config
       - run: sleep 30
 
-      - name: Publish sdi-parsing
-        run: cargo publish -p sdi-parsing
+      - name: Publish sdivi-parsing
+        run: cargo publish -p sdivi-parsing
       - run: sleep 30
 
       - name: Publish language adapters
         run: |
-          cargo publish -p sdi-lang-rust
+          cargo publish -p sdivi-lang-rust
           sleep 10
-          cargo publish -p sdi-lang-python
+          cargo publish -p sdivi-lang-python
           sleep 10
-          cargo publish -p sdi-lang-typescript
+          cargo publish -p sdivi-lang-typescript
           sleep 10
-          cargo publish -p sdi-lang-javascript
+          cargo publish -p sdivi-lang-javascript
           sleep 10
-          cargo publish -p sdi-lang-go
+          cargo publish -p sdivi-lang-go
           sleep 10
-          cargo publish -p sdi-lang-java
+          cargo publish -p sdivi-lang-java
       - run: sleep 30
 
-      - name: Publish sdi-graph
-        run: cargo publish -p sdi-graph
+      - name: Publish sdivi-graph
+        run: cargo publish -p sdivi-graph
       - run: sleep 30
 
-      - name: Publish sdi-detection
-        run: cargo publish -p sdi-detection
+      - name: Publish sdivi-detection
+        run: cargo publish -p sdivi-detection
       - run: sleep 30
 
-      - name: Publish sdi-patterns
-        run: cargo publish -p sdi-patterns
+      - name: Publish sdivi-patterns
+        run: cargo publish -p sdivi-patterns
       - run: sleep 30
 
-      - name: Publish sdi-snapshot
-        run: cargo publish -p sdi-snapshot
+      - name: Publish sdivi-snapshot
+        run: cargo publish -p sdivi-snapshot
       - run: sleep 30
 
-      - name: Publish sdi-core
-        run: cargo publish -p sdi-core
+      - name: Publish sdivi-core
+        run: cargo publish -p sdivi-core
       - run: sleep 30
 
-      - name: Publish sdi-pipeline
-        run: cargo publish -p sdi-pipeline
+      - name: Publish sdivi-pipeline
+        run: cargo publish -p sdivi-pipeline
       - run: sleep 30
 
-      - name: Publish sdi-cli
-        run: cargo publish -p sdi-cli
+      - name: Publish sdivi-cli
+        run: cargo publish -p sdivi-cli
       - run: sleep 30
 
-      - name: Publish sdi-rust (install-discovery meta-crate)
-        run: cargo publish -p sdi-rust
+      - name: Publish sdivi-rust (install-discovery meta-crate)
+        run: cargo publish -p sdivi-rust
 
   # ── Publish to npm (manual approval gate) ────────────────────────────────
   publish-npm:
-    name: Publish @geoffgodwin/sdi-wasm to npm
+    name: Publish @geoffgodwin/sdivi-wasm to npm
     needs: [create-release]
     runs-on: ubuntu-latest
     environment: npm-publish
@@ -238,13 +238,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build WASM bundle (release-wasm profile)
-        working-directory: bindings/sdi-wasm
+        working-directory: bindings/sdivi-wasm
         run: wasm-pack build --target bundler --profile release-wasm
 
       - name: Report WASM bundle size
-        working-directory: bindings/sdi-wasm/pkg
+        working-directory: bindings/sdivi-wasm/pkg
         run: |
-          SIZE=$(wc -c < sdi_wasm_bg.wasm)
+          SIZE=$(wc -c < sdivi_wasm_bg.wasm)
           echo "WASM bundle size: ${SIZE} bytes ($(( SIZE / 1024 )) KiB)"
 
       - name: Set up Node.js
@@ -255,12 +255,12 @@ jobs:
 
       - name: Dry-run (pre-release tags only)
         if: contains(github.ref_name, '-rc')
-        working-directory: bindings/sdi-wasm/pkg
+        working-directory: bindings/sdivi-wasm/pkg
         run: npm publish --dry-run --access public
 
       - name: Publish to npm (release tags only)
         if: "!contains(github.ref_name, '-rc')"
-        working-directory: bindings/sdi-wasm/pkg
+        working-directory: bindings/sdivi-wasm/pkg
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}

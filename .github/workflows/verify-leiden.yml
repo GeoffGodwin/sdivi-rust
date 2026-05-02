@@ -4,8 +4,8 @@
 #   - community count within ±10% of leidenalg on all fixture graphs
 #
 # Implementation lives in:
-#   crates/sdi-detection/src/leiden/
-#   crates/sdi-detection/tests/leiden_quality.rs  (gated: verify-leiden feature)
+#   crates/sdivi-detection/src/leiden/
+#   crates/sdivi-detection/tests/leiden_quality.rs  (gated: verify-leiden feature)
 #   tests/fixtures/leiden-graphs/{small,medium,large}/
 #   tools/generate-leiden-fixtures.py
 #
@@ -20,12 +20,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "crates/sdi-detection/**"
+      - "crates/sdivi-detection/**"
       - "tests/fixtures/leiden-graphs/**"
       - "tools/generate-leiden-fixtures.py"
   pull_request:
     paths:
-      - "crates/sdi-detection/**"
+      - "crates/sdivi-detection/**"
       - "tests/fixtures/leiden-graphs/**"
 
 jobs:
@@ -53,4 +53,4 @@ jobs:
         run: python tools/generate-leiden-fixtures.py --leiden
 
       - name: Run Leiden verification tests
-        run: cargo test -p sdi-detection --features verify-leiden -- --nocapture
+        run: cargo test -p sdivi-detection --features verify-leiden -- --nocapture

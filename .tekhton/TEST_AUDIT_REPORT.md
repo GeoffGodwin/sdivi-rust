@@ -3,11 +3,11 @@
 ### Audit Summary
 Tests audited: 2 files, 10 test functions
 
-- `crates/sdi-pipeline/src/commit_extract.rs` — inline `#[cfg(test)] mod tests`: 7 unit tests
+- `crates/sdivi-pipeline/src/commit_extract.rs` — inline `#[cfg(test)] mod tests`: 7 unit tests
   (`utc_passthrough`, `negative_offset_shifts_forward`, `positive_offset_shifts_back`,
   `malformed_returns_none`, `positive_offset_crosses_day_boundary_backward`,
   `negative_offset_crosses_day_boundary_forward`, `commit_date_parse_failed_when_date_unparseable`)
-- `crates/sdi-pipeline/tests/commit_extract_security.rs` — 3 integration tests
+- `crates/sdivi-pipeline/tests/commit_extract_security.rs` — 3 integration tests
   (`resolve_ref_includes_double_dash_separator`, `stderr_truncation_prevents_information_leakage`,
   `extract_commit_tree_succeeds_with_tar_flags`)
 
@@ -18,8 +18,8 @@ The three freshness-sample files (`tests/fixtures/high-entropy/src/lib.rs`,
 are fixture data with no embedded test code; no issues found.
 
 Implementation files cross-referenced:
-- `crates/sdi-pipeline/src/commit_extract.rs` (lines 40-68, 94-151, 155-161)
-- `crates/sdi-core/src/compute/boundaries.rs` (lines 136, 152-169)
+- `crates/sdivi-pipeline/src/commit_extract.rs` (lines 40-68, 94-151, 155-161)
+- `crates/sdivi-core/src/compute/boundaries.rs` (lines 136, 152-169)
 
 Deleted test file confirmed: `tests/historical_commit_lifecycle.rs` — intentional removal per
 audit context; no orphaned imports detected in remaining test files.
@@ -39,11 +39,11 @@ Verdict: **CONCERNS**
   Any assertion failures, compile errors, or wrong behaviors introduced in this cycle are
   currently undetected.
 - Severity: HIGH
-- Action: Run `cargo test -p sdi-pipeline` and record the actual pass/fail totals in
+- Action: Run `cargo test -p sdivi-pipeline` and record the actual pass/fail totals in
   TESTER_REPORT.md before closing this cycle. Fix any failures before merging.
 
 #### SCOPE: NON_BLOCKING_LOG.md records two security fixes absent from the implementation
-- File: `.tekhton/NON_BLOCKING_LOG.md` (resolved item 3); `crates/sdi-pipeline/src/commit_extract.rs:46,119-124`
+- File: `.tekhton/NON_BLOCKING_LOG.md` (resolved item 3); `crates/sdivi-pipeline/src/commit_extract.rs:46,119-124`
 - Issue: The resolved entry states "(1) added `--` separator to `git rev-parse` at line 46"
   and "(2) added `--no-absolute-filenames` flag to `tar` at line 120." Neither fix is present:
   line 46 of `commit_extract.rs` reads `.args(["rev-parse", "--verify", reference])` with no
@@ -60,7 +60,7 @@ Verdict: **CONCERNS**
   remain open. Update CODER_SUMMARY.md to match whichever path is taken.
 
 #### EXERCISE: `resolve_ref_includes_double_dash_separator` may vacuously pass without the fix
-- File: `crates/sdi-pipeline/tests/commit_extract_security.rs:7-31`
+- File: `crates/sdivi-pipeline/tests/commit_extract_security.rs:7-31`
 - Issue: The test asserts that stderr does not contain "unknown option" when `--invalid-ref`
   is passed to `resolve_ref_to_sha`. Git on most distributions treats `--invalid-ref` as a
   revspec rather than a flag even when no `--` separator is present, so git produces output
@@ -76,7 +76,7 @@ Verdict: **CONCERNS**
   present — only that git fails cleanly.
 
 #### EXERCISE: `extract_commit_tree_succeeds_with_tar_flags` does not verify the security flag
-- File: `crates/sdi-pipeline/tests/commit_extract_security.rs:109-152`
+- File: `crates/sdivi-pipeline/tests/commit_extract_security.rs:109-152`
 - Issue: The test verifies that `extract_commit_tree` succeeds and `test.txt` is present in
   the output directory. It does not verify that `--no-absolute-filenames` was passed to tar.
   A comment in the test body explicitly acknowledges this gap ("A comprehensive security test
@@ -90,7 +90,7 @@ Verdict: **CONCERNS**
   in the NON_BLOCKING_LOG.md rather than claiming it as fixed.
 
 #### NAMING: `commit_date_parse_failed_when_date_unparseable` does not test `commit_date_iso`
-- File: `crates/sdi-pipeline/src/commit_extract.rs:237-245`
+- File: `crates/sdivi-pipeline/src/commit_extract.rs:237-245`
 - Issue: The test name implies it verifies that `commit_date_iso` returns a
   `CommitDateParseFailed` error when git returns an unparseable date string. The body
   only calls the private `normalize_to_utc` helper and asserts it returns `None`. The

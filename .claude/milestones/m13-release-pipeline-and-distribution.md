@@ -14,18 +14,18 @@ status: "done"
 - `cargo audit` weekly cron in `.github/workflows/audit.yml`
 - Binary size and `.wasm` bundle size tracked in `CHANGELOG.md` per release
 - crates.io publish (in dependency order):
-  1. `sdi-config`
-  2. six `sdi-lang-*`
-  3. `sdi-parsing`
-  4. `sdi-graph`
-  5. `sdi-detection`
-  6. `sdi-patterns`
-  7. `sdi-snapshot`
-  8. `sdi-core` (depends on 4–7 with `default-features = false`)
-  9. `sdi-pipeline` (new in M08; depends on 3–8)
-  10. `sdi-cli` (depends on 9 + `sdi-core` for shared types)
-  11. `sdi-rust` (install-discovery meta-crate)
-- npm publish: `@geoffgodwin/sdi-wasm@0.1.0` on the same tag, behind the same manual approval
+  1. `sdivi-config`
+  2. six `sdivi-lang-*`
+  3. `sdivi-parsing`
+  4. `sdivi-graph`
+  5. `sdivi-detection`
+  6. `sdivi-patterns`
+  7. `sdivi-snapshot`
+  8. `sdivi-core` (depends on 4–7 with `default-features = false`)
+  9. `sdivi-pipeline` (new in M08; depends on 3–8)
+  10. `sdivi-cli` (depends on 9 + `sdivi-core` for shared types)
+  11. `sdivi-rust` (install-discovery meta-crate)
+- npm publish: `@geoffgodwin/sdivi-wasm@0.1.0` on the same tag, behind the same manual approval
 - PyO3/napi-rs bindings remain post-MVP / v1 era (see deferred `m12-bindings-pyo3-and-napi-rs-post-mvp.md`)
 
 **Files to create or modify:**
@@ -33,12 +33,12 @@ status: "done"
 - `CHANGELOG.md` (0.1.0 entry)
 - `Cargo.toml` (workspace version bump to `0.1.0`)
 - Each crate's `Cargo.toml` populated with `description`, `repository`, `license = "Apache-2.0"`, `readme`, `keywords`, `categories`
-- `bindings/sdi-wasm/package.json` version pinned to `0.1.0`
+- `bindings/sdivi-wasm/package.json` version pinned to `0.1.0`
 
 **Acceptance criteria:**
 - Tagging `v0.1.0` triggers the release workflow; crates.io and npm pushes wait on manual approval
-- After approval, `cargo install sdi-rust` from crates.io succeeds and produces a working `sdi` binary on PATH (binary name comes from `[[bin]] name = "sdi"` in `sdi-cli`)
-- After approval, `npm install @geoffgodwin/sdi-wasm` works and the consumer app can `import init, { ... }` successfully against a non-local registry
+- After approval, `cargo install sdivi-rust` from crates.io succeeds and produces a working `sdivi` binary on PATH (binary name comes from `[[bin]] name = "sdivi"` in `sdivi-cli`)
+- After approval, `npm install @geoffgodwin/sdivi-wasm` works and the consumer app can `import init, { ... }` successfully against a non-local registry
 - GitHub Release page has binaries for all five Tier-1 + Tier-2 platforms
 - Binary size and `.wasm` bundle size noted in CHANGELOG
 - `cargo audit` cron green
@@ -46,8 +46,8 @@ status: "done"
 
 **Tests:**
 - Dry-run the release workflow on a `v0.1.0-rc.N` pre-tag
-- Smoke test: `cargo install --version 0.1.0 sdi-rust` on each platform; `sdi --version` reports `0.1.0`
-- Smoke test: `npm install @geoffgodwin/sdi-wasm@0.1.0-rc.N` from a clean Node project; `await init()` and call one export
+- Smoke test: `cargo install --version 0.1.0 sdivi-rust` on each platform; `sdivi --version` reports `0.1.0`
+- Smoke test: `npm install @geoffgodwin/sdivi-wasm@0.1.0-rc.N` from a clean Node project; `await init()` and call one export
 - `cargo audit` clean
 
 **Watch For:**
@@ -58,12 +58,12 @@ status: "done"
 - Strip + LTO bloat fix: `[profile.release] lto = "thin"`, `strip = true`, `panic = "abort"` (the last only if no test code unwinds)
 - WASM profile is separate: `[profile.release-wasm] inherits = "release", lto = "fat", opt-level = "s"`
 - npm scope `@geoffgodwin/` must be claimed and the publish token configured in GitHub Actions secrets before this milestone runs
-- Publish ordering: `sdi-core` before `sdi-pipeline` (the new dep order); `sdi-wasm` last (depends only on `sdi-core` but published to npm, not crates.io, so it doesn't block other crates)
+- Publish ordering: `sdivi-core` before `sdivi-pipeline` (the new dep order); `sdivi-wasm` last (depends only on `sdivi-core` but published to npm, not crates.io, so it doesn't block other crates)
 
 **Seeds Forward:**
-- `0.1.0` is the SemVer commitment baseline. Adding `pub` items to `sdi-core` is now deliberate; removing them requires a major bump to `1.0.0`.
+- `0.1.0` is the SemVer commitment baseline. Adding `pub` items to `sdivi-core` is now deliberate; removing them requires a major bump to `1.0.0`.
 - The release workflow is reused for every subsequent tag, including npm-only patches if WASM ever needs a fast-track fix
 - Distribution channels (crates.io + GitHub Releases + npm) are the public commitments. Adding PyPI in a v1 era must not regress these.
-- The consumer app becomes a real-world post-release validation source — track its issue intake against `sdi-wasm` as the first signal of API churn pressure.
+- The consumer app becomes a real-world post-release validation source — track its issue intake against `sdivi-wasm` as the first signal of API churn pressure.
 
 ---

@@ -1,0 +1,36 @@
+[package]
+name = "sdivi-snapshot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Snapshot assembly, delta, and persistence for sdivi-rust"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "snapshot", "delta", "drift"]
+categories = ["development-tools"]
+
+[features]
+# Gates FS-touching code (write_snapshot, enforce_retention, Snapshot::load).
+# Default ON for sdivi-pipeline; OFF for sdivi-core's WASM-compatible build.
+pipeline-records = ["dep:tempfile"]
+default = ["pipeline-records"]
+
+[dependencies]
+sdivi-config    = { workspace = true }
+sdivi-graph     = { workspace = true }
+sdivi-detection = { workspace = true }
+sdivi-patterns  = { workspace = true }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+blake3        = { workspace = true }
+tempfile      = { workspace = true, optional = true }
+tracing       = { workspace = true }
+
+[dev-dependencies]
+tempfile      = { workspace = true }
+proptest      = { workspace = true }
+sdivi-graph     = { workspace = true }
+sdivi-detection = { workspace = true }
+sdivi-patterns  = { workspace = true }

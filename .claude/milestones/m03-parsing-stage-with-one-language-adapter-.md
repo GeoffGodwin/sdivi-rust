@@ -8,16 +8,16 @@ status: "done"
 **Scope:** Stand up the parsing pipeline end-to-end with a single language: Rust itself (dogfood). File walker, `LanguageAdapter` trait, `FeatureRecord` struct, parallel parsing via `rayon`. Enforce the CST-drop ownership invariant. The other five adapters land in Milestone 4.
 
 **Deliverables:**
-- `LanguageAdapter` trait in `sdi-parsing::adapter` with methods to parse a file and emit a `FeatureRecord`
+- `LanguageAdapter` trait in `sdivi-parsing::adapter` with methods to parse a file and emit a `FeatureRecord`
 - `FeatureRecord` struct: path, imports (Vec<String>), exports, function/class/method signatures, pattern instance handles. `serde::Serialize + Deserialize`
 - `parse_repository(&Config, &Path) -> impl Iterator<Item = FeatureRecord>` doing breadth-first stable-sorted walk
 - `walkdir` + `ignore` + `globset` honoring `.gitignore` and `core.exclude`
 - `rayon` parallel parsing; per-worker grammar instance
-- `sdi-lang-rust` crate implementing `LanguageAdapter` with `tree-sitter-rust` linked at compile time behind feature `lang-rust`
+- `sdivi-lang-rust` crate implementing `LanguageAdapter` with `tree-sitter-rust` linked at compile time behind feature `lang-rust`
 
 **Files to create or modify:**
-- `crates/sdi-parsing/src/{adapter.rs,feature_record.rs,walker.rs,parse.rs}`
-- `crates/sdi-lang-rust/{Cargo.toml,build.rs,src/lib.rs}`
+- `crates/sdivi-parsing/src/{adapter.rs,feature_record.rs,walker.rs,parse.rs}`
+- `crates/sdivi-lang-rust/{Cargo.toml,build.rs,src/lib.rs}`
 - `tests/fixtures/simple-rust/` with 5–10 known files (cargo crate skeleton, lib.rs with declared modules, mod files)
 
 **Acceptance criteria:**
@@ -28,10 +28,10 @@ status: "done"
 - `core.exclude` glob suppresses files; `.gitignore` is honored
 
 **Tests:**
-- `crates/sdi-parsing/tests/walk_ordering.rs`: walk twice, assert identical paths
-- `crates/sdi-parsing/tests/memory_invariant.rs`: parse 100 large files, assert no `Tree` survives across files (use a feature-gated `Drop` counter on a wrapper type around `tree_sitter::Tree`)
+- `crates/sdivi-parsing/tests/walk_ordering.rs`: walk twice, assert identical paths
+- `crates/sdivi-parsing/tests/memory_invariant.rs`: parse 100 large files, assert no `Tree` survives across files (use a feature-gated `Drop` counter on a wrapper type around `tree_sitter::Tree`)
 - `tests/full_pipeline.rs` (top-level): parse fixture, assert `FeatureRecord` count matches a hand-counted constant
-- Property test in `crates/sdi-parsing/tests/proptest.rs`: random file content → parse never panics
+- Property test in `crates/sdivi-parsing/tests/proptest.rs`: random file content → parse never panics
 
 **Watch For:**
 - The parsing API must consume `String` (or `Vec<u8>`) by value and the returned `FeatureRecord` must own no reference into the input — otherwise the CST-drop invariant becomes a lifetime puzzle

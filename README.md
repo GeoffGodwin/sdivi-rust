@@ -1,9 +1,9 @@
-# sdi-rust
+# sdivi-rust
 
 **Structural Divergence Indexer** — a measurement instrument that tracks the
 rate of structural drift in a codebase over time.
 
-SDI captures the structural fingerprint of a repository (dependency graph,
+SDIVI captures the structural fingerprint of a repository (dependency graph,
 community partition, pattern catalog) into deterministic JSON snapshots, and
 reports four divergence metrics between consecutive snapshots:
 
@@ -14,15 +14,15 @@ reports four divergence metrics between consecutive snapshots:
 | **Coupling delta rate** | How fast inter-module coupling changes |
 | **Boundary violation rate** | How often code crosses declared module boundaries |
 
-Threshold breaches are observations, not judgements. SDI never opines on code
-quality — it produces numbers, and a CI gate (`sdi check`) decides what to do
+Threshold breaches are observations, not judgements. SDIVI never opines on code
+quality — it produces numbers, and a CI gate (`sdivi check`) decides what to do
 with them.
 
-sdi-rust ships as a Cargo workspace with a two-layer library shape:
+sdivi-rust ships as a Cargo workspace with a two-layer library shape:
 
-- **`sdi-core`** — pure-compute facade, WASM-compatible, no I/O
-- **`sdi-pipeline`** — FS orchestration (parsing, snapshot writes, retention)
-- **`sdi-cli`** — the `sdi` binary
+- **`sdivi-core`** — pure-compute facade, WASM-compatible, no I/O
+- **`sdivi-pipeline`** — FS orchestration (parsing, snapshot writes, retention)
+- **`sdivi-cli`** — the `sdivi` binary
 
 Languages: **Rust · Python · TypeScript · JavaScript · Go · Java**
 
@@ -36,25 +36,25 @@ Linux / macOS / Windows builds are attached to every GitHub Release.
 
 ```sh
 # Linux x86_64
-curl -Lo sdi https://github.com/geoffgodwin/sdi-rust/releases/latest/download/sdi-linux-x86_64
-chmod +x sdi && mv sdi ~/.local/bin/
-sdi --version
+curl -Lo sdivi https://github.com/geoffgodwin/sdivi-rust/releases/latest/download/sdivi-linux-x86_64
+chmod +x sdivi && mv sdivi ~/.local/bin/
+sdivi --version
 ```
 
 ### From crates.io
 
 ```sh
-cargo install sdi-cli
-sdi --version
+cargo install sdivi-cli
+sdivi --version
 ```
 
 ### npm (WASM bundle)
 
 ```sh
-npm install @geoffgodwin/sdi-wasm
+npm install @geoffgodwin/sdivi-wasm
 ```
 
-The npm package exposes every `sdi-core::compute_*` function plus
+The npm package exposes every `sdivi-core::compute_*` function plus
 `normalize_and_hash` to JS / TS callers, with `tsify`-derived `.d.ts`.
 
 ---
@@ -63,17 +63,17 @@ The npm package exposes every `sdi-core::compute_*` function plus
 
 ```sh
 cd my-repo
-sdi init                  # creates .sdi/ with default config + .gitignore
-sdi snapshot              # writes the first snapshot under .sdi/snapshots/
+sdivi init                  # creates .sdivi/ with default config + .gitignore
+sdivi snapshot              # writes the first snapshot under .sdivi/snapshots/
 # ...edit code, merge a PR...
-sdi snapshot              # captures a new snapshot; first delta becomes meaningful
-sdi check                 # runs the threshold gate (exit 10 on breach)
-sdi trend --last 10       # slope across the last 10 snapshots
-sdi show                  # pretty-prints the latest snapshot
+sdivi snapshot              # captures a new snapshot; first delta becomes meaningful
+sdivi check                 # runs the threshold gate (exit 10 on breach)
+sdivi trend --last 10       # slope across the last 10 snapshots
+sdivi show                  # pretty-prints the latest snapshot
 ```
 
 The intended cadence is **once per merge to your primary branch**, plus ad-hoc
-`sdi check` runs from a CI gate. There is no daemon and no watch mode.
+`sdivi check` runs from a CI gate. There is no daemon and no watch mode.
 
 ---
 
@@ -82,27 +82,27 @@ The intended cadence is **once per merge to your primary branch**, plus ad-hoc
 All commands accept `--repo <path>` (default: current directory). Every command
 that prints structured output also accepts `--format text` (default) or
 `--format json`. JSON output goes to **stdout**; logs and progress go to
-**stderr**, so `sdi show --format json | jq '.'` always works.
+**stderr**, so `sdivi show --format json | jq '.'` always works.
 
 | Command | Purpose |
 |---|---|
-| `sdi init` | Create `.sdi/` with a default `config.toml` and `.gitignore` |
-| `sdi snapshot [--commit SHA] [--format ...]` | Capture and persist a snapshot under `.sdi/snapshots/` |
-| `sdi diff <PREV> <CURR> [--format ...]` | Compare two snapshot files and print a `DivergenceSummary` |
-| `sdi trend [--last N] [--format ...]` | Slope statistics across stored snapshots (oldest → newest) |
-| `sdi check [--no-write] [--format ...]` | Snapshot, compare to prior, exit 10 if any threshold is breached |
-| `sdi show [ID] [--format ...]` | Inspect a stored snapshot (defaults to latest); ID is the filename stem |
-| `sdi catalog [--format ...]` | Build and display the pattern catalog only (no snapshot write) |
-| `sdi boundaries infer [--format ...]` | Propose module groupings from Leiden community history |
-| `sdi boundaries ratify` | Write accepted groupings to `.sdi/boundaries.yaml` |
-| `sdi boundaries show` | Print the current boundary specification |
+| `sdivi init` | Create `.sdivi/` with a default `config.toml` and `.gitignore` |
+| `sdivi snapshot [--commit SHA] [--format ...]` | Capture and persist a snapshot under `.sdivi/snapshots/` |
+| `sdivi diff <PREV> <CURR> [--format ...]` | Compare two snapshot files and print a `DivergenceSummary` |
+| `sdivi trend [--last N] [--format ...]` | Slope statistics across stored snapshots (oldest → newest) |
+| `sdivi check [--no-write] [--format ...]` | Snapshot, compare to prior, exit 10 if any threshold is breached |
+| `sdivi show [ID] [--format ...]` | Inspect a stored snapshot (defaults to latest); ID is the filename stem |
+| `sdivi catalog [--format ...]` | Build and display the pattern catalog only (no snapshot write) |
+| `sdivi boundaries infer [--format ...]` | Propose module groupings from Leiden community history |
+| `sdivi boundaries ratify` | Write accepted groupings to `.sdivi/boundaries.yaml` |
+| `sdivi boundaries show` | Print the current boundary specification |
 
 ### Useful flags
 
-- `sdi snapshot --commit <sha>` — record a snapshot at the given git ref instead
+- `sdivi snapshot --commit <sha>` — record a snapshot at the given git ref instead
   of the working tree (M16). The git checkout is performed in a worktree so
   your working directory is untouched.
-- `sdi check --no-write` — run the threshold gate without persisting a
+- `sdivi check --no-write` — run the threshold gate without persisting a
   snapshot. Useful for ephemeral PR-preview checks.
 - `--format json` — machine-readable output on stdout. Stable across patch
   versions within `snapshot_version: "1.0"`.
@@ -115,7 +115,7 @@ that prints structured output also accepts `--format text` (default) or
 | `1` | Generic runtime error (I/O, parse, internal) |
 | `2` | Configuration error (e.g. threshold override missing `expires`) |
 | `3` | All detected languages lack tree-sitter grammars (no records produced) |
-| `10` | `sdi check` only — at least one threshold breached |
+| `10` | `sdivi check` only — at least one threshold breached |
 
 Adding or repurposing an exit code is a breaking change.
 
@@ -126,13 +126,13 @@ Adding or repurposing an exit code is a breaking change.
 Config loads in this order (later wins):
 
 1. CLI flags
-2. Environment variables (`SDI_LOG_LEVEL`, `SDI_WORKERS`, `SDI_CONFIG_PATH`,
-   `SDI_SNAPSHOT_DIR`, `NO_COLOR`)
-3. Project `.sdi/config.toml`
-4. Global `$XDG_CONFIG_HOME/sdi/config.toml`
+2. Environment variables (`SDIVI_LOG_LEVEL`, `SDIVI_WORKERS`, `SDIVI_CONFIG_PATH`,
+   `SDIVI_SNAPSHOT_DIR`, `NO_COLOR`)
+3. Project `.sdivi/config.toml`
+4. Global `$XDG_CONFIG_HOME/sdivi/config.toml`
 5. Built-in defaults
 
-All keys are optional. A representative `.sdi/config.toml`:
+All keys are optional. A representative `.sdivi/config.toml`:
 
 ```toml
 [core]
@@ -141,11 +141,11 @@ exclude     = ["vendor/**", "node_modules/**", "target/**"]
 random_seed = 42              # all RNG is StdRng seeded from this
 
 [snapshots]
-dir       = ".sdi/snapshots"
+dir       = ".sdivi/snapshots"
 retention = 100               # 0 = unlimited
 
 [boundaries]
-spec_file           = ".sdi/boundaries.yaml"
+spec_file           = ".sdivi/boundaries.yaml"
 leiden_gamma        = 1.0
 stability_threshold = 3
 weighted_edges      = false   # set true to use change-coupling edge weights
@@ -188,26 +188,26 @@ no manual reset. A missing `expires` is a `ConfigError` (exit 2).
 
 ## Boundaries
 
-A `.sdi/boundaries.yaml` file declares your intended module structure:
+A `.sdivi/boundaries.yaml` file declares your intended module structure:
 
 ```yaml
 boundaries:
   parsing:
-    paths: ["crates/sdi-parsing/**"]
-    allowed_imports: ["sdi-config", "tree-sitter"]
+    paths: ["crates/sdivi-parsing/**"]
+    allowed_imports: ["sdivi-config", "tree-sitter"]
   detection:
-    paths: ["crates/sdi-detection/**"]
-    allowed_imports: ["sdi-graph", "petgraph"]
+    paths: ["crates/sdivi-detection/**"]
+    allowed_imports: ["sdivi-graph", "petgraph"]
 ```
 
 A missing `boundaries.yaml` is **normal operation**: every metric except
 `boundary_violation_rate` is still computed; intent divergence is simply absent
 from the snapshot.
 
-**Workflow.** Run `sdi boundaries infer` after a few snapshots have been
+**Workflow.** Run `sdivi boundaries infer` after a few snapshots have been
 captured — it proposes groupings derived from the Leiden community history
 (stable across `stability_threshold` consecutive snapshots). Then
-`sdi boundaries ratify` writes them. *Comments in `boundaries.yaml` are lost
+`sdivi boundaries ratify` writes them. *Comments in `boundaries.yaml` are lost
 when ratify rewrites the file* (KDD-6).
 
 ---
@@ -215,11 +215,11 @@ when ratify rewrites the file* (KDD-6).
 ## CI integration
 
 ```yaml
-# .github/workflows/sdi.yml
+# .github/workflows/sdivi.yml
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }       # change-coupling needs git history
-- run: cargo install sdi-cli
-- run: sdi check                 # exits 0 if healthy, 10 if thresholds exceeded
+- run: cargo install sdivi-cli
+- run: sdivi check                 # exits 0 if healthy, 10 if thresholds exceeded
 ```
 
 See [`docs/cli-integration.md`](docs/cli-integration.md) for the full recipe
@@ -229,22 +229,22 @@ See [`docs/cli-integration.md`](docs/cli-integration.md) for the full recipe
 
 ## Embedding
 
-### Rust — full pipeline (`sdi-pipeline`)
+### Rust — full pipeline (`sdivi-pipeline`)
 
-For Rust callers that want SDI to walk the filesystem, parse with tree-sitter,
+For Rust callers that want SDIVI to walk the filesystem, parse with tree-sitter,
 and write snapshots:
 
 ```toml
 [dependencies]
-sdi-config   = "0.1"
-sdi-pipeline = "0.1"
-sdi-lang-rust = "0.1"   # plus any other languages you want
+sdivi-config   = "0.1"
+sdivi-pipeline = "0.1"
+sdivi-lang-rust = "0.1"   # plus any other languages you want
 ```
 
 ```rust
-use sdi_config::Config;
-use sdi_lang_rust::RustAdapter;
-use sdi_pipeline::{Pipeline, current_timestamp};
+use sdivi_config::Config;
+use sdivi_lang_rust::RustAdapter;
+use sdivi_pipeline::{Pipeline, current_timestamp};
 
 let config   = Config::default();
 let pipeline = Pipeline::new(config, vec![Box::new(RustAdapter)]);
@@ -262,21 +262,21 @@ println!(
 `Pipeline::snapshot_with_mode(repo, commit, ts, WriteMode::EphemeralForCheck)`
 runs the pipeline without persisting a snapshot — useful for PR-preview gates.
 
-### Rust — pure compute (`sdi-core`)
+### Rust — pure compute (`sdivi-core`)
 
 For Rust callers that already have their own extractors (e.g. agent runtimes,
 gardener LLMs, the consumer app):
 
 ```toml
 [dependencies]
-sdi-core = "0.1"
+sdivi-core = "0.1"
 ```
 
-`sdi-core` exposes `compute_*` functions over plain `serde` `*Input` structs:
+`sdivi-core` exposes `compute_*` functions over plain `serde` `*Input` structs:
 
 ```rust
-use sdi_core::input::{DependencyGraphInput, NodeInput, EdgeInput, ThresholdsInput};
-use sdi_core::{
+use sdivi_core::input::{DependencyGraphInput, NodeInput, EdgeInput, ThresholdsInput};
+use sdivi_core::{
     compute_coupling_topology, compute_pattern_metrics, compute_thresholds_check,
     compute_delta, normalize_and_hash, null_summary,
 };
@@ -294,11 +294,11 @@ let check = compute_thresholds_check(&null_summary(), &ThresholdsInput::default(
 assert!(!check.breached);
 ```
 
-`sdi-core` has **no I/O, no clock, no tree-sitter, no `std::fs`** — every
+`sdivi-core` has **no I/O, no clock, no tree-sitter, no `std::fs`** — every
 function that conceptually needs the wall clock takes a `chrono::NaiveDate` as
 input (e.g. `compute_thresholds_check` for override-expiry resolution).
 
-### WASM / JS / TS (`@geoffgodwin/sdi-wasm`)
+### WASM / JS / TS (`@geoffgodwin/sdivi-wasm`)
 
 ```ts
 import init, {
@@ -306,7 +306,7 @@ import init, {
   compute_pattern_metrics,
   compute_thresholds_check,
   normalize_and_hash,
-} from "@geoffgodwin/sdi-wasm";
+} from "@geoffgodwin/sdivi-wasm";
 
 await init();
 
@@ -316,19 +316,19 @@ const check    = compute_thresholds_check(summary, thresholds);
 ```
 
 Every input/output type has a `.d.ts` definition derived from `tsify`. The
-WASM build pulls only `sdi-core`'s pure-compute path — no `walkdir`, `ignore`,
+WASM build pulls only `sdivi-core`'s pure-compute path — no `walkdir`, `ignore`,
 `rayon`, or `tree-sitter` in the bundle.
 
 ### Public surface
 
 | Crate | Use it for | Stability |
 |---|---|---|
-| `sdi-core` | Pure-compute API; WASM target; foreign extractors | Stable, `#![deny(missing_docs)]` |
-| `sdi-pipeline` | Full FS pipeline from Rust | Stable |
-| `sdi-cli` | The `sdi` binary | Stable CLI surface; not intended as a library |
-| `sdi-config` | `Config` loader and types | Stable |
-| `sdi-lang-{rust,python,typescript,javascript,go,java}` | Language adapters | Stable |
-| `sdi-graph`, `sdi-detection`, `sdi-patterns`, `sdi-snapshot`, `sdi-parsing` | Inner crates; depend on these only if you need a single stage | Stable, but most embedders should use `sdi-core` or `sdi-pipeline` instead |
+| `sdivi-core` | Pure-compute API; WASM target; foreign extractors | Stable, `#![deny(missing_docs)]` |
+| `sdivi-pipeline` | Full FS pipeline from Rust | Stable |
+| `sdivi-cli` | The `sdivi` binary | Stable CLI surface; not intended as a library |
+| `sdivi-config` | `Config` loader and types | Stable |
+| `sdivi-lang-{rust,python,typescript,javascript,go,java}` | Language adapters | Stable |
+| `sdivi-graph`, `sdivi-detection`, `sdivi-patterns`, `sdivi-snapshot`, `sdivi-parsing` | Inner crates; depend on these only if you need a single stage | Stable, but most embedders should use `sdivi-core` or `sdivi-pipeline` instead |
 
 Adding a `pub` item is deliberate; removing or renaming one is a breaking
 change. SemVer commitment begins at `0.1.0`.
@@ -338,7 +338,7 @@ change. SemVer commitment begins at `0.1.0`.
 ## Snapshot schema
 
 Snapshots are JSON, tagged with `"snapshot_version": "1.0"`, written atomically
-(tempfile + rename) under `.sdi/snapshots/`. Top-level fields:
+(tempfile + rename) under `.sdivi/snapshots/`. Top-level fields:
 
 ```jsonc
 {
@@ -369,8 +369,8 @@ warning and baseline treatment (no delta) — never a crash.
   No `thread_rng`, no `SystemTime`-derived seeds.
 - `BTreeMap` everywhere output ordering matters.
 - Pattern fingerprints use `blake3` with a fixed key constant
-  (`sdi_core::PATTERN_FINGERPRINT_KEY`); `normalize_and_hash` is the canonical
-  entry point and produces the same digest in WASM as in native sdi-core for
+  (`sdivi_core::PATTERN_FINGERPRINT_KEY`); `normalize_and_hash` is the canonical
+  entry point and produces the same digest in WASM as in native sdivi-core for
   the same `NormalizeNode` input.
 - First-snapshot deltas are `null` per dimension (not `0`). `0` means
   "compared and unchanged."
@@ -403,15 +403,15 @@ cargo run --example embed_compute     # pure-compute path with parity check
 cargo run --example custom_config     # programmatic Config building
 ```
 
-Source: [`crates/sdi-cli/examples/`](crates/sdi-cli/examples/).
+Source: [`crates/sdivi-cli/examples/`](crates/sdivi-cli/examples/).
 
 ---
 
 ## Contributing
 
 ```sh
-git clone https://github.com/geoffgodwin/sdi-rust
-cd sdi-rust
+git clone https://github.com/geoffgodwin/sdivi-rust
+cd sdivi-rust
 cargo test --workspace          # full test suite
 cargo clippy -- -D warnings     # CI-equivalent lint pass
 cargo fmt --check

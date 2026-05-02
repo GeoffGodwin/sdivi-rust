@@ -1,0 +1,30 @@
+[package]
+name = "sdivi-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Dependency graph construction for sdivi-rust"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "graph", "dependency", "coupling"]
+categories = ["development-tools", "algorithms", "data-structures"]
+
+[features]
+# Enables the sdivi-parsing dep and build_dependency_graph(records) path.
+# Default ON for sdivi-pipeline; OFF for sdivi-core's WASM-compatible build.
+pipeline-records = ["dep:sdivi-parsing"]
+default = ["pipeline-records"]
+
+[dependencies]
+sdivi-config  = { workspace = true }
+sdivi-parsing = { workspace = true, optional = true }
+thiserror   = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+petgraph    = { workspace = true }
+tracing     = { workspace = true }
+
+[dev-dependencies]
+sdivi-lang-rust = { path = "../sdivi-lang-rust" }
+tempfile      = { workspace = true }

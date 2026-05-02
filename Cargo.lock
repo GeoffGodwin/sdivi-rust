@@ -920,7 +920,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-cli"
+name = "sdivi-cli"
 version = "0.1.5"
 dependencies = [
  "anyhow",
@@ -928,17 +928,17 @@ dependencies = [
  "chrono",
  "clap",
  "predicates",
- "sdi-config",
- "sdi-core",
- "sdi-lang-go",
- "sdi-lang-java",
- "sdi-lang-javascript",
- "sdi-lang-python",
- "sdi-lang-rust",
- "sdi-lang-typescript",
- "sdi-parsing",
- "sdi-patterns",
- "sdi-pipeline",
+ "sdivi-config",
+ "sdivi-core",
+ "sdivi-lang-go",
+ "sdivi-lang-java",
+ "sdivi-lang-javascript",
+ "sdivi-lang-python",
+ "sdivi-lang-rust",
+ "sdivi-lang-typescript",
+ "sdivi-parsing",
+ "sdivi-patterns",
+ "sdivi-pipeline",
  "serde_json",
  "serde_yml",
  "tempfile",
@@ -948,7 +948,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-config"
+name = "sdivi-config"
 version = "0.1.5"
 dependencies = [
  "chrono",
@@ -962,16 +962,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-core"
+name = "sdivi-core"
 version = "0.1.5"
 dependencies = [
  "chrono",
  "proptest",
- "sdi-config",
- "sdi-detection",
- "sdi-graph",
- "sdi-patterns",
- "sdi-snapshot",
+ "sdivi-config",
+ "sdivi-detection",
+ "sdivi-graph",
+ "sdivi-patterns",
+ "sdivi-snapshot",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -979,15 +979,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-detection"
+name = "sdivi-detection"
 version = "0.1.5"
 dependencies = [
  "proptest",
  "rand",
- "sdi-config",
- "sdi-graph",
- "sdi-parsing",
- "sdi-pipeline",
+ "sdivi-config",
+ "sdivi-graph",
+ "sdivi-parsing",
+ "sdivi-pipeline",
  "serde",
  "serde_json",
  "tempfile",
@@ -996,13 +996,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-graph"
+name = "sdivi-graph"
 version = "0.1.5"
 dependencies = [
  "petgraph",
- "sdi-config",
- "sdi-lang-rust",
- "sdi-parsing",
+ "sdivi-config",
+ "sdivi-lang-rust",
+ "sdivi-parsing",
  "serde",
  "serde_json",
  "tempfile",
@@ -1011,63 +1011,63 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-lang-go"
+name = "sdivi-lang-go"
 version = "0.1.5"
 dependencies = [
- "sdi-parsing",
+ "sdivi-parsing",
  "tree-sitter",
  "tree-sitter-go",
 ]
 
 [[package]]
-name = "sdi-lang-java"
+name = "sdivi-lang-java"
 version = "0.1.5"
 dependencies = [
- "sdi-parsing",
+ "sdivi-parsing",
  "tree-sitter",
  "tree-sitter-java",
 ]
 
 [[package]]
-name = "sdi-lang-javascript"
+name = "sdivi-lang-javascript"
 version = "0.1.5"
 dependencies = [
- "sdi-parsing",
+ "sdivi-parsing",
  "tree-sitter",
  "tree-sitter-javascript",
 ]
 
 [[package]]
-name = "sdi-lang-python"
+name = "sdivi-lang-python"
 version = "0.1.5"
 dependencies = [
- "sdi-parsing",
+ "sdivi-parsing",
  "tree-sitter",
  "tree-sitter-python",
 ]
 
 [[package]]
-name = "sdi-lang-rust"
+name = "sdivi-lang-rust"
 version = "0.1.5"
 dependencies = [
- "sdi-config",
- "sdi-parsing",
+ "sdivi-config",
+ "sdivi-parsing",
  "tempfile",
  "tree-sitter",
  "tree-sitter-rust",
 ]
 
 [[package]]
-name = "sdi-lang-typescript"
+name = "sdivi-lang-typescript"
 version = "0.1.5"
 dependencies = [
- "sdi-parsing",
+ "sdivi-parsing",
  "tree-sitter",
  "tree-sitter-typescript",
 ]
 
 [[package]]
-name = "sdi-parsing"
+name = "sdivi-parsing"
 version = "0.1.5"
 dependencies = [
  "globset",
@@ -1075,8 +1075,8 @@ dependencies = [
  "proptest",
  "rayon",
  "rayon-core",
- "sdi-config",
- "sdi-lang-rust",
+ "sdivi-config",
+ "sdivi-lang-rust",
  "serde",
  "serde_json",
  "tempfile",
@@ -1085,34 +1085,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-patterns"
+name = "sdivi-patterns"
 version = "0.1.5"
 dependencies = [
  "blake3",
  "globset",
  "proptest",
- "sdi-config",
- "sdi-lang-rust",
- "sdi-parsing",
+ "sdivi-config",
+ "sdivi-lang-rust",
+ "sdivi-parsing",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "sdi-pipeline"
+name = "sdivi-pipeline"
 version = "0.1.5"
 dependencies = [
  "chrono",
  "proptest",
- "sdi-config",
- "sdi-core",
- "sdi-detection",
- "sdi-graph",
- "sdi-lang-rust",
- "sdi-parsing",
- "sdi-patterns",
- "sdi-snapshot",
+ "sdivi-config",
+ "sdivi-core",
+ "sdivi-detection",
+ "sdivi-graph",
+ "sdivi-lang-rust",
+ "sdivi-parsing",
+ "sdivi-patterns",
+ "sdivi-snapshot",
  "serde",
  "serde_json",
  "tempfile",
@@ -1121,23 +1121,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-rust"
+name = "sdivi-rust"
 version = "0.1.5"
 dependencies = [
- "sdi-cli",
- "sdi-core",
+ "sdivi-cli",
+ "sdivi-core",
 ]
 
 [[package]]
-name = "sdi-snapshot"
+name = "sdivi-snapshot"
 version = "0.1.5"
 dependencies = [
  "blake3",
  "proptest",
- "sdi-config",
- "sdi-detection",
- "sdi-graph",
- "sdi-patterns",
+ "sdivi-config",
+ "sdivi-detection",
+ "sdivi-graph",
+ "sdivi-patterns",
  "serde",
  "serde_json",
  "tempfile",
@@ -1146,12 +1146,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdi-wasm"
+name = "sdivi-wasm"
 version = "0.1.5"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
- "sdi-core",
+ "sdivi-core",
  "serde",
  "serde-wasm-bindgen 0.6.5",
  "serde_json",

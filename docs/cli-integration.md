@@ -1,6 +1,6 @@
 # CLI Integration Guide
 
-This guide covers CI integration for `sdi check`, the full exit-code reference,
+This guide covers CI integration for `sdivi check`, the full exit-code reference,
 and tips for interpreting threshold output.
 
 ## GitHub Actions Snippet
@@ -14,21 +14,21 @@ on:
   pull_request:
 
 jobs:
-  sdi-check:
+  sdivi-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # full history for coupling analysis
 
-      - name: Install sdi
-        run: cargo install sdi-cli
+      - name: Install sdivi
+        run: cargo install sdivi-cli
 
       - name: Capture snapshot
-        run: sdi snapshot --commit "$GITHUB_SHA"
+        run: sdivi snapshot --commit "$GITHUB_SHA"
 
       - name: Run threshold gate
-        run: sdi check
+        run: sdivi check
         # Exits 0 on success, 10 if any threshold is exceeded.
         # The check also writes a new snapshot for trend tracking.
 ```
@@ -37,40 +37,40 @@ jobs:
 
 ```yaml
       - name: Check (JSON output)
-        id: sdi
-        run: sdi check --format json | tee sdi-check.json
+        id: sdivi
+        run: sdivi check --format json | tee sdivi-check.json
         continue-on-error: true
 
       - name: Upload check result
         uses: actions/upload-artifact@v4
         with:
-          name: sdi-check
-          path: sdi-check.json
+          name: sdivi-check
+          path: sdivi-check.json
 ```
 
 ### Check without writing a snapshot
 
 ```yaml
       - name: Dry-run check
-        run: sdi check --no-write
+        run: sdivi check --no-write
 ```
 
 ## Exit Code Reference
 
 | Code | Meaning |
 |---|---|
-| `0` | Success — all commands except `sdi check` always exit 0 on success |
+| `0` | Success — all commands except `sdivi check` always exit 0 on success |
 | `1` | Runtime error — I/O failure, unreadable snapshot, or unexpected error |
 | `2` | Configuration error — malformed TOML, missing required field (`expires`) |
 | `3` | Analysis error — all detected languages lack tree-sitter grammars |
-| `10` | Threshold exceeded — **`sdi check` only**; at least one dimension exceeds its limit |
+| `10` | Threshold exceeded — **`sdivi check` only**; at least one dimension exceeds its limit |
 
-Exit code `10` is exclusive to `sdi check`. Adding or repurposing any exit code
+Exit code `10` is exclusive to `sdivi check`. Adding or repurposing any exit code
 is a breaking change requiring a major version bump.
 
 ## Threshold Configuration
 
-Thresholds are declared in `.sdi/config.toml`:
+Thresholds are declared in `.sdivi/config.toml`:
 
 ```toml
 [thresholds]
@@ -96,16 +96,16 @@ expiry the override is silently ignored and defaults resume — no manual reset.
 
 | Command | Description |
 |---|---|
-| `sdi init` | Initialise `.sdi/` and write a default `config.toml` |
-| `sdi snapshot` | Capture a structural snapshot of the current repo state |
-| `sdi check` | Snapshot + threshold gate; exit 10 if any dimension is exceeded |
-| `sdi show [<id>]` | Inspect a stored snapshot (latest by default) |
-| `sdi diff <prev> <curr>` | Compare two snapshot files |
-| `sdi trend [--last N]` | Show trend statistics across stored snapshots |
-| `sdi catalog` | Display the pattern catalog for the current repo state |
-| `sdi boundaries infer` | Propose community-based module boundaries |
-| `sdi boundaries ratify` | Write inferred boundaries to `.sdi/boundaries.yaml` |
-| `sdi boundaries show` | Display currently declared boundaries |
+| `sdivi init` | Initialise `.sdivi/` and write a default `config.toml` |
+| `sdivi snapshot` | Capture a structural snapshot of the current repo state |
+| `sdivi check` | Snapshot + threshold gate; exit 10 if any dimension is exceeded |
+| `sdivi show [<id>]` | Inspect a stored snapshot (latest by default) |
+| `sdivi diff <prev> <curr>` | Compare two snapshot files |
+| `sdivi trend [--last N]` | Show trend statistics across stored snapshots |
+| `sdivi catalog` | Display the pattern catalog for the current repo state |
+| `sdivi boundaries infer` | Propose community-based module boundaries |
+| `sdivi boundaries ratify` | Write inferred boundaries to `.sdivi/boundaries.yaml` |
+| `sdivi boundaries show` | Display currently declared boundaries |
 
 ### Flags available on most commands
 
@@ -115,19 +115,19 @@ expiry the override is silently ignored and defaults resume — no manual reset.
 | `--format json\|text` | Output format (default: `text`) |
 | `--no-color` | Disable ANSI color output (also `NO_COLOR=1`) |
 
-### `sdi snapshot` flags
+### `sdivi snapshot` flags
 
 | Flag | Description |
 |---|---|
 | `--commit <ref>` | Analyze the tree at `<ref>` (branch, tag, or SHA); labels the snapshot with the resolved SHA and the commit's commit-date |
 
-### `sdi check` flags
+### `sdivi check` flags
 
 | Flag | Description |
 |---|---|
 | `--no-write` | Compute threshold check without writing a snapshot |
 
-### `sdi trend` flags
+### `sdivi trend` flags
 
 | Flag | Description |
 |---|---|
@@ -137,15 +137,15 @@ expiry the override is silently ignored and defaults resume — no manual reset.
 
 | Variable | Effect |
 |---|---|
-| `SDI_LOG_LEVEL=debug` | Enable structured tracing output to stderr |
-| `SDI_WORKERS=N` | Parallel parsing worker count |
-| `SDI_SNAPSHOT_DIR=<path>` | Override snapshot directory |
-| `SDI_CONFIG_PATH=<path>` | Override config file path |
+| `SDIVI_LOG_LEVEL=debug` | Enable structured tracing output to stderr |
+| `SDIVI_WORKERS=N` | Parallel parsing worker count |
+| `SDIVI_SNAPSHOT_DIR=<path>` | Override snapshot directory |
+| `SDIVI_CONFIG_PATH=<path>` | Override config file path |
 | `NO_COLOR=1` | Disable ANSI output (same as `--no-color`) |
 
 ## Interpreting Threshold Output
 
-`sdi check --format json` returns a JSON object:
+`sdivi check --format json` returns a JSON object:
 
 ```json
 {
@@ -167,7 +167,7 @@ All thresholds use **rate** semantics (delta per snapshot interval). A value of
 
 ## Snapshot Retention
 
-By default sdi retains the last 100 snapshots. Override in config:
+By default sdivi retains the last 100 snapshots. Override in config:
 
 ```toml
 [snapshots]
@@ -179,13 +179,13 @@ failed write never removes an existing snapshot.
 
 ## Analyzing a historical commit
 
-`sdi snapshot --commit REF` analyzes the **actual source tree** at `REF`, not
+`sdivi snapshot --commit REF` analyzes the **actual source tree** at `REF`, not
 the working directory.
 
 ```bash
-sdi snapshot --commit v1.2.0          # analyze a release tag
-sdi snapshot --commit HEAD~10         # analyze 10 commits ago
-sdi snapshot --commit abc123def456    # analyze a specific SHA
+sdivi snapshot --commit v1.2.0          # analyze a release tag
+sdivi snapshot --commit HEAD~10         # analyze 10 commits ago
+sdivi snapshot --commit abc123def456    # analyze a specific SHA
 ```
 
 What happens internally:
@@ -202,10 +202,10 @@ What happens internally:
    historical and current snapshots.
 6. Change-coupling history is collected ending at the resolved SHA, so the
    coupling section reflects commits up to that point in history.
-7. The Leiden partition cache (`.sdi/cache/partition.json`) and the snapshot
-   output directory (`.sdi/snapshots/`) are located relative to the **original
+7. The Leiden partition cache (`.sdivi/cache/partition.json`) and the snapshot
+   output directory (`.sdivi/snapshots/`) are located relative to the **original
    `repo_root`**, not the temporary extraction directory.
-8. The temporary directory is removed before `sdi snapshot` returns.
+8. The temporary directory is removed before `sdivi snapshot` returns.
 
 ### Caveats
 
@@ -226,16 +226,16 @@ To produce snapshots for a range of commits, script the CLI:
 
 ```bash
 for sha in $(git rev-list v1.0.0..v2.0.0 --reverse); do
-  sdi snapshot --commit "$sha"
+  sdivi snapshot --commit "$sha"
 done
-sdi trend
+sdivi trend
 ```
 
-Batch backfill (`sdi backfill`) is not provided in v0.
+Batch backfill (`sdivi backfill`) is not provided in v0.
 
 ## Change-coupling and weighted community detection
 
-Set `boundaries.weighted_edges = true` in `.sdi/config.toml` to have the
+Set `boundaries.weighted_edges = true` in `.sdivi/config.toml` to have the
 Leiden community detection step use change-coupling frequencies as edge
 weights. Edges between files that frequently co-change are weighted by
 `1.0 + frequency`, pulling highly-coupled files into the same community.

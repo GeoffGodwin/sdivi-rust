@@ -18,10 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.3] - 2026-05-01
 
 ### Added
-- `crates/sdi-pipeline/src/commit_extract.rs` (NEW) — ref resolution, UTC date normalization, tree extraction via git archive | tar (M16)
+- `crates/sdivi-pipeline/src/commit_extract.rs` (NEW) — ref resolution, UTC date normalization, tree extraction via git archive | tar (M16)
 
 ### Changed
-- **M16 — `sdi snapshot --commit REF` now analyzes the actual tree at REF.**
+- **M16 — `sdivi snapshot --commit REF` now analyzes the actual tree at REF.**
   Previously the flag only populated the snapshot's `commit` label while still
   parsing the working directory, silently producing snapshots with mismatched
   content. Now the pipeline resolves `REF` to a full 40-char SHA, extracts the
@@ -32,14 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall-clock invocation time. Change-coupling history is collected ending at
   the resolved SHA (not HEAD). Pre-v0 callers relying on the prior label-only
   behavior must adjust.
-- **`CommitExtractError`** added to `sdi_pipeline::PipelineError` as
+- **`CommitExtractError`** added to `sdivi_pipeline::PipelineError` as
   `PipelineError::CommitExtract`. Propagates structured git diagnostic output
   (`stderr`) to callers. `--commit nonexistent-ref` exits with code 1.
 
 ## [0.1.2] - 2026-05-01
 
 ### Added
-- **M15 — Change-coupling analyzer**: New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdi_core::compute_change_coupling` exported through WASM. Schema stays `"1.0"`.
+- **M15 — Change-coupling analyzer**: New snapshot field `change_coupling`. New `boundaries.weighted_edges = true` mode multiplies import-edge weights by `(1.0 + frequency)`. New pure-compute entry point `sdivi_core::compute_change_coupling` exported through WASM. Schema stays `"1.0"`.
 
 ## [0.1.1] - 2026-05-01
 
@@ -50,30 +50,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **M01 — Workspace scaffold**: Cargo workspace with all 15 member crates, `[workspace.dependencies]`, resolver 2.
-- **M02 — Config loading**: `Config::load_or_default` with 5-level precedence chain; `BoundarySpec` YAML reader; per-category threshold overrides with mandatory `expires`; `sdi init`.
-- **M03 — Parsing stage**: `sdi-parsing` with `walkdir` + `ignore` + `rayon`; `LanguageAdapter` trait; CST-drop ownership invariant; Rust language adapter.
+- **M02 — Config loading**: `Config::load_or_default` with 5-level precedence chain; `BoundarySpec` YAML reader; per-category threshold overrides with mandatory `expires`; `sdivi init`.
+- **M03 — Parsing stage**: `sdivi-parsing` with `walkdir` + `ignore` + `rayon`; `LanguageAdapter` trait; CST-drop ownership invariant; Rust language adapter.
 - **M04 — Language adapters**: Python, TypeScript, JavaScript, Go, Java adapters via tree-sitter grammars.
-- **M05 — Dependency graph + native Leiden**: `sdi-graph` (`petgraph` dependency graph); native Rust Leiden port in `sdi-detection` (CPM + Modularity quality, no FFI); `LeidenPartition` with stability score; `sdi snapshot` baseline.
-- **M06 — Pattern fingerprinting**: `sdi-patterns` with tree-sitter queries, `blake3`-keyed fingerprints, `PatternCatalog` with entropy; `normalize_and_hash` canonical entry point.
-- **M07 — Snapshot assembly, delta, persistence**: `assemble_snapshot`, `compute_delta` (null on first snapshot), atomic write + retention enforcement in `sdi-pipeline::store`.
-- **M08 — `sdi-core` pure-compute reshape**: `sdi-core` reshaped to WASM-compatible pure-compute facade; `sdi-pipeline` extracted as orchestration crate; `compute_*` functions over `*Input` serde structs; `pipeline-records` feature gates on inner crates.
-- **M09 — CLI commands**: `sdi trend`, `sdi check` (exit 10 on threshold breach), `sdi show` (text + JSON); stdout/stderr discipline; exit-code test suite.
-- **M10 — Boundaries**: `sdi boundaries infer`, `sdi boundaries ratify`, `sdi boundaries show`; `infer_boundaries` and `compute_boundary_violations` in `sdi-core`.
+- **M05 — Dependency graph + native Leiden**: `sdivi-graph` (`petgraph` dependency graph); native Rust Leiden port in `sdivi-detection` (CPM + Modularity quality, no FFI); `LeidenPartition` with stability score; `sdivi snapshot` baseline.
+- **M06 — Pattern fingerprinting**: `sdivi-patterns` with tree-sitter queries, `blake3`-keyed fingerprints, `PatternCatalog` with entropy; `normalize_and_hash` canonical entry point.
+- **M07 — Snapshot assembly, delta, persistence**: `assemble_snapshot`, `compute_delta` (null on first snapshot), atomic write + retention enforcement in `sdivi-pipeline::store`.
+- **M08 — `sdivi-core` pure-compute reshape**: `sdivi-core` reshaped to WASM-compatible pure-compute facade; `sdivi-pipeline` extracted as orchestration crate; `compute_*` functions over `*Input` serde structs; `pipeline-records` feature gates on inner crates.
+- **M09 — CLI commands**: `sdivi trend`, `sdivi check` (exit 10 on threshold breach), `sdivi show` (text + JSON); stdout/stderr discipline; exit-code test suite.
+- **M10 — Boundaries**: `sdivi boundaries infer`, `sdivi boundaries ratify`, `sdivi boundaries show`; `infer_boundaries` and `compute_boundary_violations` in `sdivi-core`.
 - **M11 — Documentation, examples, determinism polish**: `docs/` directory (cli-integration, library-embedding, migrating-from-sdi-py, determinism); `examples/` (embed_pipeline.rs, embed_compute.rs, custom_config.rs, binding_node.ts); `normalize_and_hash` cross-platform determinism tests.
-- **M12 — WASM crate + npm package**: `bindings/sdi-wasm` crate with wasm-bindgen + tsify-derived `.d.ts`; all `sdi_core::compute_*` functions exported; `normalize_and_hash` exported for foreign extractors; `@geoffgodwin/sdi-wasm` npm package; WASM CI workflow with cross-platform hash determinism check.
+- **M12 — WASM crate + npm package**: `bindings/sdivi-wasm` crate with wasm-bindgen + tsify-derived `.d.ts`; all `sdivi_core::compute_*` functions exported; `normalize_and_hash` exported for foreign extractors; `@geoffgodwin/sdivi-wasm` npm package; WASM CI workflow with cross-platform hash determinism check.
 - **M13 — Release pipeline**: Tag-driven `.github/workflows/release.yml`; matrix binary builds for Linux x86_64+aarch64, macOS x86_64+aarch64, Windows x86_64; stripped LTO binaries attached to GitHub Release; manual-approval-gated crates.io publish (11 crates in dependency order); manual-approval-gated npm publish; `cargo audit` weekly cron.
 
 ### Changed
-- Workspace version: `0.0.16` → `0.1.0` (SemVer commitment baseline; `pub` items in `sdi-core` are now stable API).
+- Workspace version: `0.0.16` → `0.1.0` (SemVer commitment baseline; `pub` items in `sdivi-core` are now stable API).
 - `[profile.release]` adds `lto = "thin"`, `strip = true`, `panic = "abort"` for smaller native binaries.
 
 ### Binary and bundle sizes (measured at first release build)
-- `sdi-x86_64-unknown-linux-gnu`: ~TBD MiB
-- `sdi-aarch64-unknown-linux-gnu`: ~TBD MiB
-- `sdi-x86_64-apple-darwin`: ~TBD MiB
-- `sdi-aarch64-apple-darwin`: ~TBD MiB
-- `sdi-x86_64-pc-windows-msvc.exe`: ~TBD MiB
-- `sdi_wasm_bg.wasm` (bundler target): ~TBD KiB
+- `sdivi-x86_64-unknown-linux-gnu`: ~TBD MiB
+- `sdivi-aarch64-unknown-linux-gnu`: ~TBD MiB
+- `sdivi-x86_64-apple-darwin`: ~TBD MiB
+- `sdivi-aarch64-apple-darwin`: ~TBD MiB
+- `sdivi-x86_64-pc-windows-msvc.exe`: ~TBD MiB
+- `sdivi_wasm_bg.wasm` (bundler target): ~TBD KiB
 
 [0.1.0] is the SemVer commitment baseline. Pre-release internal milestone
 iteration (M01–M13, 2026-04-28 → 2026-05-01) was not published to crates.io

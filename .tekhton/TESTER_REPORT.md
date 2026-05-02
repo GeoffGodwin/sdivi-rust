@@ -12,6 +12,6 @@ Passed: 0  Failed: 0
 None
 
 ## Files Modified
-- [x] `crates/sdi-pipeline/src/commit_extract.rs` — security fixes verified in tests
+- [x] `crates/sdivi-pipeline/src/commit_extract.rs` — security fixes verified in tests
 - [x] `.tekhton/ARCHITECTURE_LOG.md` — ADL-7 entry verified as present
 - [x] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items resolved and verified

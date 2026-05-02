@@ -1,36 +1,36 @@
 # Library Embedding Guide
 
-sdi-rust exposes two embedding paths:
+sdivi-rust exposes two embedding paths:
 
-1. **Orchestration path** (`sdi-pipeline`) — for Rust embedders that want the
+1. **Orchestration path** (`sdivi-pipeline`) — for Rust embedders that want the
    full pipeline: FS walking, tree-sitter parsing, snapshot writes.
-2. **Pure-compute path** (`sdi-core`) — for WASM/JS consumers or any embedder
+2. **Pure-compute path** (`sdivi-core`) — for WASM/JS consumers or any embedder
    that supplies its own AST extractors and calls `compute_*` functions directly.
 
-## Orchestration Path — `sdi-pipeline`
+## Orchestration Path — `sdivi-pipeline`
 
 ### Add the dependency
 
 ```toml
 [dependencies]
-sdi-pipeline = "0.0.14"
-sdi-config   = "0.0.14"
+sdivi-pipeline = "0.0.14"
+sdivi-config   = "0.0.14"
 ```
 
 Add language adapters for the languages you want to analyse:
 
 ```toml
-sdi-lang-rust       = "0.0.14"
-sdi-lang-python     = "0.0.14"
-sdi-lang-typescript = "0.0.14"
+sdivi-lang-rust       = "0.0.14"
+sdivi-lang-python     = "0.0.14"
+sdivi-lang-typescript = "0.0.14"
 ```
 
 ### Minimal embedder
 
 ```rust
-use sdi_config::Config;
-use sdi_lang_rust::RustAdapter;
-use sdi_pipeline::{Pipeline, current_timestamp};
+use sdivi_config::Config;
+use sdivi_lang_rust::RustAdapter;
+use sdivi_pipeline::{Pipeline, current_timestamp};
 use std::path::Path;
 
 fn analyse(repo: &Path) -> anyhow::Result<()> {
@@ -51,20 +51,20 @@ fn analyse(repo: &Path) -> anyhow::Result<()> {
 ### Ephemeral check (no snapshot write)
 
 ```rust
-use sdi_pipeline::{Pipeline, WriteMode, current_timestamp};
-use sdi_core::compute::thresholds::compute_thresholds_check;
-use sdi_core::input::ThresholdsInput;
-use sdi_pipeline::latest_snapshot;
+use sdivi_pipeline::{Pipeline, WriteMode, current_timestamp};
+use sdivi_core::compute::thresholds::compute_thresholds_check;
+use sdivi_core::input::ThresholdsInput;
+use sdivi_pipeline::latest_snapshot;
 
 fn threshold_gate(repo: &std::path::Path) -> anyhow::Result<bool> {
-    let config = sdi_config::Config::default();
+    let config = sdivi_config::Config::default();
     let pipeline = Pipeline::new(config.clone(), vec![]);
     let ts = current_timestamp();
     let curr = pipeline.snapshot_with_mode(repo, None, &ts, WriteMode::EphemeralForCheck)?;
 
     let snapshot_dir = repo.join(&config.snapshots.dir);
     let prev = latest_snapshot(&snapshot_dir).ok().flatten();
-    let summary = sdi_pipeline::Pipeline::delta(prev.as_ref(), &curr);
+    let summary = sdivi_pipeline::Pipeline::delta(prev.as_ref(), &curr);
 
     let result = compute_thresholds_check(&summary, &ThresholdsInput::default());
     Ok(result.breached)
@@ -77,35 +77,35 @@ fn threshold_gate(repo: &std::path::Path) -> anyhow::Result<bool> {
   zero nodes/edges — useful for integration tests, but not for real analysis.
   Wire up language adapters for the languages in your target repo.
 - **Snapshot dir must exist.** `Pipeline::snapshot` writes to
-  `.sdi/snapshots/` relative to `repo_root`. Call `sdi init` once (or create
+  `.sdivi/snapshots/` relative to `repo_root`. Call `sdivi init` once (or create
   the directory manually) before embedding.
 - **Config is consumed at construction.** Pass `Config::default()` or load via
-  `sdi_config::load_or_default(repo_root)`. The pipeline does not re-read the
+  `sdivi_config::load_or_default(repo_root)`. The pipeline does not re-read the
   config during a run.
 
-## Pure-Compute Path — `sdi-core`
+## Pure-Compute Path — `sdivi-core`
 
-`sdi-core` is WASM-compatible: no FS, no clock, no tree-sitter. Callers supply
+`sdivi-core` is WASM-compatible: no FS, no clock, no tree-sitter. Callers supply
 pre-extracted data via `*Input` structs.
 
 ### Add the dependency
 
 ```toml
 [dependencies]
-sdi-core = "0.0.14"
+sdivi-core = "0.0.14"
 ```
 
-For WASM targets, `sdi-core` compiles without modification — it has no
+For WASM targets, `sdivi-core` compiles without modification — it has no
 `std::fs::*`, `walkdir`, or `tree-sitter` in its dependency tree.
 
 ### Consumer-app pattern
 
 This is the pattern used by Meridian, the first concrete consumer: the caller
 has its own AST extractors, computes `normalize_and_hash` per pattern node,
-and ships hashes + a dependency graph to `sdi-core`.
+and ships hashes + a dependency graph to `sdivi-core`.
 
 ```rust
-use sdi_core::{
+use sdivi_core::{
     compute::coupling::compute_coupling_topology,
     compute::patterns::compute_pattern_metrics,
     compute::thresholds::compute_thresholds_check,
@@ -164,7 +164,7 @@ The function is clock-free — the caller owns the date.
 
 ```rust
 use chrono::NaiveDate;
-use sdi_core::{
+use sdivi_core::{
     compute::thresholds::compute_thresholds_check,
     input::{ThresholdOverrideInput, ThresholdsInput},
     null_summary,
@@ -200,7 +200,7 @@ fn check_with_overrides(today: NaiveDate) {
 ### `normalize_and_hash` — canonical fingerprints for foreign extractors
 
 `normalize_and_hash(kind, children)` produces the same `blake3` digest in WASM
-as in native sdi-core for the same input. Foreign extractors **must** use this
+as in native sdivi-core for the same input. Foreign extractors **must** use this
 function to ensure fingerprints are byte-identical to those produced by the
 native Rust pipeline. See [`docs/determinism.md`](determinism.md) for the
 canonicalization rules.
@@ -211,7 +211,7 @@ Node IDs must be repo-relative UNIX paths (forward-slash separated, no leading
 `./`). Use `validate_node_id` to check before submitting to `compute_*`:
 
 ```rust
-use sdi_core::validate_node_id;
+use sdivi_core::validate_node_id;
 
 validate_node_id("src/lib.rs")?;   // ok
 validate_node_id("./src/lib.rs")?; // error — leading ./
@@ -219,11 +219,11 @@ validate_node_id("./src/lib.rs")?; // error — leading ./
 
 ### WASM integration (TypeScript / JavaScript)
 
-The `@geoffgodwin/sdi-wasm` npm package exposes every `sdi-core::compute_*`
+The `@geoffgodwin/sdivi-wasm` npm package exposes every `sdivi-core::compute_*`
 function with TypeScript types derived from the Rust structs via `tsify`.
 
 ```typescript
-import { compute_coupling_topology, DependencyGraphInput } from '@geoffgodwin/sdi-wasm';
+import { compute_coupling_topology, DependencyGraphInput } from '@geoffgodwin/sdivi-wasm';
 
 const graph: DependencyGraphInput = {
     nodes: [
@@ -237,11 +237,11 @@ const result = compute_coupling_topology(graph);
 console.log(result.node_count, result.density);
 ```
 
-See the `bindings/sdi-wasm/README.md` for the npm package setup and full API.
+See the `bindings/sdivi-wasm/README.md` for the npm package setup and full API.
 
 ## Choosing Between the Two Paths
 
-| | `sdi-pipeline` | `sdi-core` |
+| | `sdivi-pipeline` | `sdivi-core` |
 |---|---|---|
 | Requires FS | Yes | No |
 | Requires tree-sitter | Yes | No |
@@ -252,14 +252,14 @@ See the `bindings/sdi-wasm/README.md` for the npm package setup and full API.
 
 ## Historical commits and the pure-compute path
 
-`sdi snapshot --commit REF` is an `sdi-pipeline` / CLI convenience. It shells
+`sdivi snapshot --commit REF` is an `sdivi-pipeline` / CLI convenience. It shells
 out to `git` to resolve the ref, extracts the tree, and feeds it through
-`sdi-pipeline::Pipeline::snapshot`. Embedders using the **pure-compute path**
-(`sdi-core`) do not need any of this machinery: they supply whatever source
+`sdivi-pipeline::Pipeline::snapshot`. Embedders using the **pure-compute path**
+(`sdivi-core`) do not need any of this machinery: they supply whatever source
 tree they have in hand directly to `compute_*` functions via `*Input` structs.
 
 For example, Meridian and other agent runtimes that maintain their own AST
-extractor simply call `sdi_core::detect_boundaries`, `compute_pattern_metrics`,
+extractor simply call `sdivi_core::detect_boundaries`, `compute_pattern_metrics`,
 etc. with pre-extracted data. They own the tree-at-commit extraction
 themselves (e.g. via the VSCode git index or their own `git archive` wrapper)
 and never call `Pipeline::snapshot` at all.
@@ -271,7 +271,7 @@ Meridian), supply a `Vec<CoChangeEventInput>` directly to
 `compute_change_coupling` without shelling out to `git log`:
 
 ```rust
-use sdi_core::{compute_change_coupling, CoChangeEventInput, ChangeCouplingConfigInput};
+use sdivi_core::{compute_change_coupling, CoChangeEventInput, ChangeCouplingConfigInput};
 
 let events = vec![
     CoChangeEventInput {
@@ -289,7 +289,7 @@ for pair in &result.pairs {
 }
 ```
 
-The same function is exported from `@geoffgodwin/sdi-wasm` as
+The same function is exported from `@geoffgodwin/sdivi-wasm` as
 `compute_change_coupling`, making it callable from TypeScript consumers.
 
 ## Weighted Leiden — `edge_weight_key`
@@ -300,7 +300,7 @@ field uses `BTreeMap<String, f64>` with NUL-delimited string keys. Use the
 `edge_weight_key` helper to construct keys:
 
 ```rust
-use sdi_core::input::{edge_weight_key, split_edge_weight_key, LeidenConfigInput};
+use sdivi_core::input::{edge_weight_key, split_edge_weight_key, LeidenConfigInput};
 use std::collections::BTreeMap;
 
 let mut weights = BTreeMap::new();

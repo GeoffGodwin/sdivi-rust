@@ -34,14 +34,17 @@ jobs:
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
+      # sdivi-wasm is a cdylib that only compiles for wasm32-unknown-unknown
+      # (it uses wasm-bindgen types that don't implement the host-target ABI).
+      # It has its own dedicated workflow at .github/workflows/wasm.yml.
       - name: cargo clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude sdivi-wasm -- -D warnings
 
       - name: cargo build
-        run: cargo build --workspace
+        run: cargo build --workspace --exclude sdivi-wasm
 
       - name: cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude sdivi-wasm
 
   doc:
     name: Docs (ubuntu / stable)
@@ -51,6 +54,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo doc
-        run: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --exclude sdivi-wasm --no-deps
         env:
           RUSTDOCFLAGS: "-D warnings"

@@ -1,0 +1,33 @@
+[package]
+name = "sdivi-pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Orchestration pipeline for the Structural Divergence Indexer — owns FS, clock, and atomic writes"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "pipeline", "metrics", "analysis"]
+categories = ["development-tools"]
+
+[dependencies]
+sdivi-core      = { workspace = true }
+# Explicitly enable the features that the orchestration layer requires.
+sdivi-config    = { workspace = true, features = ["loader"] }
+sdivi-parsing   = { workspace = true }
+sdivi-graph     = { workspace = true, features = ["pipeline-records"] }
+sdivi-detection = { workspace = true, features = ["pipeline-records"] }
+sdivi-patterns  = { workspace = true, features = ["pipeline-records"] }
+sdivi-snapshot  = { workspace = true, features = ["pipeline-records"] }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+tracing       = { workspace = true }
+tempfile      = { workspace = true }
+chrono        = { workspace = true }
+
+[dev-dependencies]
+tempfile      = { workspace = true }
+sdivi-config    = { workspace = true }
+sdivi-lang-rust = { workspace = true }
+proptest      = { workspace = true }

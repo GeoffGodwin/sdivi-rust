@@ -1,7 +1,7 @@
 # Tekhton Init Report
 
 <!-- init-report-meta
-project: sdi-rust
+project: sdivi-rust
 timestamp: 2026-04-28 14:20:00
 tekhton_version: 3.138.0
 file_count: 2
@@ -39,7 +39,7 @@ project_type: custom
 
 ## Project Summary
 
-- **Project name:** sdi-rust
+- **Project name:** sdivi-rust
 - **Project type:** custom
 - **Tracked files:** 2
 - **Init timestamp:** 2026-04-28 14:20:00
