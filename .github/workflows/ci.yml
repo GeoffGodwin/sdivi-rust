@@ -37,14 +37,19 @@ jobs:
       # sdivi-wasm is a cdylib that only compiles for wasm32-unknown-unknown
       # (it uses wasm-bindgen types that don't implement the host-target ABI).
       # It has its own dedicated workflow at .github/workflows/wasm.yml.
+      #
+      # sdivi-rust is the install-discovery meta-crate; its [[bin]] sdivi
+      # collides with sdivi-cli's identically-named binary at
+      # target/debug/deps/sdivi(.exe), which Windows refuses to overwrite
+      # (LNK1104). The meta-crate is exercised at `cargo publish` time only.
       - name: cargo clippy
-        run: cargo clippy --workspace --exclude sdivi-wasm -- -D warnings
+        run: cargo clippy --workspace --exclude sdivi-wasm --exclude sdivi-rust -- -D warnings
 
       - name: cargo build
-        run: cargo build --workspace --exclude sdivi-wasm
+        run: cargo build --workspace --exclude sdivi-wasm --exclude sdivi-rust
 
       - name: cargo test
-        run: cargo test --workspace --exclude sdivi-wasm
+        run: cargo test --workspace --exclude sdivi-wasm --exclude sdivi-rust
 
   doc:
     name: Docs (ubuntu / stable)
@@ -54,6 +59,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo doc
-        run: cargo doc --workspace --exclude sdivi-wasm --no-deps
+        run: cargo doc --workspace --exclude sdivi-wasm --exclude sdivi-rust --no-deps
         env:
           RUSTDOCFLAGS: "-D warnings"

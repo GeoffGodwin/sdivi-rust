@@ -43,9 +43,14 @@ jobs:
           fi
           echo "OK: no forbidden deps"
 
-      - name: Build WASM bundle (release-wasm profile)
+      - name: Build WASM bundle (release profile)
         working-directory: bindings/sdivi-wasm
-        run: wasm-pack build --target bundler --profile release-wasm
+        # wasm-pack 0.13.x passes both `--release` and `--profile <name>` to
+        # cargo, which cargo 1.85+ rejects as conflicting (rustwasm/wasm-pack
+        # has an open issue for this). For now we use the default `--release`
+        # profile and accept slightly larger wasm output. The size-optimised
+        # `[profile.release-wasm]` is still available for direct cargo use.
+        run: wasm-pack build --target bundler --release
 
       - name: Check bundle size
         working-directory: bindings/sdivi-wasm/pkg

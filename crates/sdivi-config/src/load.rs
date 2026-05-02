@@ -55,10 +55,26 @@ pub fn project_config_path(repo_root: &Path) -> PathBuf {
 /// ```
 pub fn load_or_default(repo_root: &Path) -> Result<Config, ConfigError> {
     let project_config = project_config_path(repo_root);
-    let global_config = dirs::config_dir().map(|d| d.join("sdivi").join("config.toml"));
+    let global_config = global_config_path();
     let mut config = load_with_paths(Some(&project_config), global_config.as_deref())?;
     apply_env_overrides(&mut config);
     Ok(config)
+}
+
+/// Resolves the global config file path.
+///
+/// Checks `$XDG_CONFIG_HOME` first (Linux convention, also honoured on macOS
+/// when explicitly set, matching git/vim/etc.), then falls through to the
+/// platform-default `dirs::config_dir()` (Linux: `~/.config`, macOS:
+/// `~/Library/Application Support`, Windows: `%APPDATA%`).
+fn global_config_path() -> Option<std::path::PathBuf> {
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        let p = std::path::PathBuf::from(xdg);
+        if !p.as_os_str().is_empty() {
+            return Some(p.join("sdivi").join("config.toml"));
+        }
+    }
+    dirs::config_dir().map(|d| d.join("sdivi").join("config.toml"))
 }
 
 /// Load configuration from explicit file paths, without reading env vars.
