@@ -1,0 +1,43 @@
+[package]
+name = "sdivi-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Command-line interface for the Structural Divergence Indexer"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "metrics", "code-analysis", "drift"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "sdivi"
+path = "src/main.rs"
+
+[dependencies]
+sdivi-core     = { workspace = true }
+sdivi-pipeline = { workspace = true }
+sdivi-config   = { workspace = true, features = ["loader"] }
+sdivi-parsing  = { workspace = true }
+sdivi-patterns = { workspace = true, features = ["pipeline-records"] }
+sdivi-lang-rust       = { workspace = true }
+sdivi-lang-python     = { workspace = true }
+sdivi-lang-typescript = { workspace = true }
+sdivi-lang-javascript = { workspace = true }
+sdivi-lang-go         = { workspace = true }
+sdivi-lang-java       = { workspace = true }
+clap       = { workspace = true }
+anyhow     = { workspace = true }
+serde_json = { workspace = true }
+chrono     = { workspace = true, features = ["clock"] }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+sdivi-config = { workspace = true }
+tempfile   = { workspace = true }
+serde_json = { workspace = true }
+serde_yml  = { workspace = true }

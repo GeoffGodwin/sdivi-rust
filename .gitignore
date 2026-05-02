@@ -36,7 +36,7 @@ id_rsa
 .claude/TEST_BASELINE.json
 .claude/TEST_BASELINE_OUTPUT.txt
 .claude/test_acceptance_output.tmp
-.claude/dashboard/data/
+.claude/dashboard/
 .claude/logs/
 .claude/indexer-venv/
 .claude/index/
@@ -47,4 +47,13 @@ id_rsa
 .claude/tui_sidecar.pid
 .claude/worktrees/
 .tekhton/BUILD_FIX_REPORT.md
+.tekhton/INTAKE_REPORT.md
+.tekhton/NON_BLOCKING_LOG.md
 .claude/preflight_bak/
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db

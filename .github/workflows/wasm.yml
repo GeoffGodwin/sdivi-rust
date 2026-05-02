@@ -1,0 +1,137 @@
+name: WASM
+
+on:
+  push:
+    branches: [main, "milestones/**", "feat/**", "fix/**", "chore/**", "docs/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  WASM_PACK_VERSION: "0.13.1"
+  # Pin wasm-bindgen-cli to match the workspace's wasm-bindgen lib version
+  # (capped at <0.2.118 in Cargo.toml so the CLI builds on rustc 1.85).
+  WASM_BINDGEN_VERSION: "0.2.117"
+  WASM_BUDGET_BYTES: "1258291"   # 1.2 MB
+
+jobs:
+  build:
+    name: Build WASM (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85.0"
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version ${{ env.WASM_PACK_VERSION }} --locked
+
+      # wasm-pack will install wasm-bindgen-cli on demand if it isn't on PATH,
+      # but it does so via `cargo install` *without* `--locked`, which lets
+      # the CLI's transitive deps (icu_collections, time, idna_adapter, …)
+      # resolve to versions whose MSRV is newer than ours. We sidestep that
+      # by using a prebuilt CLI binary downloaded by taiki-e/install-action.
+      # The version must match the wasm-bindgen lib version exactly.
+      - name: Install wasm-bindgen-cli (prebuilt, version-matched)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+
+      - name: Verify sdivi-core has no forbidden deps on wasm32
+        run: |
+          # `-e normal,build` excludes dev-dependencies (proptest pulls tempfile via rusty-fork
+          # — that's a test-time dep and never reaches the published wasm bundle).
+          cargo tree -p sdivi-core --target wasm32-unknown-unknown --no-default-features -e normal,build 2>&1 | tee /tmp/tree.txt
+          if grep -E "tree-sitter|walkdir|ignore|rayon|tempfile" /tmp/tree.txt; then
+            echo "FAIL: forbidden deps found in sdivi-core wasm32 tree (normal+build edges)"
+            exit 1
+          fi
+          echo "OK: no forbidden deps"
+
+      - name: Build WASM bundle (release profile)
+        working-directory: bindings/sdivi-wasm
+        # wasm-pack 0.13.x passes both `--release` and `--profile <name>` to
+        # cargo, which cargo 1.85+ rejects as conflicting (rustwasm/wasm-pack
+        # has an open issue for this). For now we use the default `--release`
+        # profile and accept slightly larger wasm output. The size-optimised
+        # `[profile.release-wasm]` is still available for direct cargo use.
+        run: wasm-pack build --target bundler --release
+
+      - name: Check bundle size
+        working-directory: bindings/sdivi-wasm/pkg
+        run: |
+          SIZE=$(wc -c < sdivi_wasm_bg.wasm)
+          echo "Bundle size: ${SIZE} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
+          if [ "$SIZE" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
+            echo "FAIL: .wasm exceeds 1.2 MB budget (${SIZE} bytes)"
+            exit 1
+          fi
+          echo "OK: within budget"
+
+      - name: Capture normalize_and_hash output for cross-platform check
+        working-directory: bindings/sdivi-wasm
+        run: |
+          wasm-pack test --node -- --test normalize_hash_deterministic 2>&1 | tee /tmp/hash_out.txt || true
+          # Extract the CI_HASH line from test output if present
+          grep -oE 'CI_HASH:[0-9a-f]{64}' /tmp/hash_out.txt | sed 's/CI_HASH://' > /tmp/normalize_hash.txt || true
+          echo "Captured hash: $(cat /tmp/normalize_hash.txt)"
+
+      - name: Upload hash artifact for cross-platform comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: normalize-hash-${{ matrix.os }}
+          path: /tmp/normalize_hash.txt
+          if-no-files-found: warn
+
+      - name: Run WASM smoke tests (Node)
+        working-directory: bindings/sdivi-wasm
+        run: wasm-pack test --node
+
+      - name: Dry-run npm publish (tagged releases only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: bindings/sdivi-wasm/pkg
+        run: npm publish --dry-run --access public
+
+  cross-platform-hash:
+    name: Cross-platform hash determinism check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: build
+    steps:
+      - name: Download linux hash
+        uses: actions/download-artifact@v4
+        with:
+          name: normalize-hash-ubuntu-latest
+          path: /tmp/linux
+
+      - name: Download macos hash
+        uses: actions/download-artifact@v4
+        with:
+          name: normalize-hash-macos-latest
+          path: /tmp/macos
+
+      - name: Compare hashes
+        run: |
+          LINUX=$(cat /tmp/linux/normalize_hash.txt)
+          MACOS=$(cat /tmp/macos/normalize_hash.txt)
+          echo "Linux:  $LINUX"
+          echo "macOS:  $MACOS"
+          if [[ -z "$LINUX" || -z "$MACOS" ]]; then
+            echo "[WARN] hash capture was empty — smoke test may not have printed a hash; skipping comparison"
+            exit 0
+          fi
+          if [[ "$LINUX" != "$MACOS" ]]; then
+            echo "FAIL: normalize_and_hash differs between Linux and macOS!"
+            exit 1
+          fi
+          echo "OK: identical blake3 digest on both platforms"

@@ -1,0 +1,32 @@
+[package]
+name = "sdivi-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Pure-compute facade for the Structural Divergence Indexer — WASM-compatible, no I/O"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "wasm", "metrics", "code-analysis"]
+categories = ["development-tools", "algorithms"]
+
+[dependencies]
+# All compute crates declared with default-features = false so the
+# pipeline-records feature (sdivi-parsing dep) is not pulled in.
+# This keeps sdivi-core free of tree-sitter, walkdir, ignore, rayon, tempfile,
+# and std::fs — required for wasm32-unknown-unknown builds.
+sdivi-config    = { workspace = true, default-features = false }
+sdivi-graph     = { workspace = true, default-features = false }
+sdivi-detection = { workspace = true, default-features = false }
+sdivi-patterns  = { workspace = true, default-features = false }
+sdivi-snapshot  = { workspace = true, default-features = false }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+# Clock feature deliberately absent — sdivi-core must not call SystemTime::now().
+# NaiveDate is in the features = ["serde"] set which is in workspace default.
+chrono        = { workspace = true }
+tracing       = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest   = { workspace = true }

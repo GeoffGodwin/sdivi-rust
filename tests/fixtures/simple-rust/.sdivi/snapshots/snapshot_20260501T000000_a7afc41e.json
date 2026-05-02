@@ -1,0 +1,67 @@
+{
+  "snapshot_version": "1.0",
+  "timestamp": "2026-05-01T00:00:00Z",
+  "graph": {
+    "node_count": 5,
+    "edge_count": 0,
+    "density": 0.0,
+    "cycle_count": 0,
+    "top_hubs": [
+      [
+        "src/config.rs",
+        0
+      ],
+      [
+        "src/errors.rs",
+        0
+      ],
+      [
+        "src/lib.rs",
+        0
+      ],
+      [
+        "src/models.rs",
+        0
+      ],
+      [
+        "src/utils.rs",
+        0
+      ]
+    ],
+    "component_count": 5
+  },
+  "partition": {
+    "assignments": {
+      "0": 0,
+      "1": 1,
+      "2": 2,
+      "3": 3,
+      "4": 4
+    },
+    "stability": {
+      "0": 1.0,
+      "1": 1.0,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0
+    },
+    "modularity": 0.0,
+    "seed": 42
+  },
+  "catalog": {
+    "entries": {}
+  },
+  "pattern_metrics": {
+    "entropy_per_category": {},
+    "total_entropy": 0.0,
+    "convention_drift": 0.0,
+    "convention_drift_per_category": {}
+  },
+  "path_partition": {
+    "src/config.rs": 0,
+    "src/errors.rs": 1,
+    "src/lib.rs": 2,
+    "src/models.rs": 3,
+    "src/utils.rs": 4
+  }
+}

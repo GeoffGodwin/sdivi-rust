@@ -1,0 +1,19 @@
+[package]
+name = "sdivi-lang-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Python language adapter for sdivi-rust"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "tree-sitter", "parsing", "python"]
+categories = ["development-tools", "parser-implementations"]
+
+[features]
+lang-python = []
+
+[dependencies]
+sdivi-parsing       = { workspace = true }
+tree-sitter       = { workspace = true }
+tree-sitter-python = { workspace = true }

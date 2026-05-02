@@ -1,0 +1,19 @@
+[package]
+name = "sdivi-lang-typescript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "TypeScript language adapter for sdivi-rust"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "tree-sitter", "parsing", "typescript"]
+categories = ["development-tools", "parser-implementations"]
+
+[features]
+lang-typescript = []
+
+[dependencies]
+sdivi-parsing            = { workspace = true }
+tree-sitter            = { workspace = true }
+tree-sitter-typescript = { workspace = true }

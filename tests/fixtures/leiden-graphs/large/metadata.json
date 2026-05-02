@@ -1,0 +1,6 @@
+{
+  "node_count": 5000,
+  "edge_count": 247550,
+  "reference_modularity": 0.979798,
+  "reference_community_count": 50
+}

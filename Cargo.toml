@@ -1,0 +1,165 @@
+[workspace]
+members = [
+    "crates/sdivi-rust",
+    "crates/sdivi-core",
+    "crates/sdivi-pipeline",
+    "crates/sdivi-cli",
+    "crates/sdivi-config",
+    "crates/sdivi-parsing",
+    "crates/sdivi-graph",
+    "crates/sdivi-detection",
+    "crates/sdivi-patterns",
+    "crates/sdivi-snapshot",
+    "crates/sdivi-lang-python",
+    "crates/sdivi-lang-typescript",
+    "crates/sdivi-lang-javascript",
+    "crates/sdivi-lang-go",
+    "crates/sdivi-lang-java",
+    "crates/sdivi-lang-rust",
+    "bindings/sdivi-wasm",
+]
+resolver = "2"
+
+# Native binary release profile — thin LTO, stripped symbols, abort on panic.
+[profile.release]
+lto = "thin"
+strip = true
+panic = "abort"
+
+# Custom WASM release profile — smaller output at cost of longer link time.
+# wasm-pack build --profile release-wasm uses this profile (wasm-pack 0.12+).
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+
+[workspace.package]
+version = "0.1.8"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
+repository = "https://github.com/geoffgodwin/sdivi-rust"
+
+[workspace.dependencies]
+# ── internal crates ──────────────────────────────────────────────────────────
+sdivi-core     = { path = "crates/sdivi-core" }
+sdivi-cli      = { path = "crates/sdivi-cli" }
+sdivi-pipeline = { path = "crates/sdivi-pipeline" }
+# default-features = false so crates can opt into features explicitly.
+# sdivi-config: loader feature gates load_or_default / BoundarySpec::load.
+# sdivi-graph, sdivi-patterns: pipeline-records gates sdivi-parsing dep + from-records paths.
+# sdivi-detection: pipeline-records is empty but listed for uniformity.
+# sdivi-snapshot: pipeline-records gates tempfile + write/retention FS paths.
+sdivi-config    = { path = "crates/sdivi-config",    default-features = false }
+sdivi-parsing   = { path = "crates/sdivi-parsing" }
+sdivi-graph     = { path = "crates/sdivi-graph",     default-features = false }
+sdivi-detection = { path = "crates/sdivi-detection", default-features = false }
+sdivi-patterns  = { path = "crates/sdivi-patterns",  default-features = false }
+sdivi-snapshot  = { path = "crates/sdivi-snapshot",  default-features = false }
+sdivi-lang-rust       = { path = "crates/sdivi-lang-rust" }
+sdivi-lang-python     = { path = "crates/sdivi-lang-python" }
+sdivi-lang-typescript = { path = "crates/sdivi-lang-typescript" }
+sdivi-lang-javascript = { path = "crates/sdivi-lang-javascript" }
+sdivi-lang-go         = { path = "crates/sdivi-lang-go" }
+sdivi-lang-java       = { path = "crates/sdivi-lang-java" }
+
+# ── serialization ────────────────────────────────────────────────────────────
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yml  = "0.0.12"   # maintained fork of serde_yaml (which was archived 2024)
+toml       = ">=0.8, <0.8.20"
+# Pin indexmap below 2.14.0 (edition2024) so Cargo 1.75 (MSRV-1 env) can parse the manifest.
+# Remove this pin once CI mandates Cargo >= 1.85 in the lock.
+indexmap   = ">=2.0, <2.14"
+
+# ── error handling ────────────────────────────────────────────────────────────
+thiserror = "2"
+anyhow    = "1"
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+clap = { version = "4", features = ["derive"] }
+
+# ── terminal output ───────────────────────────────────────────────────────────
+ratatui    = "0.28"
+owo-colors = "4"
+anstream   = "0.6"
+
+# ── file system / discovery ───────────────────────────────────────────────────
+walkdir = "2"
+globset = ">=0.4.0, <0.4.15"   # <0.4.15 avoids edition2024 on Cargo 1.75
+ignore  = ">=0.4.0, <0.4.22"   # pin to avoid potential edition2024 transitive
+
+# ── concurrency ───────────────────────────────────────────────────────────────
+rayon      = ">=1, <1.10"   # <1.10 avoids rayon-core 1.13 (rustc 1.80 MSRV) on Cargo 1.75
+rayon-core = ">=1, <1.13"   # explicit cap; rayon-core 1.13+ requires rustc 1.80
+
+# ── graph ─────────────────────────────────────────────────────────────────────
+petgraph = "0.6"
+
+# ── parsing ───────────────────────────────────────────────────────────────────
+# tree-sitter 0.23+ pulls in tree-sitter-language which requires rustc 1.77.
+# Pin to 0.22.x (no tree-sitter-language dep) for Cargo 1.75 / rustc 1.75 compat.
+tree-sitter          = "0.22"
+# Grammar crates: use 0.21.x which targets tree-sitter 0.20-0.22 range.
+# Update these to 0.24.x once CI runs on the pinned 1.85 toolchain.
+tree-sitter-rust       = "0.21"
+# Downgraded from 0.23 to 0.21 for tree-sitter 0.22 compat (no tree-sitter-language dep).
+# Update to 0.24.x once CI mandates rustc >= 1.77.
+tree-sitter-python     = "0.21"
+tree-sitter-typescript = "0.21"
+tree-sitter-javascript = "0.21"
+tree-sitter-go         = "0.21"
+tree-sitter-java       = "0.21"
+
+# ── hashing / fingerprinting ──────────────────────────────────────────────────
+blake3     = "1"
+twox-hash  = "1"         # xxh3 cache keys
+
+# ── randomness ───────────────────────────────────────────────────────────────
+rand = "0.8"
+
+# ── logging / tracing ─────────────────────────────────────────────────────────
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ── date / time ───────────────────────────────────────────────────────────────
+# default-features = false omits clock/std — WASM-compatible. Clock feature is
+# opt-in per crate (sdivi-cli enables it; sdivi-core must not).
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
+
+# ── filesystem helpers ────────────────────────────────────────────────────────
+dirs     = "5"
+tempfile = ">=3.0, <3.20"   # <3.20 avoids getrandom 0.4 (edition2024) on Cargo 1.75
+
+# ── WASM / bindings ──────────────────────────────────────────────────────────
+# Pinned per KDD-13; pre-1.0 crates require explicit version management.
+#
+# wasm-bindgen-cli is installed by wasm-pack and must match the wasm-bindgen
+# library version. From 0.2.118+, wasm-bindgen-cli requires rustc 1.86; our
+# rust-toolchain.toml pins 1.85, so we cap wasm-bindgen at 0.2.117 to keep
+# the installable CLI compatible with the toolchain. js-sys and
+# wasm-bindgen-test ride on this; cargo will pick versions that satisfy the
+# pinned wasm-bindgen.
+wasm-bindgen       = ">=0.2, <0.2.118"
+# wasm-bindgen-test isn't tied to the CLI MSRV problem — let cargo pick
+# a version compatible with wasm-bindgen 0.2.117. The earlier <0.3.50 cap
+# resolved to 0.3.45, which predates the `run_in_node` configuration the
+# tests use.
+wasm-bindgen-test  = "0.3"
+# `tsify` 0.4.x is unmaintained since 2023 and incompatible with
+# wasm-bindgen ≥ 0.2.105 (missing ErasableGeneric / WasmDescribeVector
+# impls for derived types used as `Vec<T>` parameters). `tsify-next` is the
+# actively-maintained fork. We can't rename it via `package = "..."` — the
+# derive macro hardcodes `::tsify_next::...` paths. Source uses
+# `use tsify_next::Tsify;` directly.
+tsify-next         = { version = "0.5", features = ["js"] }
+serde-wasm-bindgen = "0.6"
+js-sys             = "0.3"
+console_error_panic_hook = "0.1"
+
+# ── testing ───────────────────────────────────────────────────────────────────
+assert_cmd = { version = ">=2.0, <2.1" }
+predicates = { version = ">=3.0, <3.1" }
+proptest   = "1"
+criterion  = { version = "0.5", features = ["html_reports"] }

@@ -1,0 +1,24 @@
+[package]
+name = "sdivi-rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Structural Divergence Indexer — install-discovery meta-crate (see sdivi-cli for the binary)"
+readme = "README.md"
+keywords = ["sdivi", "structural-divergence", "metrics", "code-analysis", "drift"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "sdivi"
+path = "src/main.rs"
+# The same binary is also produced by sdivi-cli (the canonical home of the
+# CLI source). Skip rustdoc here so `cargo doc --workspace` does not collide
+# on the shared `sdivi` doc filename. The binary itself is still built and
+# shipped; only its doc output is suppressed.
+doc = false
+
+[dependencies]
+sdivi-core = { workspace = true }
+sdivi-cli  = { workspace = true }

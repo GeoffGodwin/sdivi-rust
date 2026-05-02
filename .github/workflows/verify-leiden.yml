@@ -1,0 +1,65 @@
+# KD11 Leiden quality verification: compares the native Rust Leiden port against
+# the Python `leidenalg` reference implementation. Gate criteria:
+#   - modularity within 1% of leidenalg on all fixture graphs
+#   - community count within ±10% of leidenalg on all fixture graphs
+#
+# Implementation lives in:
+#   crates/sdivi-detection/src/leiden/
+#   crates/sdivi-detection/tests/leiden_quality.rs  (gated: verify-leiden feature)
+#   tests/fixtures/leiden-graphs/{small,medium,large}/
+#   tools/generate-leiden-fixtures.py
+#
+# Regenerate reference fixtures:
+#   pip install leidenalg igraph
+#   python tools/generate-leiden-fixtures.py --leiden
+
+name: Verify Leiden (KD11)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "milestones/**"]
+    paths:
+      - "crates/sdivi-detection/**"
+      - "tests/fixtures/leiden-graphs/**"
+      - "tools/generate-leiden-fixtures.py"
+  pull_request:
+    paths:
+      - "crates/sdivi-detection/**"
+      - "tests/fixtures/leiden-graphs/**"
+
+jobs:
+  verify:
+    name: Leiden quality cross-check
+    runs-on: ubuntu-latest
+    # Cap the whole job at 30 min. The Leiden cross-check on the small/medium/
+    # large fixtures runs in well under 5 min locally; allow ~6× headroom
+    # for cold cargo cache and `pip install`. GitHub's default timeout is
+    # 6 hours, which has previously let runaway runs burn through billing
+    # quotas before anyone noticed.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install leidenalg
+        run: pip install leidenalg igraph
+        timeout-minutes: 5
+
+      - name: Regenerate reference fixtures from leidenalg
+        run: python tools/generate-leiden-fixtures.py --leiden
+        timeout-minutes: 5
+
+      - name: Run Leiden verification tests
+        run: cargo test -p sdivi-detection --features verify-leiden -- --nocapture
+        timeout-minutes: 15
