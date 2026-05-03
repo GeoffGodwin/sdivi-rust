@@ -12,8 +12,14 @@ env:
   # Pin wasm-bindgen-cli to match the workspace's wasm-bindgen lib version
   # (capped at <0.2.118 in Cargo.toml so the CLI builds on rustc 1.85).
   WASM_BINDGEN_VERSION: "0.2.117"
-  # 1.2 MB per-target budget; 5 MB combined budget for both targets.
-  WASM_BUDGET_BYTES: "1258291"
+  # 1.75 MB per-target budget; 5 MB combined budget for both targets.
+  # The per-target budget was raised from 1.2 MB at the close of M19–M24 to
+  # absorb the new WASM surface (weighted Leiden, list_categories,
+  # assemble_snapshot, threshold-comparison epsilon, change-coupling) plus
+  # the bundler+node dual build. It can be tightened again if/when wasm-pack
+  # 0.13.x's `--release` + `--profile <name>` conflict is fixed and we can
+  # drive the size-optimised `release-wasm` profile through wasm-pack.
+  WASM_BUDGET_BYTES: "1835008"
   WASM_COMBINED_BUDGET_BYTES: "5242880"
 
 jobs:
@@ -82,11 +88,11 @@ jobs:
           echo "nodejs  .wasm: ${SIZE_NODE} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
           echo "combined:      ${COMBINED} bytes (budget: ${{ env.WASM_COMBINED_BUDGET_BYTES }})"
           if [ "$SIZE_BUNDLER" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
-            echo "FAIL: bundler .wasm exceeds 1.2 MB budget (${SIZE_BUNDLER} bytes)"
+            echo "FAIL: bundler .wasm exceeds 1.75 MB budget (${SIZE_BUNDLER} bytes)"
             exit 1
           fi
           if [ "$SIZE_NODE" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
-            echo "FAIL: nodejs .wasm exceeds 1.2 MB budget (${SIZE_NODE} bytes)"
+            echo "FAIL: nodejs .wasm exceeds 1.75 MB budget (${SIZE_NODE} bytes)"
             exit 1
           fi
           if [ "$COMBINED" -gt "${{ env.WASM_COMBINED_BUDGET_BYTES }}" ]; then
