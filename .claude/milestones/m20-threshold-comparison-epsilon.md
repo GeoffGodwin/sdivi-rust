@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "20"
-status: "todo"
+status: "done"
 -->
 
 **Scope:** Add a small fixed epsilon (`1e-9`) inside `compute_thresholds_check` so that the strict `>` comparisons against threshold rates cannot flip sign across platforms purely from documented per-arch ULP drift in upstream `compute_delta` / `compute_trend` outputs. Raw `DivergenceSummary` and trend values are left untouched — only the gate-comparison is rounded. Document the new contract in `docs/determinism.md`.

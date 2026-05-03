@@ -2,73 +2,38 @@
 ## Status: COMPLETE
 
 ## What Was Implemented
-- Implemented real `compute_boundary_violations` in `crates/sdivi-core/src/compute/boundaries.rs`:
-  - Compiles boundary globs via `globset`
-  - Assigns each node to its most-specific-matching boundary (longest glob wins; ties broken by ascending name)
-  - Flags edges where both endpoints are in different boundaries and the source boundary's `allow_imports_from` does not name the target boundary
-  - Skips edges with unscoped endpoints (neither endpoint matches any boundary)
-  - Returns sorted violation pairs
-- Created private helper module `crates/sdivi-core/src/compute/violation.rs`:
-  - `CompiledBoundary`: pre-built globset + allow list
-  - `compile_boundaries`: compiles all boundary globs once per call
-  - `match_boundary`: most-specific-wins matching with name tie-break
-- Added `globset` as a direct dep to `sdivi-core/Cargo.toml` (already satisfied via workspace dep)
-- Updated `assemble_snapshot` in `sdivi-snapshot` to accept `violation_count: u32` param;
-  populated into `IntentDivergenceInfo` when boundary spec is present
-- Updated `sdivi-pipeline` to compute violations and thread count through to `assemble_snapshot`
-- Added `graph_to_boundary_input` and `spec_to_boundary_input` helpers to `pipeline/helpers.rs`
-- Created `crates/sdivi-core/tests/compute_boundary_violations.rs` — 12 unit tests covering:
-  empty spec, empty graph, db→api violation, api→db allowed, unscoped nodes, same-boundary
-  edges, non-transitivity, most-specific glob, tie-break by name, sorted output
-- Moved `snapshot.rs` internal tests to `crates/sdivi-snapshot/tests/snapshot_unit.rs`
-- Updated `boundary_spec_assembly.rs` tests to pass `violation_count`
-- Updated `boundary_lifecycle.rs` integration test with `snapshot_with_boundary_violations_reports_nonzero_count`
-- Updated `wasm_smoke.rs` with boundary violation WASM tests; split oversized file into
-  `wasm_smoke.rs` (242 lines, function smoke tests) and `wasm_snapshot.rs` (156 lines,
-  snapshot/delta/trend/ADL tests) to stay under the 300-line ceiling
-- Updated `CHANGELOG.md` and `docs/cli-integration.md`
+- Added `pub const THRESHOLD_EPSILON: f64 = 1e-9` to `crates/sdivi-core/src/compute/threshold_types.rs` (new file, extracted from `thresholds.rs`) with a doc comment citing `docs/determinism.md § Threshold gate stability`.
+- Replaced all six `delta > limit` comparisons in `compute_thresholds_check` with `delta > limit + THRESHOLD_EPSILON` (four aggregate dimensions + two per-category loops). The `boundary_violation_delta` integer cast comment explains epsilon has no functional effect there.
+- Re-exported `THRESHOLD_EPSILON` from `sdivi-core::lib` alongside the other threshold types so WASM callers and other embedders can reference the constant.
+- Added "Threshold gate stability" subsection to `docs/determinism.md` explaining the constant value, the asymmetric application (epsilon is added to limit, not subtracted from delta), and the guarantee that genuine breaches above `limit + 2e-9` still trip.
+- Updated `CHANGELOG.md` under `[0.1.10]` with the behaviour-change note.
+- Added unit tests in `crates/sdivi-core/tests/thresholds_epsilon.rs` (NEW): two cases per dimension (`limit + 5e-10` does not breach; `limit + 2e-9` does breach), plus per-category path tests and THRESHOLD_EPSILON regression gate.
+- Added property test `prop_breach_equals_delta_gt_limit_plus_epsilon` to `prop_thresholds.rs` asserting `breached(delta, limit) == (delta > limit + THRESHOLD_EPSILON)` for any limit and delta.
 
 ## Root Cause (bugs only)
-The `compute_boundary_violations` function in `crates/sdivi-core/src/compute/boundaries.rs`
-was stubbed to always return `{ violation_count: 0, violations: [] }`. This made Factor 4
-(boundary violation velocity) permanently inactive in `sdivi check`.
+N/A — this is a feature milestone.
 
 ## Files Modified
-- `crates/sdivi-core/src/compute/boundaries.rs` — real implementation replacing stub
-- `crates/sdivi-core/src/compute/violation.rs` (NEW) — private glob-matching helpers
-- `crates/sdivi-core/src/compute/mod.rs` — added `mod violation`
-- `crates/sdivi-core/Cargo.toml` — added `globset` dependency
-- `crates/sdivi-core/tests/compute_boundary_violations.rs` (NEW) — 12 unit tests
-- `crates/sdivi-snapshot/src/snapshot.rs` — `assemble_snapshot` + `violation_count` param
-- `crates/sdivi-snapshot/tests/snapshot_unit.rs` (NEW) — extracted from snapshot.rs inline tests
-- `crates/sdivi-snapshot/tests/boundary_spec_assembly.rs` — updated to pass `violation_count`
-- `crates/sdivi-snapshot/tests/atomic_write.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/tests/compute_trend.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/tests/delta_pure.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/tests/null_vs_zero.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/tests/retention.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/tests/snapshot_load.rs` — updated `assemble_snapshot` call
-- `crates/sdivi-snapshot/src/delta.rs` — minor test adjustment
-- `crates/sdivi-snapshot/src/trend.rs` — minor test adjustment
-- `crates/sdivi-pipeline/src/pipeline.rs` — compute violations and pass to assemble_snapshot
-- `crates/sdivi-pipeline/src/helpers.rs` — `graph_to_boundary_input` and `spec_to_boundary_input`
-- `crates/sdivi-pipeline/src/boundaries.rs` — minor update
-- `crates/sdivi-cli/tests/boundary_lifecycle.rs` — added violation count integration test
-- `bindings/sdivi-wasm/src/exports.rs` — updated boundary violations export
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — trimmed to 242 lines (imports cleaned)
-- `bindings/sdivi-wasm/tests/wasm_snapshot.rs` (NEW) — 156 lines, snapshot/delta/trend/ADL tests
-- `CHANGELOG.md` — entry for `compute_boundary_violations` implementation
-- `docs/cli-integration.md` — boundary violation rate factor documented
+- `crates/sdivi-core/src/compute/threshold_types.rs` (NEW) — public types (THRESHOLD_EPSILON, ThresholdBreachInfo, AppliedOverrideInfo, ThresholdCheckResult) extracted from thresholds.rs to keep thresholds.rs under 300 lines
+- `crates/sdivi-core/src/compute/thresholds.rs` — replaced 6 `delta > limit` comparisons with `delta > limit + THRESHOLD_EPSILON`; added `pub use super::threshold_types::*`
+- `crates/sdivi-core/src/compute/mod.rs` — added `mod threshold_types`
+- `crates/sdivi-core/src/lib.rs` — added `THRESHOLD_EPSILON` to the compute::thresholds re-export
+- `crates/sdivi-core/tests/thresholds_epsilon.rs` (NEW) — M20 epsilon boundary unit tests
+- `crates/sdivi-core/tests/thresholds_overrides.rs` (NEW) — M14 per-category override tests (extracted from compute_thresholds_check.rs to keep it under 300 lines)
+- `crates/sdivi-core/tests/compute_thresholds_check.rs` — removed M14/drift override tests (moved to thresholds_overrides.rs); removed unused `cfg_with_drift_override` helper
+- `crates/sdivi-core/tests/prop_thresholds.rs` — added `prop_breach_equals_delta_gt_limit_plus_epsilon` property test
+- `docs/determinism.md` — added "Threshold gate stability" subsection
+- `CHANGELOG.md` — added `[0.1.10]` entry under Changed
 
 ## Docs Updated
-- `CHANGELOG.md` — added entry under Unreleased
-- `docs/cli-integration.md` — documented boundary_violation_rate threshold factor
+- `docs/determinism.md` — "Threshold gate stability" subsection added
+- `CHANGELOG.md` — entry for M20 behaviour change
 
 ## Human Notes Status
-N/A — no Human Notes section present in this milestone.
+N/A — no Human Notes section in this task.
 
 ## Observed Issues (out of scope)
-- `crates/sdivi-patterns/src/catalog.rs:7` — unused import `sdivi_config::PatternsConfig`
-- `crates/sdivi-patterns/src/catalog.rs:10` — unused import `fingerprint_node_kind`
-- `crates/sdivi-patterns/src/catalog.rs:11` — unused import `crate::queries`
-- `crates/sdivi-graph/src/dependency_graph.rs` — one unused import warning (cargo fix suggestion)
+- `crates/sdivi-patterns/src/catalog.rs:7` — unused import `sdivi_config::PatternsConfig` (pre-existing)
+- `crates/sdivi-patterns/src/catalog.rs:10` — unused import `fingerprint_node_kind` (pre-existing)
+- `crates/sdivi-patterns/src/catalog.rs:11` — unused import `crate::queries` (pre-existing)
+- `crates/sdivi-graph/src/dependency_graph.rs` — one unused import warning (pre-existing, `cargo fix` suggestion)

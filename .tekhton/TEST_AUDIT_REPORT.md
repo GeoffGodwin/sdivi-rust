@@ -1,90 +1,39 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 16 test functions (14 unit, 2 property)
+Tests audited: 1 file, 9 test functions (prop_thresholds.rs)
 Verdict: PASS
 
 ---
 
 ### Findings
 
-#### COVERAGE: proptest `prop_violation_count_equals_violations_len` never exercises violation logic
-- File: `crates/sdivi-core/tests/boundary_violations_proptest.rs:26`
-- Issue: All generated nodes use the path prefix `crates/a/f{i}.rs`.
-  The spec declares two boundaries — `crates/api/**` and `crates/db/**`.
-  The glob `crates/api/**` requires the literal segment `api`; the path
-  prefix `crates/a/` does not satisfy it.  Every generated node is
-  therefore unscoped, `violations` is always empty, and the assertion
-  reduces to `prop_assert_eq!(0usize, 0)` on every execution.
-  Additionally, even if violations were generated the property
-  `violation_count == violations.len()` is trivially guaranteed by the
-  implementation (`boundaries.rs:274`:
-  `let violation_count = violations.len() as u32;`), so the test cannot
-  detect a future regression where those two fields diverge via an
-  independent calculation path.
-- Severity: MEDIUM
-- Action: Replace the node-name template with paths that actually match
-  the spec — e.g. `crates/api/f{i}.rs` for even-indexed nodes and
-  `crates/db/f{i}.rs` for odd-indexed nodes.  This makes violations
-  genuinely occur and exercises the property non-trivially.
-
-#### COVERAGE: No test for `AnalysisError::InvalidConfig` (malformed glob)
-- File: `crates/sdivi-core/tests/compute_boundary_violations.rs` (absent)
-- Issue: `compute_boundary_violations` returns
-  `AnalysisError::InvalidConfig` when a boundary's `modules` list
-  contains an invalid glob pattern (e.g. `[`).  The current test suite
-  has no test exercising this error path; the `Err(InvalidConfig)` branch
-  in `violation.rs:compile_boundaries` is never reached.
+#### COVERAGE: Per-category epsilon comparison sites have no property-test coverage
+- File: `crates/sdivi-core/tests/prop_thresholds.rs` (entire file)
+- Issue: `thresholds.rs` contains six `delta > limit + THRESHOLD_EPSILON` comparison sites — four aggregate (lines 66, 78, 90, 105) and two per-category (lines 122, 139). The tester's three new property tests cover only the four aggregate dimensions. The per-category epsilon sites are guarded solely by unit tests in `thresholds_epsilon.rs` (coder-authored, outside this audit's scope). If those unit tests were removed or the per-category loops were accidentally refactored to drop epsilon, no property test would catch the regression.
 - Severity: LOW
-- Action: Add one test passing a boundary with an invalid glob string
-  (`"["` is sufficient) and asserting the return value matches
-  `Err(AnalysisError::InvalidConfig { .. })`.
+- Action: Add two property tests analogous to the aggregate ones — one for `pattern_entropy_per_category_delta` and one for `convention_drift_per_category_delta` — asserting `breached == (delta > effective_limit + THRESHOLD_EPSILON)` when a single category is populated. Not a blocker since the unit tests currently fill the gap.
 
-#### COVERAGE: No test for `AnalysisError::InvalidNodeId`
-- File: `crates/sdivi-core/tests/compute_boundary_violations.rs` (absent)
-- Issue: `compute_boundary_violations` validates every node ID via
-  `validate_node_id` before proceeding (`boundaries.rs:225-227`).  No
-  test exercises the early-exit `Err(InvalidNodeId)` path.
+#### COVERAGE: prop_per_category_delta_pure assertion is vacuously true
+- File: `crates/sdivi-core/tests/prop_thresholds.rs:146-150`
+- Issue: `prop_assert!(cat_breaches.len() <= 1, …)` is trivially satisfied when the input `BTreeMap` contains exactly one entry (as constructed by `BTreeMap::from([(cat.clone(), delta)])`). The assertion cannot distinguish "no breach" from "one breach" — it only verifies the implementation produces no duplicate breach records for the same category. The pre-existing test is not a regression guard for whether the breach fires correctly.
 - Severity: LOW
-- Action: Add one test with a node whose ID fails `validate_node_id`
-  (check what that function rejects — empty string or embedded NUL) and
-  assert `Err(AnalysisError::InvalidNodeId)` is returned.
+- Action: Strengthen the assertion: if `delta > effective_limit + THRESHOLD_EPSILON` assert `cat_breaches.len() == 1`, else assert `cat_breaches.is_empty()`. This is a follow-up recommendation; not a blocker.
 
-#### COVERAGE: No test for edges referencing nodes absent from `graph.nodes`
-- File: `crates/sdivi-core/tests/compute_boundary_violations.rs` (absent)
-- Issue: The implementation builds `node_boundaries` from `graph.nodes`
-  only.  An edge whose `source` or `target` is absent from `graph.nodes`
-  resolves to `None` in `node_boundaries.get()` and is silently skipped
-  (`boundaries.rs:254-261`).  No test documents or asserts this contract,
-  leaving callers without a verified guarantee for inconsistent inputs.
+#### EXERCISE: Epsilon property tests are regression guards, not independent specifications
+- File: `crates/sdivi-core/tests/prop_thresholds.rs:217,247,277,310`
+- Issue: All four `prop_breach_equals_delta_gt_limit_plus_epsilon*` tests derive `expected` by importing `THRESHOLD_EPSILON` from the same crate under test (`let expected = delta > limit + THRESHOLD_EPSILON`). If both the constant's value and all comparison sites were changed consistently, every test would still pass. The constant's value is independently pinned in `thresholds_epsilon.rs::threshold_epsilon_value()` (outside this audit's scope). The first test's inline comment acknowledges this: "Trivially true given the implementation but catches accidental refactors."
 - Severity: LOW
-- Action: Add one test with an edge whose `target` ID is absent from
-  `graph.nodes` and assert `violation_count == 0`.
+- Action: No immediate action required. The tests correctly detect the primary failure mode (a comparison site that drops `THRESHOLD_EPSILON`). Document the dependency on `threshold_epsilon_value()` in the `prop_thresholds.rs` module-level doc comment so future auditors understand why that value-guard test must not be deleted.
 
 ---
 
 ### Non-Findings (rationale recorded)
 
-- **Assertion honesty (unit tests):** All 14 unit-test assertions derive
-  their expected values from the documented algorithm (boundary assignment
-  rules, allow-list membership, sorted output, duplicate-edge counting).
-  No hard-coded magic numbers unrelated to implementation logic were found.
-- **Test weakening:** The tester added two new tests
-  (`duplicate_edge_produces_two_violations`,
-  `duplicate_same_boundary_edge_produces_no_violation`) without modifying
-  any assertion in the 12 tests written by the coder.  No weakening
-  occurred.
-- **Scope alignment:** All imports (`compute_boundary_violations`,
-  `BoundaryDefInput`, `BoundarySpecInput`, `DependencyGraphInput`,
-  `EdgeInput`, `NodeInput`) are re-exported from `sdivi_core::lib.rs`
-  and match the current public surface.  No orphaned references.
-  `proptest` is listed in `[dev-dependencies]` of `sdivi-core/Cargo.toml`.
-- **Naming:** All 16 test names encode both scenario and expected outcome.
-- **Implementation exercise:** Every test calls
-  `compute_boundary_violations` with real, un-mocked inputs.
-- **Test isolation:** All fixture data is constructed inline in memory.
-  No test reads mutable project files, pipeline artifacts, or
-  `.tekhton/` reports.
-- **`prop_violations_are_sorted`:** Uses `crates/a/**` and `crates/b/**`
-  against nodes with matching prefixes; violations are genuinely produced
-  and the sorted-output invariant is meaningfully exercised.
+- **Assertion honesty:** All nine tests derive expected values from actual `compute_thresholds_check` invocations with meaningful inputs. No hard-coded sentinel magic numbers unrelated to implementation logic were found.
+- **Test weakening:** The tester added three new tests without modifying any assertion in the six pre-existing tests. No weakening occurred.
+- **Scope alignment:** All imports in `prop_thresholds.rs` resolve against the current codebase — `compute_thresholds_check` and `THRESHOLD_EPSILON` are re-exported via `thresholds.rs:10-11` from `threshold_types.rs`; `ThresholdOverrideInput` and `ThresholdsInput` are in `input`; `DivergenceSummary` is in `sdivi_snapshot::delta`. No orphaned references. The deleted file `.tekhton/test_dedup.fingerprint` is not imported by any test.
+- **Implementation exercise:** All nine tests call `compute_thresholds_check` with real, un-mocked inputs; no dependency is mocked.
+- **Test isolation:** All tests construct their fixture data inline from proptest-generated values. No test reads `.tekhton/` reports, build artifacts, snapshot files, or any mutable project state.
+- **Naming:** All nine test names encode the scenario and expected outcome (e.g., `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation`). No opaque `test_1()` patterns.
+- **boundary_violation i64 cast:** `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation` correctly mirrors the implementation's `delta as f64` cast and notes that epsilon has no functional effect for integer deltas — consistent with the comment at `thresholds.rs:103-104`.

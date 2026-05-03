@@ -26,9 +26,7 @@ pub(super) fn compute_historical_stability(prior: &[PriorPartition]) -> f64 {
     matching / n_pairs
 }
 
-fn invert_assignments(
-    assignments: &BTreeMap<String, u32>,
-) -> BTreeMap<u32, BTreeSet<String>> {
+fn invert_assignments(assignments: &BTreeMap<String, u32>) -> BTreeMap<u32, BTreeSet<String>> {
     let mut result: BTreeMap<u32, BTreeSet<String>> = BTreeMap::new();
     for (node, &comm) in assignments {
         result.entry(comm).or_default().insert(node.clone());

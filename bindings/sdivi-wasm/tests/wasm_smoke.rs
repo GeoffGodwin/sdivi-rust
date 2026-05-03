@@ -238,4 +238,3 @@ fn normalize_hash_deterministic() {
     assert_eq!(hash.len(), 64);
     assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
 }
-

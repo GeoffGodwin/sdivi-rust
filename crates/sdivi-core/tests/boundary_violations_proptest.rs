@@ -7,11 +7,18 @@ use sdivi_core::{
 };
 
 fn node(id: &str) -> NodeInput {
-    NodeInput { id: id.into(), path: id.into(), language: "rust".into() }
+    NodeInput {
+        id: id.into(),
+        path: id.into(),
+        language: "rust".into(),
+    }
 }
 
 fn edge(src: &str, tgt: &str) -> EdgeInput {
-    EdgeInput { source: src.into(), target: tgt.into() }
+    EdgeInput {
+        source: src.into(),
+        target: tgt.into(),
+    }
 }
 
 fn boundary(name: &str, modules: &[&str], allow: &[&str]) -> BoundaryDefInput {

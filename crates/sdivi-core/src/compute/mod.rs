@@ -5,6 +5,7 @@ pub mod change_coupling;
 pub mod coupling;
 pub mod normalize;
 pub mod patterns;
-pub mod thresholds;
 mod stability;
+mod threshold_types;
+pub mod thresholds;
 mod violation;

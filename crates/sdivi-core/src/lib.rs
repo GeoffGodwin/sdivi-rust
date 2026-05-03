@@ -70,6 +70,7 @@ pub use compute::normalize::normalize_and_hash;
 pub use compute::patterns::{compute_pattern_metrics, compute_pattern_metrics_from_catalog};
 pub use compute::thresholds::{
     compute_thresholds_check, AppliedOverrideInfo, ThresholdBreachInfo, ThresholdCheckResult,
+    THRESHOLD_EPSILON,
 };
 
 // ── facade re-exports (sdivi-snapshot) ──────────────────────────────────────

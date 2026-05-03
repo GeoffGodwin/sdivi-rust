@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
 use proptest::prelude::*;
-use sdivi_core::compute::thresholds::compute_thresholds_check;
+use sdivi_core::compute::thresholds::{compute_thresholds_check, THRESHOLD_EPSILON};
 use sdivi_core::input::{ThresholdOverrideInput, ThresholdsInput};
 use sdivi_snapshot::delta::DivergenceSummary;
 
@@ -192,5 +192,127 @@ proptest! {
                 "negative convention_drift delta must never breach"
             );
         }
+    }
+
+    /// The pattern_entropy aggregate breach decision equals `delta > limit + THRESHOLD_EPSILON`.
+    ///
+    /// Trivially true given the implementation but catches accidental refactors.
+    #[test]
+    fn prop_breach_equals_delta_gt_limit_plus_epsilon(
+        limit in 0.1f64..10.0,
+        delta in -5.0f64..15.0,
+    ) {
+        let mut cfg = ThresholdsInput::default();
+        cfg.pattern_entropy_rate = limit;
+        let summary = DivergenceSummary {
+            pattern_entropy_delta: Some(delta),
+            convention_drift_delta: None,
+            coupling_delta: None,
+            community_count_delta: None,
+            boundary_violation_delta: None,
+            pattern_entropy_per_category_delta: None,
+            convention_drift_per_category_delta: None,
+        };
+        let r = compute_thresholds_check(&summary, &cfg);
+        let expected = delta > limit + THRESHOLD_EPSILON;
+        prop_assert_eq!(
+            r.breached,
+            expected,
+            "breached({}, {}) must equal delta > limit + THRESHOLD_EPSILON ({})",
+            delta, limit, expected
+        );
+    }
+
+    /// The convention_drift aggregate breach decision equals `delta > limit + THRESHOLD_EPSILON`.
+    ///
+    /// Guards against a per-dimension refactor that accidentally drops epsilon at the
+    /// convention_drift comparison site.
+    #[test]
+    fn prop_breach_equals_delta_gt_limit_plus_epsilon_convention_drift(
+        limit in 0.1f64..10.0,
+        delta in -5.0f64..15.0,
+    ) {
+        let mut cfg = ThresholdsInput::default();
+        cfg.convention_drift_rate = limit;
+        let summary = DivergenceSummary {
+            pattern_entropy_delta: None,
+            convention_drift_delta: Some(delta),
+            coupling_delta: None,
+            community_count_delta: None,
+            boundary_violation_delta: None,
+            pattern_entropy_per_category_delta: None,
+            convention_drift_per_category_delta: None,
+        };
+        let r = compute_thresholds_check(&summary, &cfg);
+        let expected = delta > limit + THRESHOLD_EPSILON;
+        prop_assert_eq!(
+            r.breached,
+            expected,
+            "convention_drift: breached({}, {}) must equal delta > limit + THRESHOLD_EPSILON ({})",
+            delta, limit, expected
+        );
+    }
+
+    /// The coupling_delta aggregate breach decision equals `delta > limit + THRESHOLD_EPSILON`.
+    ///
+    /// Guards against a per-dimension refactor that accidentally drops epsilon at the
+    /// coupling_delta comparison site.
+    #[test]
+    fn prop_breach_equals_delta_gt_limit_plus_epsilon_coupling_delta(
+        limit in 0.01f64..1.0,
+        delta in -1.0f64..2.0,
+    ) {
+        let mut cfg = ThresholdsInput::default();
+        cfg.coupling_delta_rate = limit;
+        let summary = DivergenceSummary {
+            pattern_entropy_delta: None,
+            convention_drift_delta: None,
+            coupling_delta: Some(delta),
+            community_count_delta: None,
+            boundary_violation_delta: None,
+            pattern_entropy_per_category_delta: None,
+            convention_drift_per_category_delta: None,
+        };
+        let r = compute_thresholds_check(&summary, &cfg);
+        let expected = delta > limit + THRESHOLD_EPSILON;
+        prop_assert_eq!(
+            r.breached,
+            expected,
+            "coupling_delta: breached({}, {}) must equal delta > limit + THRESHOLD_EPSILON ({})",
+            delta, limit, expected
+        );
+    }
+
+    /// The boundary_violation_delta aggregate breach decision equals
+    /// `(delta as f64) > limit + THRESHOLD_EPSILON`.
+    ///
+    /// `boundary_violation_delta` is `i64`; epsilon has no functional effect for
+    /// integer-cast deltas, but the same comparison form is applied for consistency.
+    /// This test guards against a future refactor that drops epsilon at this site.
+    #[test]
+    fn prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation(
+        limit in 0.1f64..10.0,
+        delta in -10i64..20,
+    ) {
+        let mut cfg = ThresholdsInput::default();
+        cfg.boundary_violation_rate = limit;
+        let summary = DivergenceSummary {
+            pattern_entropy_delta: None,
+            convention_drift_delta: None,
+            coupling_delta: None,
+            community_count_delta: None,
+            boundary_violation_delta: Some(delta),
+            pattern_entropy_per_category_delta: None,
+            convention_drift_per_category_delta: None,
+        };
+        let r = compute_thresholds_check(&summary, &cfg);
+        let delta_f = delta as f64;
+        let expected = delta_f > limit + THRESHOLD_EPSILON;
+        prop_assert_eq!(
+            r.breached,
+            expected,
+            "boundary_violation: breached({}, {}) must equal delta_f > limit + THRESHOLD_EPSILON ({})",
+            delta_f, limit, expected
+        );
     }
 }

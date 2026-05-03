@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.10] - 2026-05-02
+
+### Changed
+
+- Threshold gate now applies a `1e-9` epsilon to the limit in `compute_thresholds_check`,
+  eliminating cross-arch gate flap from documented per-arch ULP drift in delta computations.
+  Behaviour for any user-meaningful threshold is unchanged. (M20)
+- `pub const THRESHOLD_EPSILON: f64 = 1e-9` added to `sdivi-core` and re-exported
+  from `sdivi_core`. WASM and other embedders can reference the same constant.
+
+- Added `pub const THRESHOLD_EPSILON: f64 = 1e-9` to `crates/sdivi-core/src/compute/threshold_types.rs` (new file, extracted from `thresholds.rs`) with a doc comment citing `docs/determinism.md § Threshold gate stability`. (M20)
 ## [0.1.9] - 2026-05-02
 
 ### Added
