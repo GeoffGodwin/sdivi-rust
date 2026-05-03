@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use crate::category_types::*;
 use crate::types::*;
 use crate::weight_keys::parse_wasm_edge_weights;
 
@@ -248,6 +249,15 @@ fn build_leiden_partition(
         modularity: input.modularity,
         seed: input.leiden_seed.unwrap_or(42),
     })
+}
+
+/// Return the canonical pattern-category contract for `snapshot_version "1.0"`.
+///
+/// Embedders that supply their own tree-sitter extractors should call this
+/// function to discover which category names are valid instead of hard-coding them.
+#[wasm_bindgen]
+pub fn list_categories() -> Result<WasmCategoryCatalog, JsError> {
+    from_core(sdivi_core::list_categories())
 }
 
 fn build_pattern_catalog(

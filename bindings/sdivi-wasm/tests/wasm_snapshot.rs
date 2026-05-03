@@ -183,12 +183,16 @@ fn test_assemble_snapshot_with_change_coupling_round_trips() {
 
     let mut input = make_assemble_input(0.25, "2026-05-01T00:00:00Z");
     input.change_coupling = Some(WasmChangeCouplingInput {
-        pairs: cc_result.pairs.iter().map(|p| WasmCoChangePairInput {
-            source: p.source.clone(),
-            target: p.target.clone(),
-            frequency: p.frequency,
-            cochange_count: p.cochange_count,
-        }).collect(),
+        pairs: cc_result
+            .pairs
+            .iter()
+            .map(|p| WasmCoChangePairInput {
+                source: p.source.clone(),
+                target: p.target.clone(),
+                frequency: p.frequency,
+                cochange_count: p.cochange_count,
+            })
+            .collect(),
         commits_analyzed: cc_result.commits_analyzed,
         distinct_files_touched: cc_result.distinct_files_touched,
     });
@@ -201,7 +205,10 @@ fn test_assemble_snapshot_with_change_coupling_round_trips() {
         .change_coupling
         .expect("change_coupling must be Some when supplied");
     assert_eq!(cc.commits_analyzed, 2, "commits_analyzed must round-trip");
-    assert_eq!(cc.distinct_files_touched, 2, "distinct_files_touched must round-trip");
+    assert_eq!(
+        cc.distinct_files_touched, 2,
+        "distinct_files_touched must round-trip"
+    );
     assert_eq!(cc.pairs.len(), 1, "one pair above min_frequency expected");
     assert_eq!(cc.pairs[0].source, "src/a.rs");
     assert_eq!(cc.pairs[0].target, "src/b.rs");

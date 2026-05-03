@@ -1,98 +1,57 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 21 test functions
-Verdict: CONCERNS
+Tests audited: 1 file, 13 test functions (1 added by tester, 12 pre-existing)
+Verdict: PASS
 
 Files audited:
-- `crates/sdivi-core/tests/prop_thresholds.rs` (9 proptest functions; 4 added by tester)
-- `bindings/sdivi-wasm/src/weight_keys.rs` `#[cfg(test)] mod tests` (12 unit tests; 5 added by tester)
+- `bindings/sdivi-wasm/src/weight_keys.rs` `#[cfg(test)] mod tests` — tester added `rejects_negative_infinity_weight` (line 184)
+
+Coder-written test files (`category_contract.rs`, `m23_native.rs`, `wasm_smoke.rs`) were created as part of the M23 implementation and are outside the tester's scope. They were reviewed informally for context and are noted in the Non-Findings section.
 
 ---
 
 ### Findings
 
-#### EXERCISE: Failing test exposes unimplemented infinity fix
-- File: `bindings/sdivi-wasm/src/weight_keys.rs:172`
-- Issue: `rejects_positive_infinity_weight` calls `unwrap_err()` expecting `parse_wasm_edge_weights`
-  to reject `f64::INFINITY`. The implementation checks `weight.is_nan()` (line 25) and
-  `weight < 0.0` (line 29) but has no `is_infinite()` guard. `f64::INFINITY` is not NaN and is
-  not negative, so the function reaches the insert and returns `Ok(result)` with infinity in the
-  map. `unwrap_err()` on `Ok(...)` panics. The tester documented this in `TESTER_REPORT.md`
-  ("Passed: 20, Failed: 1") and correctly identified the root cause, but shipped the test without
-  the implementation fix. CI will fail on this test.
-- Severity: HIGH
-- Action: Fix `parse_wasm_edge_weights` in `bindings/sdivi-wasm/src/weight_keys.rs`: add an
-  `is_infinite()` check immediately after the `is_nan()` block at line 28 —
-  `if weight.is_infinite() { return Err(format!("edge weight for key \"{key}\" is infinite; weights must be finite")); }`.
-  The test is correct and must not be changed. The function's own doc comment already promises
-  "weights must be finite", so this is a straightforward implementation fix.
-
----
-
-#### COVERAGE: Epsilon assertion is vacuous for the `boundary_violation_delta` (i64) dimension
-- File: `crates/sdivi-core/tests/prop_thresholds.rs:293`
-- Issue: `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation` asserts
-  `r.breached == (delta_f > limit + THRESHOLD_EPSILON)` where `THRESHOLD_EPSILON = 1e-9` and
-  `delta_f` is an `i64` cast to `f64`. The minimum gap between consecutive integer-cast deltas
-  (1.0) is nine orders of magnitude larger than epsilon, so epsilon can never flip the comparison
-  outcome. The assertion is functionally identical to `delta_f > limit`. The doc comment
-  acknowledges this explicitly ("epsilon has no functional effect for integer-cast deltas") and
-  frames the test as a guard against a future refactor that drops the epsilon term entirely.
-  The code path is exercised; only the epsilon portion of the assertion is vacuous.
+#### COVERAGE: `rejects_negative_infinity_weight` does not exclusively exercise the new `is_infinite()` path
+- File: `bindings/sdivi-wasm/src/weight_keys.rs:184`
+- Issue: `f64::NEG_INFINITY` satisfies `weight < 0.0` (line 30), which was present before the coder's fix. The test would pass against the pre-fix implementation — the old code returned `"is negative (-inf); weights must be >= 0.0"`, and `-inf` contains `"inf"`, satisfying the assertion `e.contains("finite") || e.contains("infinite") || e.contains("inf")`. The test correctly asserts that `NEG_INFINITY` is rejected, but it does not independently verify that the `is_infinite()` fix was needed for the negative-infinity case. The bug under repair (POSITIVE infinity passing validation silently) is verified only by the coder-written `rejects_positive_infinity_weight` test.
 - Severity: LOW
-- Action: No change required. The acknowledged rationale is sound. If `boundary_violation_delta`
-  is ever changed to `f64`, the test gains real epsilon coverage automatically.
-
----
-
-#### NAMING: `handles_colon_in_node_id` asserts count only, not key content
-- File: `bindings/sdivi-wasm/src/weight_keys.rs:108`
-- Issue: The test name implies verification of correct colon-in-node-id handling, but the body
-  only asserts `result.len() == 1`. The key-content assertion for this scenario is fully covered
-  by the tester-added `colon_in_node_id_produces_correct_nul_key` at line 136. The count-only
-  assertion adds no signal not already provided by the content test. This is a coder-authored
-  test; the tester did not weaken it.
-- Severity: LOW
-- Action: Consider merging `handles_colon_in_node_id` into `colon_in_node_id_produces_correct_nul_key`
-  (the content test already implicitly verifies a single entry via `contains_key`). Not blocking.
+- Action: No change required. The test exercises legitimate behavior and will remain a valid regression guard. The tester could optionally strengthen the assertion to verify the "finite" error path is taken (e.g., `e.contains("finite")`) and add a comment explaining that `is_nan() || is_infinite()` is the matching branch, but this is not blocking.
 
 ---
 
 ### Non-Findings (rationale recorded)
 
-**Assertion honesty (`prop_thresholds.rs`):** All nine proptest functions derive expected values
-from actual `compute_thresholds_check` calls with proptest-generated inputs. The four
-`prop_breach_equals_delta_gt_limit_plus_epsilon_*` tests import `THRESHOLD_EPSILON` from the
-crate under test and use the same comparison formula as the implementation — this is intentional
-regression-guard behavior (acknowledged in the doc comments), not a fake assertion. No sentinel
-magic numbers unrelated to implementation logic were found.
+**Prior HIGH finding resolved:** The previous `TEST_AUDIT_REPORT.md` flagged `rejects_positive_infinity_weight` (line 172) as HIGH — the implementation lacked `is_infinite()` so `f64::INFINITY` would reach the insert and the test would panic on `unwrap_err()`. The coder has added `weight.is_nan() || weight.is_infinite()` at line 25 (confirmed by reading `weight_keys.rs`). The HIGH finding is closed. CI will now pass on that test.
 
-**Test weakening:** The tester added four proptest functions to `prop_thresholds.rs` and five unit
-tests to `weight_keys.rs` without modifying any assertion in any pre-existing test. No weakening
-occurred.
+**Assertion honesty (`rejects_negative_infinity_weight`):** The test calls the real `parse_wasm_edge_weights` with `f64::NEG_INFINITY`. The implementation at line 25 (`weight.is_nan() || weight.is_infinite()`) fires, producing `"edge weight for key \"a:b\" is not finite (-inf); all weights must be finite and >= 0.0"`. The assertion `e.contains("finite")` is satisfied. No sentinel values unrelated to implementation logic.
 
-**Scope alignment:** All imports in both files resolve against the current codebase.
-`compute_thresholds_check` and `THRESHOLD_EPSILON` are re-exported from
-`crates/sdivi-core/src/compute/thresholds.rs`. `edge_weight_key` is exported from
-`crates/sdivi-core/src/input/edge_weight.rs`. The deleted file `.tekhton/test_dedup.fingerprint`
-is not imported by any test under audit.
+**Test weakening:** The tester did not modify any assertion in any pre-existing test. `rejects_negative_infinity_weight` is a pure addition.
 
-**Implementation exercise:** All tests call real functions with un-mocked inputs. No mock
-infrastructure was introduced.
+**Scope alignment:** All 13 tests in the module reference `parse_wasm_edge_weights` and `sdivi_core::input::edge_weight_key`, both present in the current codebase. The deleted file `.tekhton/test_dedup.fingerprint` is not referenced by any test under audit.
 
-**Test isolation:** All tests construct fixture data inline from literals or proptest strategies.
-No test reads `.tekhton/` pipeline reports, build artifacts, snapshot files, or any mutable
-project state.
+**Test isolation:** `rejects_negative_infinity_weight` constructs a `BTreeMap` from inline literals and calls no I/O. No mutable project files are read.
+
+**Test naming:** `rejects_negative_infinity_weight` clearly encodes the scenario (negative infinity input) and the expected outcome (rejection).
+
+**Implementation exercise:** The test calls the real function with no mocking.
+
+**Coder-written test files (out of formal scope):** `crates/sdivi-core/tests/category_contract.rs` (6 tests), `bindings/sdivi-wasm/tests/m23_native.rs` (4 tests), and `bindings/sdivi-wasm/tests/wasm_smoke.rs` (1 test added) were reviewed informally.
+- `markdown_table_matches_list_categories_output` reads `docs/pattern-categories.md` at test time. This is a source documentation file, not a pipeline artifact or build report. The test is an intentional documentation-code parity gate; reading a source-controlled doc file does not violate the isolation rubric.
+- `no_category_string_in_patterns_src_missing_from_list_categories` scans live source files (`crates/sdivi-patterns/src/`). Same rationale — this is an intentional drift gate over source files, not a build artifact reader.
+- `list_categories_wasm_export_returns_five_categories` hardcodes `5`. This matches `CATEGORIES.len()` in `crates/sdivi-core/src/categories.rs` — a contract constant, not a magic number.
+- `list_categories_includes_all_expected_names` hardcodes the five category name strings. These are the verbatim contract values from `CATEGORIES`. Valid contract assertions.
+- No orphaned imports, no always-pass assertions, and no weakened pre-existing tests were found in any of the coder-written test files.
 
 **Rubric table:**
 
-| Criterion              | prop_thresholds.rs                        | weight_keys.rs tests                               |
-|------------------------|-------------------------------------------|----------------------------------------------------|
-| Assertion Honesty      | PASS                                      | PASS                                               |
-| Edge Case Coverage     | PASS                                      | PASS (empty map, 0.0, colon-in-ID, value fidelity) |
-| Implementation Exercise| PASS                                      | PASS                                               |
-| Test Weakening         | PASS — additions only                     | PASS — additions only                              |
-| Test Naming            | PASS                                      | LOW concern on `handles_colon_in_node_id`          |
-| Scope Alignment        | PASS                                      | HIGH — `rejects_positive_infinity_weight` asserts rejected behavior the impl does not enforce |
-| Test Isolation         | PASS                                      | PASS                                               |
+| Criterion              | `weight_keys.rs` — tester addition                                |
+|------------------------|-------------------------------------------------------------------|
+| Assertion Honesty      | PASS — calls real function, checks meaningful error message       |
+| Edge Case Coverage     | LOW concern — NEG_INFINITY was already caught by `< 0.0` guard   |
+| Implementation Exercise| PASS — real function, no mocks                                    |
+| Test Weakening         | PASS — addition only; no existing assertion modified              |
+| Test Naming            | PASS — name encodes scenario and expected outcome                 |
+| Scope Alignment        | PASS — `parse_wasm_edge_weights` present and correctly fixed      |
+| Test Isolation         | PASS — inline literals only                                       |

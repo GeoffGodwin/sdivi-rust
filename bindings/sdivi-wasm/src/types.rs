@@ -297,4 +297,6 @@ pub struct WasmTrendResult {
 }
 
 // ── assemble_snapshot input (moved to assemble_types.rs) ─────────────────────
-pub use crate::assemble_types::{WasmAssembleSnapshotInput, WasmChangeCouplingInput, WasmCoChangePairInput};
+pub use crate::assemble_types::{
+    WasmAssembleSnapshotInput, WasmChangeCouplingInput, WasmCoChangePairInput,
+};

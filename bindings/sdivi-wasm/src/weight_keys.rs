@@ -22,9 +22,9 @@ pub fn parse_wasm_edge_weights(
 ) -> Result<BTreeMap<String, f64>, String> {
     let mut result = BTreeMap::new();
     for (key, weight) in weights {
-        if weight.is_nan() {
+        if weight.is_nan() || weight.is_infinite() {
             return Err(format!(
-                "edge weight for key \"{key}\" is NaN; all weights must be finite"
+                "edge weight for key \"{key}\" is not finite ({weight}); all weights must be finite and >= 0.0"
             ));
         }
         if weight < 0.0 {
@@ -176,6 +176,18 @@ mod tests {
         assert!(
             e.contains("finite") || e.contains("infinite") || e.contains("NaN"),
             "error message must explain why infinity is rejected: {e}"
+        );
+    }
+
+    /// `f64::NEG_INFINITY` must be rejected — the `is_infinite()` check must catch both signs.
+    #[test]
+    fn rejects_negative_infinity_weight() {
+        let mut m = BTreeMap::new();
+        m.insert("a:b".to_string(), f64::NEG_INFINITY);
+        let e = parse_wasm_edge_weights(m).unwrap_err();
+        assert!(
+            e.contains("finite") || e.contains("infinite") || e.contains("inf"),
+            "error message must explain why negative infinity is rejected: {e}"
         );
     }
 }

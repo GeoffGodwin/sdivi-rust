@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-05-03
+
+### Added
+
+- `sdivi-core`: `list_categories() -> CategoryCatalog` — returns the canonical pattern-category
+  contract for `snapshot_version "1.0"`. Embedders can call this instead of hard-coding category
+  names to ensure their `PatternInstanceInput.category` values stay aligned. (M23)
+- `sdivi-core`: `CategoryCatalog` and `CategoryInfo` structs — serde-serializable contract types
+  with `schema_version` and per-category name + description. (M23)
+- `sdivi-core`: `CATEGORIES` constant — canonical category name slice in alphabetical order. (M23)
+- `@geoffgodwin/sdivi-wasm`: `list_categories()` export — returns `WasmCategoryCatalog` with
+  `schema_version: "1.0"` and all five categories. TypeScript type is tsify-derived. (M23)
+- `docs/pattern-categories.md` — versioned contract document: canonical category list table,
+  per-language node-kind mappings, normalization rules, and embedder responsibilities. (M23)
+- `crates/sdivi-core/tests/category_contract.rs` — CI drift gate that greps
+  `crates/sdivi-patterns/src/` at test time and asserts every discovered category string is
+  present in `list_categories()` output; also verifies the markdown table matches runtime output. (M23)
+
+- [MILESTONE 22 ✓] feat: M22 (M23)
 ## [0.1.12] - 2026-05-02
 
 ### Added

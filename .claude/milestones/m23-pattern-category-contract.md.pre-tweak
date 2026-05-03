@@ -1,11 +1,9 @@
-
 #### Milestone 23: Pattern Category Contract + WASM `list_categories()`
 
 <!-- milestone-meta
 id: "23"
-status: "done"
+status: "in_progress"
 -->
-<!-- PM-tweaked: 2026-05-02 -->
 
 **Scope:** Establish the canonical pattern-category schema as a versioned, documented contract — the canonical category names (`error_handling`, `data_access`, `logging`, etc.), their expected tree-sitter node-kind shapes per language, and the normalization rules that produce a `blake3` fingerprint. Ship as `docs/pattern-categories.md` versioned to `snapshot_version "1.0"`. Add a `list_categories() -> CategoryCatalog` WASM export so embedders can discover the contract at runtime instead of hard-coding category names. Doc + runtime ship together so consumers can't drift from the contract.
 
@@ -41,7 +39,7 @@ status: "done"
 - **Create:** `docs/pattern-categories.md` — the versioned contract.
 - **Create:** `crates/sdivi-core/src/categories.rs` — `CategoryCatalog`, `CategoryInfo`, `list_categories()`, `const CATEGORIES`.
 - **Modify:** `crates/sdivi-core/src/lib.rs` — re-export the catalog types and the function.
-- **Modify:** `crates/sdivi-patterns/src/` — [PM: The original instruction ("replace inline category-string literals with references to `sdivi-core::categories::CATEGORIES`") creates a dependency cycle: `sdivi-core` already depends on `sdivi-patterns`, so `sdivi-patterns` cannot in turn depend on `sdivi-core`. **Do not attempt that import.** Instead, keep the category string literals where they are in `sdivi-patterns`. The `category_contract.rs` test (below) is the enforcement mechanism: it greps `sdivi-patterns/src/` at test time and asserts every discovered string is present in `list_categories()` output. No code-level cross-reference is needed or safe to add. If a single source of truth for the constant set itself is desired, consider moving `CATEGORIES` to `sdivi-config` (a leaf crate that both `sdivi-core` and `sdivi-patterns` already depend on) — but that is optional for this milestone; the test gate is sufficient.]
+- **Modify:** `crates/sdivi-patterns/src/` — replace any inline category-string `&str` literals with references to the constant in `sdivi-core::categories::CATEGORIES`. (Mechanical refactor — same strings, single source.)
 - **Create:** `bindings/sdivi-wasm/src/exports.rs` — add `list_categories()` `#[wasm_bindgen]` wrapper.
 - **Create:** `crates/sdivi-core/tests/category_contract.rs` — drift-detection test.
 - **Modify:** `bindings/sdivi-wasm/README.md` — show `list_categories()` usage.
@@ -70,10 +68,10 @@ status: "done"
 - **`#![deny(missing_docs)]` on `sdivi-core`.** The new `categories` module, every pub item in it, every field of `CategoryInfo` needs a doc comment with an `# Examples` block where meaningful (`list_categories` definitely needs one).
 - **Don't add a "category" enum.** Use `String` for category names. An enum couples the binding ABI to the category set and forces a binding bump every time a category is added; a string is open-ended and the contract is enforced at the higher `list_categories()` layer.
 - **Doc-comment placement.** Per CLAUDE.md, when inserting `CategoryCatalog` and `CategoryInfo` adjacent to existing items in `categories.rs`, ensure blank lines separate the doc blocks.
-- **[PM: No circular dep.] `sdivi-patterns` must not import from `sdivi-core`.** The dependency direction is `sdivi-core` → `sdivi-patterns`, never the reverse. The contract is enforced purely through the `category_contract.rs` grep test, not through a shared import.
 
 **Seeds Forward:**
 - A `categories.json` machine-readable export (sibling to `list_categories()`, generated at build time and shipped under `docs/`) becomes worthwhile if a non-WASM, non-Rust consumer (e.g. a shell-script CI integration) needs to enumerate categories. Defer until requested.
 - Per-language node-kind tables in `docs/pattern-categories.md` are written by hand for the v0 supported languages. A future milestone could derive them from the tree-sitter queries themselves to eliminate the doc/code drift surface area entirely. Out of scope here — the manual table plus the contract test are sufficient for v0.
 - If a category is ever truly retired (vs deprecated), that requires a `snapshot_version` bump per Rule 16 — not a small decision. Document the bump procedure in `docs/pattern-categories.md` Versioning section so the cost is visible to future contributors.
-- If moving `CATEGORIES` to `sdivi-config` (to share the constant between `sdivi-patterns` and `sdivi-core` without a cycle) becomes worthwhile in a future cleanup pass, that is a safe mechanical move — `sdivi-config` is already a leaf crate that both depend on.
+
+---

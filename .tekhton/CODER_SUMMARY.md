@@ -3,51 +3,71 @@
 
 ## What Was Implemented
 
-- **`WasmCoChangePairInput` and `WasmChangeCouplingInput`** defined in `assemble_types.rs`, mirroring `sdivi_core::CoChangePair` and `sdivi_core::ChangeCouplingResult` exactly. Both tsify-derived with matching serde field names for a lossless round-trip conversion.
-- **`change_coupling: Option<WasmChangeCouplingInput>` field** added to `WasmAssembleSnapshotInput` with `#[serde(default)]` and `#[tsify(optional)]`. Strictly additive — callers that omit the field see identical snapshot output to pre-M22.
-- **`exports.rs` wired up**: replaced the 3-line TODO/ADL-7 comment and hardcoded `None` with `input.change_coupling.map(to_core).transpose()?` converting `WasmChangeCouplingInput` → `sdivi_core::ChangeCouplingResult`. The converted value is now passed as the 8th argument to `sdivi_core::assemble_snapshot`.
-- **`types.rs` re-export updated** (single-line, no line-count increase) to expose `WasmChangeCouplingInput` and `WasmCoChangePairInput` via the `types::*` glob used by `exports.rs` and tests.
-- **Tests updated** in `wasm_snapshot.rs`: `make_assemble_input` factory updated with `change_coupling: None`; ADL-7 test renamed/updated to `test_assemble_snapshot_without_change_coupling_produces_none`; new round-trip test `test_assemble_snapshot_with_change_coupling_round_trips` added verifying `Some(...)` populates the snapshot field with correct values.
-- **`README.md`** updated with `compute_change_coupling` in the exports table, a round-trip usage example, and an API parity note ("WASM API parity reached for snapshot assembly" per Seeds Forward instruction).
-- **`ARCHITECTURE_LOG.md`**: ADL-7 marked implemented with pointer to M22 changes.
-- **`CHANGELOG.md`**: `[0.1.12]` entry added under Unreleased.
+### BUG Fix
+- **`weight_keys.rs:25`**: Added `is_infinite()` check alongside existing `is_nan()` check in `parse_wasm_edge_weights`. Error message unified to explain both cases. The pre-existing `rejects_positive_infinity_weight` test in the same file now passes (it was asserting expected behavior before the fix was in).
+
+### M23: Pattern Category Contract + WASM `list_categories()`
+
+- **`crates/sdivi-core/src/categories.rs`** (NEW): `CATEGORIES` const (5 canonical names in alphabetical order), `CATEGORY_DESCRIPTIONS` const (name + description pairs), `CategoryInfo` struct, `CategoryCatalog` struct — both with `Serialize`/`Deserialize` + `#[derive(PartialEq)]` for test equality. `list_categories() -> CategoryCatalog` — referentially transparent, uses `SNAPSHOT_VERSION` for `schema_version`. Full `#[deny(missing_docs)]` compliance with `# Examples` blocks on every public item.
+
+- **`crates/sdivi-core/src/lib.rs`** (MODIFIED): Added `pub mod categories` module declaration and re-exports of `list_categories`, `CategoryCatalog`, `CategoryInfo`, `CATEGORIES`.
+
+- **`crates/sdivi-core/tests/category_contract.rs`** (NEW): 6-test CI drift gate:
+  1. `list_categories_returns_schema_version_1_0`
+  2. `list_categories_returns_non_empty_categories`
+  3. `list_categories_is_referentially_transparent`
+  4. `categories_constant_matches_list_categories`
+  5. `no_category_string_in_patterns_src_missing_from_list_categories` — grep-based drift gate scanning `crates/sdivi-patterns/src/` at test time for `Some("…")` patterns
+  6. `markdown_table_matches_list_categories_output` — parses `docs/pattern-categories.md` canonical-category-list table and asserts it matches `list_categories()` output
+
+- **`bindings/sdivi-wasm/src/category_types.rs`** (NEW): `WasmCategoryInfo` and `WasmCategoryCatalog` with Tsify derives (`into_wasm_abi`, `from_wasm_abi`). Field names match `sdivi_core` types exactly for serde round-trip.
+
+- **`bindings/sdivi-wasm/src/lib.rs`** (MODIFIED): Added `pub mod category_types` declaration.
+
+- **`bindings/sdivi-wasm/src/exports.rs`** (MODIFIED): Added `use crate::category_types::*` import and `list_categories() -> Result<WasmCategoryCatalog, JsError>` export using `from_core(sdivi_core::list_categories())`.
+
+- **`bindings/sdivi-wasm/tests/m23_native.rs`** (NEW): 4 native (non-wasm-pack) tests for `WasmCategoryCatalog` serde round-trip and field-name contract, plus native call to `sdivi_core::list_categories()`.
+
+- **`bindings/sdivi-wasm/tests/wasm_smoke.rs`** (MODIFIED): Added `list_categories` to import; added `list_categories_returns_schema_version_and_expected_count` `#[wasm_bindgen_test]`.
+
+- **`docs/pattern-categories.md`** (NEW): Versioned contract document with:
+  - Versioning rules (reserved-forever, additive, snapshot version bump procedure)
+  - Canonical category list table (5 categories)
+  - Per-language node-kind mappings (Rust, Python, TypeScript/JS, Go/Java)
+  - Normalization rules (`normalize_and_hash` algorithm + embedder responsibilities)
+  - Runtime discovery examples (Rust + TypeScript)
+
+- **`bindings/sdivi-wasm/README.md`** (MODIFIED): Added `list_categories()` to exports table and added "Pattern category discovery" section with TypeScript usage example.
+
+- **`CHANGELOG.md`** (MODIFIED): Added `[0.1.13]` entry under Added for all M23 deliverables.
 
 ## Root Cause (bugs only)
-N/A — feature implementation
+`parse_wasm_edge_weights` checked `is_nan()` but not `is_infinite()`. The doc comment stated weights must be "finite"; the validation did not enforce infinity rejection. Fix: combined `is_nan() || is_infinite()` check with a unified error message.
 
 ## Files Modified
-- `bindings/sdivi-wasm/src/assemble_types.rs` — added `WasmCoChangePairInput`, `WasmChangeCouplingInput`; added `change_coupling` field to `WasmAssembleSnapshotInput` (99 lines ✓)
-- `bindings/sdivi-wasm/src/types.rs` — expanded re-export line to include new types; single-line change, line count unchanged at 300 (pre-existing at 300; see Observed Issues)
-- `bindings/sdivi-wasm/src/exports.rs` — wired change_coupling conversion, removed TODO/ADL-7 comment (273 lines ✓)
-- `bindings/sdivi-wasm/tests/wasm_snapshot.rs` — updated tests for M22 (212 lines ✓)
-- `bindings/sdivi-wasm/README.md` — round-trip example + API parity note (114 lines ✓)
-- `.tekhton/ARCHITECTURE_LOG.md` — marked ADL-7 implemented
-- `CHANGELOG.md` — Added `[0.1.12]` entry (235 lines ✓)
+- `bindings/sdivi-wasm/src/weight_keys.rs` — BUG fix: added `is_infinite()` check (181 lines ✓)
+- `crates/sdivi-core/src/categories.rs` — NEW: CategoryCatalog, CategoryInfo, CATEGORIES, list_categories() (133 lines ✓)
+- `crates/sdivi-core/src/lib.rs` — added categories module + re-exports (128 lines ✓)
+- `crates/sdivi-core/tests/category_contract.rs` — NEW: 6-test drift gate (205 lines ✓)
+- `bindings/sdivi-wasm/src/category_types.rs` — NEW: WasmCategoryCatalog, WasmCategoryInfo (30 lines ✓)
+- `bindings/sdivi-wasm/src/lib.rs` — added pub mod category_types (80 lines ✓)
+- `bindings/sdivi-wasm/src/exports.rs` — added list_categories() WASM export (283 lines ✓)
+- `bindings/sdivi-wasm/tests/m23_native.rs` — NEW: 4 native tests (72 lines ✓)
+- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — added list_categories wasm_bindgen_test (254 lines ✓)
+- `bindings/sdivi-wasm/README.md` — added list_categories entry + usage section (134 lines ✓)
+- `CHANGELOG.md` — added [0.1.13] M23 entry (254 lines ✓)
+- `docs/pattern-categories.md` — NEW: versioned contract document
 
 ## Human Notes Status
 N/A — no Human Notes section in this task
 
+## Docs Updated
+- `docs/pattern-categories.md` — NEW: complete versioned contract document
+- `bindings/sdivi-wasm/README.md` — added `list_categories()` to exports table and usage section
+
 ## Observed Issues (out of scope)
-
-- **`bindings/sdivi-wasm/src/types.rs` at 300 lines**: This file was at 301 lines before M22. My modification (collapsing a multi-line re-export to a single line) reduced it to 300, which is at the 300-line ceiling ("under 300" strictly means < 300). Bringing it under 300 would require moving types to a separate file — structural refactoring outside M22 scope. Improvement tracked for a future cleanup cycle.
-- **MANIFEST.cfg and milestone file** could not be updated (protected files). Status remains `in_progress` in those files; CI pipeline will see the status via other artifacts.
-
-## Files Modified (auto-detected)
-- `.claude/milestones/MANIFEST.cfg`
-- `.claude/milestones/m22-change-coupling-wasm-assemble-snapshot.md`
-- `.tekhton/ARCHITECTURE_LOG.md`
-- `.tekhton/CODER_SUMMARY.md`
-- `.tekhton/DRIFT_LOG.md`
-- `.tekhton/HUMAN_ACTION_REQUIRED.md`
-- `.tekhton/PREFLIGHT_REPORT.md`
-- `.tekhton/REVIEWER_REPORT.md`
-- `.tekhton/TESTER_REPORT.md`
-- `.tekhton/test_dedup.fingerprint`
-- `CHANGELOG.md`
-- `bindings/sdivi-wasm/README.md`
-- `bindings/sdivi-wasm/src/assemble_types.rs`
-- `bindings/sdivi-wasm/src/exports.rs`
-- `bindings/sdivi-wasm/src/types.rs`
-- `bindings/sdivi-wasm/tests/wasm_snapshot.rs`
-- `crates/sdivi-core/src/compute/mod.rs`
-- `crates/sdivi-pipeline/src/helpers.rs`
+- **`bindings/sdivi-wasm/package.json` version** (`0.1.8`) is out of sync with workspace version (`0.1.12`). The `wasm_package_json_version_matches_workspace` test in `sdivi-cli/tests/workspace_version.rs` fails on this pre-existing mismatch. Not introduced by M23.
+- **`sdivi-config/src/thresholds.rs:52`**: `pub(crate) fn validate_and_prune_overrides` is dead code — pre-existing clippy warning. Not introduced by M23.
+- **`sdivi-graph/src/dependency_graph.rs:9`**: unused `tracing::debug` import — pre-existing. Not introduced by M23.
+- **`sdivi-patterns/src/catalog.rs`**: four unused imports (`GlobSet`, `GlobSetBuilder`, `Glob`, `fingerprint_node_kind`, `crate::queries`) — pre-existing. Not introduced by M23.
+- **DRIFT_LOG.md `## Unresolved Observations`**: was already empty — the reviewer's note about 6 entries needing to move to Resolved was already handled by the previous M22 run. No action needed.

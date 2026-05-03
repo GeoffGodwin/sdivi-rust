@@ -83,6 +83,26 @@ const snapshot = assemble_snapshot({
 | `infer_boundaries(prior_partitions, stability_threshold)` | Propose boundaries from history |
 | `assemble_snapshot(input)` | Build a Snapshot JSON from compute outputs |
 | `normalize_and_hash(node_kind, children)` | Canonical blake3 fingerprint |
+| `list_categories()` | Canonical pattern-category contract (`schema_version "1.0"`) |
+
+## Pattern category discovery
+
+Embedders that supply their own tree-sitter extractors must use the exact category names
+returned by `list_categories()`. The comparison in `compute_pattern_metrics` is case-sensitive.
+
+```ts
+import init, { list_categories } from '@geoffgodwin/sdivi-wasm';
+
+await init();
+const catalog = list_categories();
+console.log(catalog.schema_version); // "1.0"
+for (const cat of catalog.categories) {
+    console.log(cat.name); // "async_patterns", "error_handling", ...
+}
+```
+
+See [`docs/pattern-categories.md`](../../docs/pattern-categories.md) for the full contract
+including per-language node-kind tables and normalization rules.
 
 > **WASM API parity reached (M22):** `assemble_snapshot` now accepts an optional
 > `change_coupling` field. With M21 (weighted Leiden) and M22 (change coupling) both

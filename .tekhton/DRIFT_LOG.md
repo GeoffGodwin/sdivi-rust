@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-02
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -30,6 +30,7 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-03 | "Implement Milestone 23: Pattern Category Contract + WASM `list_categories()`"] `crates/sdivi-core/src/categories.rs:24,35` — `CATEGORIES` and `CATEGORY_DESCRIPTIONS` are two parallel arrays that must stay in sync (same names, same order) with no compile-time enforcement. The runtime tests catch drift. A single combined source-of-truth array (e.g. `const CATALOG_ENTRIES: &[(&str, &str)]`) iterated by both `list_categories()` and `CATEGORIES` would eliminate the possibility of the two diverging silently between tests runs.
 
 ## Decisions (Declined / Will Not Implement)
 

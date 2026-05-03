@@ -31,6 +31,9 @@
 //! assert_eq!(result.node_count, 0);
 //! ```
 
+/// Pattern category contract — canonical category list and runtime discovery via [`list_categories`].
+pub mod categories;
+
 /// Errors produced by the sdivi-core pure-compute API.
 pub mod error;
 
@@ -46,6 +49,7 @@ pub mod compute;
 /// Re-exports of snapshot assembly, delta, trend, and boundary inference from `sdivi-snapshot`.
 pub mod facade;
 
+pub use categories::{list_categories, CategoryCatalog, CategoryInfo, CATEGORIES};
 pub use error::AnalysisError;
 pub use exit_code::ExitCode;
 

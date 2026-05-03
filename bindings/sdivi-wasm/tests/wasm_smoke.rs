@@ -12,7 +12,8 @@ use sdivi_wasm::types::{
 };
 use sdivi_wasm::{
     compute_boundary_violations, compute_coupling_topology, compute_pattern_metrics,
-    compute_thresholds_check, detect_boundaries, infer_boundaries, normalize_and_hash,
+    compute_thresholds_check, detect_boundaries, infer_boundaries, list_categories,
+    normalize_and_hash,
 };
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -238,4 +239,16 @@ fn normalize_hash_deterministic() {
     println!("CI_HASH:{}", hash);
     assert_eq!(hash.len(), 64);
     assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+/// list_categories returns schema_version "1.0" and the expected number of categories.
+#[wasm_bindgen_test]
+fn list_categories_returns_schema_version_and_expected_count() {
+    let catalog = list_categories().unwrap();
+    assert_eq!(catalog.schema_version, "1.0");
+    // 5 categories defined for snapshot_version "1.0"
+    assert_eq!(catalog.categories.len(), 5);
+    let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
+    assert!(names.contains(&"error_handling"));
+    assert!(names.contains(&"async_patterns"));
 }

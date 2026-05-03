@@ -19,7 +19,10 @@ fn wasm_co_change_pair_input_fields_survive_serde_round_trip() {
     let back: WasmCoChangePairInput = serde_json::from_value(json).unwrap();
     assert_eq!(back.source, "src/a.rs");
     assert_eq!(back.target, "src/b.rs");
-    assert!((back.frequency - 0.75).abs() < 1e-10, "frequency must survive round-trip");
+    assert!(
+        (back.frequency - 0.75).abs() < 1e-10,
+        "frequency must survive round-trip"
+    );
     assert_eq!(back.cochange_count, 3);
 }
 
