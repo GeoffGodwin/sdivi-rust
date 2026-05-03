@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-05-02
+
+### Added
+
+- `@geoffgodwin/sdivi-wasm`: `detect_boundaries` now accepts an optional `edge_weights`
+  field on `WasmLeidenConfigInput`. Keys are `"source:target"` strings; weights must be
+  `>= 0.0` and finite. Existing callers that omit the field see no behavioural change. (M21)
+
+- **`bindings/sdivi-wasm/src/types.rs`**: Added `pub edge_weights: Option<BTreeMap<String, f64>>` to `WasmLeidenConfigInput` with `#[serde(default)]` and `#[tsify(optional)]`. Replaced the 3-line "INTENTIONAL GAP (ADL-4)" comment with a 1-line doc. Keyed by `"source:target"` colon-separated strings; first colon splits source from target (node IDs containing colons are supported). (M21)
 ## [0.1.10] - 2026-05-02
 
 ### Changed

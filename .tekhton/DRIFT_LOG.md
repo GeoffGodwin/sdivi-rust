@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-02
-- Runs since audit: 3
+- Runs since audit: 4
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -30,6 +30,7 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-02 | "Implement Milestone 21: Weighted Leiden on WASM"] `compute/mod.rs:9` — `threshold_types` is declared `mod threshold_types` (private) while all other compute submodules are `pub mod`. Types are accessible via `thresholds.rs`'s `pub use super::threshold_types::*`, so this is not a bug, but the asymmetry may surprise a future contributor. A brief comment on the `mod` line would forestall the question.
 - [2026-05-02 | "Implement Milestone 20: Threshold-Comparison Epsilon for Cross-Arch Stability"] `compute/mod.rs:9` — `threshold_types` is declared `mod threshold_types` (private) while all other compute submodules are `pub mod`. Types are accessible via `thresholds.rs`'s `pub use super::threshold_types::*`, so this is not a bug, but the asymmetry may surprise a future contributor. A brief comment on the `mod` line would forestall the question.
 - [2026-05-02 | "M19"] `crates/sdivi-pipeline/src/helpers.rs:55-70` — `graph_to_boundary_input` calls `dg.node_path(i)` in a `(0..n)` index range loop rather than iterating nodes directly. This pattern assumes `DependencyGraph` has a contiguous `0..node_count()` index space. If `DependencyGraph` ever uses non-contiguous indices (e.g. after node removal), this silently drops nodes. Consistent with current usage elsewhere but worth a `// SAFETY:` note on the assumption.
 - [2026-05-02 | "M19"] `bindings/sdivi-wasm/src/exports.rs:165-184` — `assemble_snapshot` WASM wrapper passes `violation_count = 0` to the core function then manually overwrites `snap.intent_divergence` if `boundary_count` is `Some`. This is a second code path that assembles `IntentDivergenceInfo` outside of `sdivi_snapshot::assemble_snapshot`. Currently harmless but diverges from the single-assembly-seam principle over time.

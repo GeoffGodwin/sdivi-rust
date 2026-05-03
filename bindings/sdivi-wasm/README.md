@@ -35,9 +35,21 @@ const graph = {
 const metrics = compute_coupling_topology(graph);
 console.log(metrics.density); // graph density
 
+// Unweighted Leiden.
 const cfg = { seed: 42, gamma: 1.0, iterations: 100, quality: 'Modularity' };
 const boundaries = detect_boundaries(graph, cfg, []);
 console.log(boundaries.cluster_assignments);
+
+// Weighted Leiden — pass co-change frequencies as edge weights.
+// Keys are "source:target" strings; the first colon splits source from target,
+// so node IDs that contain colons (e.g. "crates/foo:bar.rs") are supported.
+// Weights must be >= 0 and finite; edges absent from the graph are ignored.
+const weightedCfg = {
+  ...cfg,
+  edge_weights: { 'src/lib.rs:src/models.rs': 0.8, 'src/lib.rs:src/errors.rs': 0.5 },
+};
+const weightedBoundaries = detect_boundaries(graph, weightedCfg, []);
+console.log(weightedBoundaries.cluster_assignments);
 
 // normalize_and_hash produces the same blake3 digest as the native Rust pipeline.
 const hash = normalize_and_hash('try_expression', []);

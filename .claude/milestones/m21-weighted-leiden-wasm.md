@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "21"
-status: "todo"
+status: "done"
 -->
 
 **Scope:** Expose weighted-edge Leiden community detection through the WASM bindings by adding `edge_weights: Option<HashMap<String, f64>>` (keyed `"source_node_id:target_node_id"`) to `WasmLeidenConfigInput` and routing the value into the existing native `run_leiden_with_weights` path. Removes ADL-4 from `bindings/sdivi-wasm/src/types.rs:46`. Native `LeidenConfigInput.edge_weights` already exists and works (M15); this milestone is purely the binding-layer surface.

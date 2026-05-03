@@ -125,22 +125,22 @@ fn test_compute_trend_with_multiple_snapshots_returns_nonzero_slopes() {
     assert!(result.community_count_slope.is_some());
 }
 
-// ── ADL-4 & ADL-7 Verification Tests ────────────────────────────────────────
+// ── ADL-4 implemented (M21) & ADL-7 Verification Tests ──────────────────────
 
-/// ADL-4 verification: WasmLeidenConfigInput must NOT have an `edge_weights` field.
-/// WASM bindings expose unweighted Leiden only.
+/// M21: WasmLeidenConfigInput now has an optional `edge_weights` field.
+/// Unweighted callers pass `edge_weights: None`; the type system prevents
+/// accidental use of weighted partitions in code that doesn't supply weights.
 #[wasm_bindgen_test]
-fn test_adl4_wasm_leiden_config_input_omits_edge_weights() {
+fn test_m21_wasm_leiden_config_input_edge_weights_optional() {
     let config = WasmLeidenConfigInput {
         seed: 42,
         gamma: 1.0,
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
+        edge_weights: None,
     };
     assert_eq!(config.seed, 42);
-    assert_eq!(config.gamma, 1.0);
-    assert_eq!(config.iterations, 100);
-    // Absence of edge_weights is verified by type system at compile time.
+    assert!(config.edge_weights.is_none());
 }
 
 /// ADL-7 verification: assemble_snapshot must hardcode change_coupling to None in MVP.

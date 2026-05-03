@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use crate::types::*;
+use crate::weight_keys::parse_wasm_edge_weights;
 
 // ── Conversion helpers ────────────────────────────────────────────────────────
 
@@ -44,6 +45,11 @@ pub fn compute_coupling_topology(
 }
 
 /// Run Leiden community detection and return cluster assignments + stability.
+///
+/// When `cfg.edge_weights` is `Some`, runs weighted Leiden. Keys must be
+/// `"source:target"` strings (first colon separates source from target, so
+/// node IDs that themselves contain colons are fully supported). Weights must
+/// be `>= 0.0` and finite; edges absent from the graph are silently ignored.
 #[wasm_bindgen]
 pub fn detect_boundaries(
     graph: WasmDependencyGraphInput,
@@ -51,7 +57,17 @@ pub fn detect_boundaries(
     prior: Vec<WasmPriorPartition>,
 ) -> Result<WasmBoundaryDetectionResult, JsError> {
     let g = to_core(graph)?;
-    let c = to_core(cfg)?;
+    // Extract edge_weights before serde round-trip (WASM uses "src:tgt" colon keys;
+    // native LeidenConfigInput uses NUL-separated keys via edge_weight_key).
+    let wasm_weights = cfg.edge_weights.clone();
+    let cfg_no_weights = WasmLeidenConfigInput {
+        edge_weights: None,
+        ..cfg
+    };
+    let mut c: sdivi_core::LeidenConfigInput = to_core(cfg_no_weights)?;
+    if let Some(ew) = wasm_weights {
+        c.edge_weights = Some(parse_wasm_edge_weights(ew).map_err(|e| JsError::new(&e))?);
+    }
     let p: Vec<sdivi_core::PriorPartition> =
         prior.into_iter().map(to_core).collect::<Result<_, _>>()?;
     let result = sdivi_core::detect_boundaries(&g, &c, &p).map_err(err)?;

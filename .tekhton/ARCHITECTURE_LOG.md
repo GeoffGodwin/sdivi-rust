@@ -39,6 +39,11 @@ Each entry captures why a structural change was made, preventing future develope
 - **Rationale**: WASM bindings for `assemble_snapshot` hardcode `change_coupling: None` because `compute_change_coupling` is not yet exposed in the WASM API. This is an MVP limitation. Post-MVP, add `change_coupling` field to `WasmAssembleSnapshotInput` and expose `compute_change_coupling` as a WASM export. Tracked in `bindings/sdivi-wasm/src/exports.rs:160-162` with TODO comment.
 - **Source**: Non-blocking notes from post-M16 review cycle
 
+## ADL-9: Weighted Leiden exposed in WASM via "source:target" colon keys (Task: "M21")
+- **Date**: 2026-05-02
+- **Rationale**: `WasmLeidenConfigInput.edge_weights` uses colon-separated keys (`"source:target"`) rather than the native NUL-separated keys (`edge_weight_key`) because NUL is not a valid JSON string character in practice and is opaque to JS callers. The WASM binding layer (`weight_keys.rs`) converts colon keys to NUL keys before passing them to `sdivi_core::detect_boundaries`. The first-colon-wins split rule (splitn 2) means node IDs that themselves contain colons are fully supported. ADL-4 (serde_json round-trip conversion) remains valid; weighted fields bypass the round-trip via explicit extraction before `to_core`. Removes the MVP "unweighted only" limitation recorded informally in `bindings/sdivi-wasm/src/types.rs:46–48`.
+- **Source**: Accepted ACP from M21 pipeline run
+
 ## ADL-8: pub mod internal (Task: "M17")
 - **Date**: 2026-05-02
 - **Rationale**: Standard Rust test-plumbing pattern (`#[doc(hidden)]` + explicit "not stable API" prose). Items are in `sdivi-detection`, not in `sdivi-core` (the API-stability boundary). Well-implemented: all re-exp

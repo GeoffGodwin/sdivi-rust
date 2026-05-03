@@ -1,39 +1,98 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 1 file, 9 test functions (prop_thresholds.rs)
-Verdict: PASS
+Tests audited: 2 files, 21 test functions
+Verdict: CONCERNS
+
+Files audited:
+- `crates/sdivi-core/tests/prop_thresholds.rs` (9 proptest functions; 4 added by tester)
+- `bindings/sdivi-wasm/src/weight_keys.rs` `#[cfg(test)] mod tests` (12 unit tests; 5 added by tester)
 
 ---
 
 ### Findings
 
-#### COVERAGE: Per-category epsilon comparison sites have no property-test coverage
-- File: `crates/sdivi-core/tests/prop_thresholds.rs` (entire file)
-- Issue: `thresholds.rs` contains six `delta > limit + THRESHOLD_EPSILON` comparison sites — four aggregate (lines 66, 78, 90, 105) and two per-category (lines 122, 139). The tester's three new property tests cover only the four aggregate dimensions. The per-category epsilon sites are guarded solely by unit tests in `thresholds_epsilon.rs` (coder-authored, outside this audit's scope). If those unit tests were removed or the per-category loops were accidentally refactored to drop epsilon, no property test would catch the regression.
-- Severity: LOW
-- Action: Add two property tests analogous to the aggregate ones — one for `pattern_entropy_per_category_delta` and one for `convention_drift_per_category_delta` — asserting `breached == (delta > effective_limit + THRESHOLD_EPSILON)` when a single category is populated. Not a blocker since the unit tests currently fill the gap.
+#### EXERCISE: Failing test exposes unimplemented infinity fix
+- File: `bindings/sdivi-wasm/src/weight_keys.rs:172`
+- Issue: `rejects_positive_infinity_weight` calls `unwrap_err()` expecting `parse_wasm_edge_weights`
+  to reject `f64::INFINITY`. The implementation checks `weight.is_nan()` (line 25) and
+  `weight < 0.0` (line 29) but has no `is_infinite()` guard. `f64::INFINITY` is not NaN and is
+  not negative, so the function reaches the insert and returns `Ok(result)` with infinity in the
+  map. `unwrap_err()` on `Ok(...)` panics. The tester documented this in `TESTER_REPORT.md`
+  ("Passed: 20, Failed: 1") and correctly identified the root cause, but shipped the test without
+  the implementation fix. CI will fail on this test.
+- Severity: HIGH
+- Action: Fix `parse_wasm_edge_weights` in `bindings/sdivi-wasm/src/weight_keys.rs`: add an
+  `is_infinite()` check immediately after the `is_nan()` block at line 28 —
+  `if weight.is_infinite() { return Err(format!("edge weight for key \"{key}\" is infinite; weights must be finite")); }`.
+  The test is correct and must not be changed. The function's own doc comment already promises
+  "weights must be finite", so this is a straightforward implementation fix.
 
-#### COVERAGE: prop_per_category_delta_pure assertion is vacuously true
-- File: `crates/sdivi-core/tests/prop_thresholds.rs:146-150`
-- Issue: `prop_assert!(cat_breaches.len() <= 1, …)` is trivially satisfied when the input `BTreeMap` contains exactly one entry (as constructed by `BTreeMap::from([(cat.clone(), delta)])`). The assertion cannot distinguish "no breach" from "one breach" — it only verifies the implementation produces no duplicate breach records for the same category. The pre-existing test is not a regression guard for whether the breach fires correctly.
-- Severity: LOW
-- Action: Strengthen the assertion: if `delta > effective_limit + THRESHOLD_EPSILON` assert `cat_breaches.len() == 1`, else assert `cat_breaches.is_empty()`. This is a follow-up recommendation; not a blocker.
+---
 
-#### EXERCISE: Epsilon property tests are regression guards, not independent specifications
-- File: `crates/sdivi-core/tests/prop_thresholds.rs:217,247,277,310`
-- Issue: All four `prop_breach_equals_delta_gt_limit_plus_epsilon*` tests derive `expected` by importing `THRESHOLD_EPSILON` from the same crate under test (`let expected = delta > limit + THRESHOLD_EPSILON`). If both the constant's value and all comparison sites were changed consistently, every test would still pass. The constant's value is independently pinned in `thresholds_epsilon.rs::threshold_epsilon_value()` (outside this audit's scope). The first test's inline comment acknowledges this: "Trivially true given the implementation but catches accidental refactors."
+#### COVERAGE: Epsilon assertion is vacuous for the `boundary_violation_delta` (i64) dimension
+- File: `crates/sdivi-core/tests/prop_thresholds.rs:293`
+- Issue: `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation` asserts
+  `r.breached == (delta_f > limit + THRESHOLD_EPSILON)` where `THRESHOLD_EPSILON = 1e-9` and
+  `delta_f` is an `i64` cast to `f64`. The minimum gap between consecutive integer-cast deltas
+  (1.0) is nine orders of magnitude larger than epsilon, so epsilon can never flip the comparison
+  outcome. The assertion is functionally identical to `delta_f > limit`. The doc comment
+  acknowledges this explicitly ("epsilon has no functional effect for integer-cast deltas") and
+  frames the test as a guard against a future refactor that drops the epsilon term entirely.
+  The code path is exercised; only the epsilon portion of the assertion is vacuous.
 - Severity: LOW
-- Action: No immediate action required. The tests correctly detect the primary failure mode (a comparison site that drops `THRESHOLD_EPSILON`). Document the dependency on `threshold_epsilon_value()` in the `prop_thresholds.rs` module-level doc comment so future auditors understand why that value-guard test must not be deleted.
+- Action: No change required. The acknowledged rationale is sound. If `boundary_violation_delta`
+  is ever changed to `f64`, the test gains real epsilon coverage automatically.
+
+---
+
+#### NAMING: `handles_colon_in_node_id` asserts count only, not key content
+- File: `bindings/sdivi-wasm/src/weight_keys.rs:108`
+- Issue: The test name implies verification of correct colon-in-node-id handling, but the body
+  only asserts `result.len() == 1`. The key-content assertion for this scenario is fully covered
+  by the tester-added `colon_in_node_id_produces_correct_nul_key` at line 136. The count-only
+  assertion adds no signal not already provided by the content test. This is a coder-authored
+  test; the tester did not weaken it.
+- Severity: LOW
+- Action: Consider merging `handles_colon_in_node_id` into `colon_in_node_id_produces_correct_nul_key`
+  (the content test already implicitly verifies a single entry via `contains_key`). Not blocking.
 
 ---
 
 ### Non-Findings (rationale recorded)
 
-- **Assertion honesty:** All nine tests derive expected values from actual `compute_thresholds_check` invocations with meaningful inputs. No hard-coded sentinel magic numbers unrelated to implementation logic were found.
-- **Test weakening:** The tester added three new tests without modifying any assertion in the six pre-existing tests. No weakening occurred.
-- **Scope alignment:** All imports in `prop_thresholds.rs` resolve against the current codebase — `compute_thresholds_check` and `THRESHOLD_EPSILON` are re-exported via `thresholds.rs:10-11` from `threshold_types.rs`; `ThresholdOverrideInput` and `ThresholdsInput` are in `input`; `DivergenceSummary` is in `sdivi_snapshot::delta`. No orphaned references. The deleted file `.tekhton/test_dedup.fingerprint` is not imported by any test.
-- **Implementation exercise:** All nine tests call `compute_thresholds_check` with real, un-mocked inputs; no dependency is mocked.
-- **Test isolation:** All tests construct their fixture data inline from proptest-generated values. No test reads `.tekhton/` reports, build artifacts, snapshot files, or any mutable project state.
-- **Naming:** All nine test names encode the scenario and expected outcome (e.g., `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation`). No opaque `test_1()` patterns.
-- **boundary_violation i64 cast:** `prop_breach_equals_delta_gt_limit_plus_epsilon_boundary_violation` correctly mirrors the implementation's `delta as f64` cast and notes that epsilon has no functional effect for integer deltas — consistent with the comment at `thresholds.rs:103-104`.
+**Assertion honesty (`prop_thresholds.rs`):** All nine proptest functions derive expected values
+from actual `compute_thresholds_check` calls with proptest-generated inputs. The four
+`prop_breach_equals_delta_gt_limit_plus_epsilon_*` tests import `THRESHOLD_EPSILON` from the
+crate under test and use the same comparison formula as the implementation — this is intentional
+regression-guard behavior (acknowledged in the doc comments), not a fake assertion. No sentinel
+magic numbers unrelated to implementation logic were found.
+
+**Test weakening:** The tester added four proptest functions to `prop_thresholds.rs` and five unit
+tests to `weight_keys.rs` without modifying any assertion in any pre-existing test. No weakening
+occurred.
+
+**Scope alignment:** All imports in both files resolve against the current codebase.
+`compute_thresholds_check` and `THRESHOLD_EPSILON` are re-exported from
+`crates/sdivi-core/src/compute/thresholds.rs`. `edge_weight_key` is exported from
+`crates/sdivi-core/src/input/edge_weight.rs`. The deleted file `.tekhton/test_dedup.fingerprint`
+is not imported by any test under audit.
+
+**Implementation exercise:** All tests call real functions with un-mocked inputs. No mock
+infrastructure was introduced.
+
+**Test isolation:** All tests construct fixture data inline from literals or proptest strategies.
+No test reads `.tekhton/` pipeline reports, build artifacts, snapshot files, or any mutable
+project state.
+
+**Rubric table:**
+
+| Criterion              | prop_thresholds.rs                        | weight_keys.rs tests                               |
+|------------------------|-------------------------------------------|----------------------------------------------------|
+| Assertion Honesty      | PASS                                      | PASS                                               |
+| Edge Case Coverage     | PASS                                      | PASS (empty map, 0.0, colon-in-ID, value fidelity) |
+| Implementation Exercise| PASS                                      | PASS                                               |
+| Test Weakening         | PASS — additions only                     | PASS — additions only                              |
+| Test Naming            | PASS                                      | LOW concern on `handles_colon_in_node_id`          |
+| Scope Alignment        | PASS                                      | HIGH — `rejects_positive_infinity_weight` asserts rejected behavior the impl does not enforce |
+| Test Isolation         | PASS                                      | PASS                                               |

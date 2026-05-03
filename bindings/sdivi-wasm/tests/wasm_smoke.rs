@@ -49,6 +49,7 @@ fn default_leiden_cfg() -> WasmLeidenConfigInput {
         gamma: 1.0,
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
+        edge_weights: None,
     }
 }
 
