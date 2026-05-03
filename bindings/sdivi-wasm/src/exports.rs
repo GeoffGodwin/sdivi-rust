@@ -175,9 +175,9 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
     let catalog = build_pattern_catalog(&input.pattern_instances)?;
     let pm: sdivi_core::PatternMetricsResult = to_core(input.pattern_metrics)?;
 
-    // TODO: `change_coupling` is hardcoded to `None` (MVP limitation, see ADL-7).
-    // WASM consumers who call `compute_change_coupling` cannot include the result here.
-    // Post-MVP: add field to `WasmAssembleSnapshotInput` and expose the compute function.
+    let change_coupling: Option<sdivi_core::ChangeCouplingResult> =
+        input.change_coupling.map(to_core).transpose()?;
+
     let mut snap = sdivi_core::assemble_snapshot(
         graph,
         partition,
@@ -186,7 +186,7 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
         None,
         &input.timestamp,
         input.commit.as_deref(),
-        None,
+        change_coupling,
         0,
     );
 

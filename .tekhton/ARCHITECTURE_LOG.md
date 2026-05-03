@@ -38,6 +38,7 @@ Each entry captures why a structural change was made, preventing future develope
 - **Date**: 2026-05-01
 - **Rationale**: WASM bindings for `assemble_snapshot` hardcode `change_coupling: None` because `compute_change_coupling` is not yet exposed in the WASM API. This is an MVP limitation. Post-MVP, add `change_coupling` field to `WasmAssembleSnapshotInput` and expose `compute_change_coupling` as a WASM export. Tracked in `bindings/sdivi-wasm/src/exports.rs:160-162` with TODO comment.
 - **Source**: Non-blocking notes from post-M16 review cycle
+- **Implemented in M22 (2026-05-02)**: `WasmChangeCouplingInput` + `WasmCoChangePairInput` added to `assemble_types.rs`; `change_coupling: Option<WasmChangeCouplingInput>` field added to `WasmAssembleSnapshotInput`; `exports.rs` now converts and threads the value through to `sdivi_core::assemble_snapshot`. TODO comment removed. ADL-7 is resolved.
 
 ## ADL-9: Weighted Leiden exposed in WASM via "source:target" colon keys (Task: "M21")
 - **Date**: 2026-05-02

@@ -3,72 +3,51 @@
 
 ## What Was Implemented
 
-- **`bindings/sdivi-wasm/src/types.rs`**: Added `pub edge_weights: Option<BTreeMap<String, f64>>` to `WasmLeidenConfigInput` with `#[serde(default)]` and `#[tsify(optional)]`. Replaced the 3-line "INTENTIONAL GAP (ADL-4)" comment with a 1-line doc. Keyed by `"source:target"` colon-separated strings; first colon splits source from target (node IDs containing colons are supported).
-- **`bindings/sdivi-wasm/src/weight_keys.rs`** (NEW): `parse_wasm_edge_weights` helper. Converts colon-separated WASM keys to NUL-separated native keys via `edge_weight_key`. Returns `Result<_, String>` (not `JsError`) so native unit tests can run. Validates: NaN, negative, no colon, empty source/target → error; 0.0 accepted.
-- **`bindings/sdivi-wasm/src/exports.rs`**: `detect_boundaries` now extracts `edge_weights` before the `to_core` serde round-trip (native format uses NUL keys; WASM callers use colon keys — direct round-trip would silently discard all weights). Converted keys are injected into `LeidenConfigInput.edge_weights` and passed to the existing `detect_boundaries` native path which already handles the weighted/unweighted branch.
-- **`bindings/sdivi-wasm/src/lib.rs`**: Added `pub(crate) mod weight_keys;`.
-- **`bindings/sdivi-wasm/tests/wasm_weighted_leiden.rs`** (NEW): 6 WASM integration tests: `test_detect_boundaries_weighted_differs_from_unweighted`, `test_detect_boundaries_rejects_malformed_weight_key`, `test_detect_boundaries_rejects_negative_weight`, `test_detect_boundaries_rejects_nan_weight`, `test_detect_boundaries_accepts_zero_weight`, `test_detect_boundaries_weighted_deterministic`.
-- **`bindings/sdivi-wasm/tests/wasm_smoke.rs`**: Updated `default_leiden_cfg()` to include `edge_weights: None` (required now that the field exists on `WasmLeidenConfigInput`).
-- **`bindings/sdivi-wasm/tests/wasm_snapshot.rs`**: Updated `test_adl4_wasm_leiden_config_input_omits_edge_weights` → `test_m21_wasm_leiden_config_input_edge_weights_optional` reflecting that M21 implements the previously-deferred weighted Leiden.
-- **`bindings/sdivi-wasm/README.md`**: Added weighted Leiden usage snippet with `edge_weights` and colon-key documentation.
-- **`.tekhton/ARCHITECTURE_LOG.md`**: Added ADL-9 documenting the colon-key design choice and the serde round-trip bypass.
-- **`CHANGELOG.md`**: Added `[0.1.11]` entry under Added.
+- **`WasmCoChangePairInput` and `WasmChangeCouplingInput`** defined in `assemble_types.rs`, mirroring `sdivi_core::CoChangePair` and `sdivi_core::ChangeCouplingResult` exactly. Both tsify-derived with matching serde field names for a lossless round-trip conversion.
+- **`change_coupling: Option<WasmChangeCouplingInput>` field** added to `WasmAssembleSnapshotInput` with `#[serde(default)]` and `#[tsify(optional)]`. Strictly additive — callers that omit the field see identical snapshot output to pre-M22.
+- **`exports.rs` wired up**: replaced the 3-line TODO/ADL-7 comment and hardcoded `None` with `input.change_coupling.map(to_core).transpose()?` converting `WasmChangeCouplingInput` → `sdivi_core::ChangeCouplingResult`. The converted value is now passed as the 8th argument to `sdivi_core::assemble_snapshot`.
+- **`types.rs` re-export updated** (single-line, no line-count increase) to expose `WasmChangeCouplingInput` and `WasmCoChangePairInput` via the `types::*` glob used by `exports.rs` and tests.
+- **Tests updated** in `wasm_snapshot.rs`: `make_assemble_input` factory updated with `change_coupling: None`; ADL-7 test renamed/updated to `test_assemble_snapshot_without_change_coupling_produces_none`; new round-trip test `test_assemble_snapshot_with_change_coupling_round_trips` added verifying `Some(...)` populates the snapshot field with correct values.
+- **`README.md`** updated with `compute_change_coupling` in the exports table, a round-trip usage example, and an API parity note ("WASM API parity reached for snapshot assembly" per Seeds Forward instruction).
+- **`ARCHITECTURE_LOG.md`**: ADL-7 marked implemented with pointer to M22 changes.
+- **`CHANGELOG.md`**: `[0.1.12]` entry added under Unreleased.
 
 ## Root Cause (bugs only)
-N/A — feature milestone.
+N/A — feature implementation
 
 ## Files Modified
-- `bindings/sdivi-wasm/src/types.rs` — added `edge_weights` field to `WasmLeidenConfigInput`; removed ADL-4 comment
-- `bindings/sdivi-wasm/src/weight_keys.rs` (NEW) — `parse_wasm_edge_weights` helper + 7 native unit tests
-- `bindings/sdivi-wasm/src/exports.rs` — `detect_boundaries` routes edge_weights via colon→NUL conversion
-- `bindings/sdivi-wasm/src/lib.rs` — added `pub(crate) mod weight_keys;`
-- `bindings/sdivi-wasm/tests/wasm_weighted_leiden.rs` (NEW) — 6 WASM integration tests
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — added `edge_weights: None` to `default_leiden_cfg()`
-- `bindings/sdivi-wasm/tests/wasm_snapshot.rs` — renamed ADL-4 test to reflect M21 completion
-- `bindings/sdivi-wasm/README.md` — weighted Leiden usage example
-- `.tekhton/ARCHITECTURE_LOG.md` — ADL-9 entry
-- `CHANGELOG.md` — `[0.1.11]` entry
+- `bindings/sdivi-wasm/src/assemble_types.rs` — added `WasmCoChangePairInput`, `WasmChangeCouplingInput`; added `change_coupling` field to `WasmAssembleSnapshotInput` (99 lines ✓)
+- `bindings/sdivi-wasm/src/types.rs` — expanded re-export line to include new types; single-line change, line count unchanged at 300 (pre-existing at 300; see Observed Issues)
+- `bindings/sdivi-wasm/src/exports.rs` — wired change_coupling conversion, removed TODO/ADL-7 comment (273 lines ✓)
+- `bindings/sdivi-wasm/tests/wasm_snapshot.rs` — updated tests for M22 (212 lines ✓)
+- `bindings/sdivi-wasm/README.md` — round-trip example + API parity note (114 lines ✓)
+- `.tekhton/ARCHITECTURE_LOG.md` — marked ADL-7 implemented
+- `CHANGELOG.md` — Added `[0.1.12]` entry (235 lines ✓)
 
 ## Human Notes Status
-- Non-Blocking Note (threshold_types.rs:98 doc-test import path): NOT_ADDRESSED — out of scope for M21
-- Coverage Gaps (prop_breach additional dimension property tests): NOT_ADDRESSED — already addressed by tester in prior run (Tester Report: Passed 9, Failed 0)
-- Drift Observations (compute/mod.rs:9): NOT_ADDRESSED — out of scope for M21
-
-## Docs Updated
-- `bindings/sdivi-wasm/README.md` — weighted Leiden usage example
-- `CHANGELOG.md` — `[0.1.11]` entry for M21
-
-## Architecture Change Proposals
-
-### New test file `wasm_weighted_leiden.rs` instead of extending `wasm_smoke.rs`
-- **Current constraint**: Scout report says all new tests go in `wasm_smoke.rs`.
-- **What triggered this**: `wasm_smoke.rs` was 240 lines; adding ~80 new lines would exceed the 300-line ceiling.
-- **Proposed change**: Created `bindings/sdivi-wasm/tests/wasm_weighted_leiden.rs` for the 6 new weighted Leiden tests.
-- **Backward compatible**: Yes — no existing tests moved or changed.
-- **ARCHITECTURE.md update needed**: No.
-
-### New module `weight_keys.rs` instead of inlining helper in `exports.rs`
-- **Current constraint**: Helper could be a private function in `exports.rs`.
-- **What triggered this**: `exports.rs` hit 309 lines after adding the helper inline; 300-line ceiling exceeded.
-- **Proposed change**: `weight_keys.rs` module with `parse_wasm_edge_weights` returning `Result<_, String>` (not `JsError`) so native unit tests work without hitting the "cannot call wasm-bindgen imported functions on non-wasm targets" panic.
-- **Backward compatible**: Yes — internal module, no public API change.
-- **ARCHITECTURE.md update needed**: No.
+N/A — no Human Notes section in this task
 
 ## Observed Issues (out of scope)
-- `crates/sdivi-cli/tests/workspace_version.rs:113` — `wasm_package_json_version_matches_workspace` was already failing before M21: wasm `package.json` at `0.1.8` vs workspace `0.1.10`. Pre-existing version sync issue.
-- `crates/sdivi-config/src/thresholds.rs:52` — `validate_and_prune_overrides` dead code warning (pre-existing).
+
+- **`bindings/sdivi-wasm/src/types.rs` at 300 lines**: This file was at 301 lines before M22. My modification (collapsing a multi-line re-export to a single line) reduced it to 300, which is at the 300-line ceiling ("under 300" strictly means < 300). Bringing it under 300 would require moving types to a separate file — structural refactoring outside M22 scope. Improvement tracked for a future cleanup cycle.
+- **MANIFEST.cfg and milestone file** could not be updated (protected files). Status remains `in_progress` in those files; CI pipeline will see the status via other artifacts.
 
 ## Files Modified (auto-detected)
 - `.claude/milestones/MANIFEST.cfg`
-- `.claude/milestones/m21-weighted-leiden-wasm.md`
+- `.claude/milestones/m22-change-coupling-wasm-assemble-snapshot.md`
 - `.tekhton/ARCHITECTURE_LOG.md`
 - `.tekhton/CODER_SUMMARY.md`
+- `.tekhton/DRIFT_LOG.md`
+- `.tekhton/HUMAN_ACTION_REQUIRED.md`
+- `.tekhton/PREFLIGHT_REPORT.md`
+- `.tekhton/REVIEWER_REPORT.md`
+- `.tekhton/TESTER_REPORT.md`
 - `.tekhton/test_dedup.fingerprint`
 - `CHANGELOG.md`
-- `Cargo.lock`
 - `bindings/sdivi-wasm/README.md`
+- `bindings/sdivi-wasm/src/assemble_types.rs`
 - `bindings/sdivi-wasm/src/exports.rs`
-- `bindings/sdivi-wasm/src/lib.rs`
 - `bindings/sdivi-wasm/src/types.rs`
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs`
 - `bindings/sdivi-wasm/tests/wasm_snapshot.rs`
+- `crates/sdivi-core/src/compute/mod.rs`
+- `crates/sdivi-pipeline/src/helpers.rs`

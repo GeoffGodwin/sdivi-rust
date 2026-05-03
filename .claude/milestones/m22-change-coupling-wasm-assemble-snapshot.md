@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "22"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Add an optional `change_coupling: Option<WasmChangeCouplingInput>` field to `WasmAssembleSnapshotInput` and thread it through the WASM `assemble_snapshot` call to the 5th positional argument of native `sdivi_core::assemble_snapshot` (currently passed as `None` at `bindings/sdivi-wasm/src/exports.rs:170`). Removes ADL-7. WASM consumers can now produce snapshots that carry their own change-coupling analysis output, parallel to what `sdivi-pipeline` does for native callers.

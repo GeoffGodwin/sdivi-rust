@@ -54,6 +54,18 @@ console.log(weightedBoundaries.cluster_assignments);
 // normalize_and_hash produces the same blake3 digest as the native Rust pipeline.
 const hash = normalize_and_hash('try_expression', []);
 console.log(hash); // 64-char lowercase hex
+
+// Change-coupling round-trip: compute and include in snapshot.
+const events = [
+  { commit_sha: 'abc', commit_date: '2026-01-01T00:00:00Z', files: ['src/a.ts', 'src/b.ts'] },
+  { commit_sha: 'def', commit_date: '2026-01-02T00:00:00Z', files: ['src/a.ts', 'src/b.ts'] },
+];
+const changeCoupling = compute_change_coupling(events, { min_frequency: 0.5, history_depth: 100 });
+const snapshot = assemble_snapshot({
+  // ... graph / partition / pattern fields ...
+  timestamp: new Date().toISOString(),
+  change_coupling: changeCoupling, // pass the result directly
+});
 ```
 
 ## Exports
@@ -64,12 +76,18 @@ console.log(hash); // 64-char lowercase hex
 | `detect_boundaries(graph, cfg, prior)` | Leiden community detection |
 | `compute_boundary_violations(graph, spec)` | Cross-boundary dependency check |
 | `compute_pattern_metrics(patterns)` | Shannon entropy + convention drift |
+| `compute_change_coupling(events, cfg)` | File-pair co-change frequencies from git history |
 | `compute_thresholds_check(summary, cfg)` | CI gate — returns breach list |
 | `compute_delta(prev, curr)` | Per-dimension divergence between snapshots |
 | `compute_trend(snapshots, last_n?)` | Trend slope over snapshot history |
 | `infer_boundaries(prior_partitions, stability_threshold)` | Propose boundaries from history |
 | `assemble_snapshot(input)` | Build a Snapshot JSON from compute outputs |
 | `normalize_and_hash(node_kind, children)` | Canonical blake3 fingerprint |
+
+> **WASM API parity reached (M22):** `assemble_snapshot` now accepts an optional
+> `change_coupling` field. With M21 (weighted Leiden) and M22 (change coupling) both
+> shipped, the WASM surface fully matches the native pipeline's `assemble_snapshot`
+> capabilities. Consumers can build a complete snapshot in WASM without any gaps.
 
 ## TypeScript guarantees
 

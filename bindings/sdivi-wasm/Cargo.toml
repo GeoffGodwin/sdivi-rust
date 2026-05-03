@@ -35,5 +35,6 @@ getrandom = { version = "0.2", features = ["js"] }
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }
 js-sys            = { workspace = true }
+serde_json        = { workspace = true }
 
 # Release profile settings are set at workspace root in Cargo.toml (profile.release-wasm).

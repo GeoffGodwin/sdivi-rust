@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-05-02
+
+### Added
+
+- `@geoffgodwin/sdivi-wasm`: `assemble_snapshot` now accepts an optional `change_coupling`
+  field on `WasmAssembleSnapshotInput`. Pass the output of `compute_change_coupling` directly
+  to include change-coupling metrics in the assembled snapshot. Callers that omit the field
+  see no behavioural change — the snapshot's `change_coupling` field remains absent, identical
+  to pre-M22 output. Resolves ADL-7. (M22)
+- `WasmChangeCouplingInput` and `WasmCoChangePairInput` added to `bindings/sdivi-wasm/src/assemble_types.rs`
+  with full tsify-derived TypeScript types. Field names match `sdivi_core::ChangeCouplingResult`
+  exactly for bit-identical serde round-trip. (M22)
+
+- **`WasmCoChangePairInput` and `WasmChangeCouplingInput`** defined in `assemble_types.rs`, mirroring `sdivi_core::CoChangePair` and `sdivi_core::ChangeCouplingResult` exactly. Both tsify-derived with matching serde field names for a lossless round-trip conversion. (M22)
 ## [0.1.11] - 2026-05-02
 
 ### Added

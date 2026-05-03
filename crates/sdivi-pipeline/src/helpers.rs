@@ -54,6 +54,8 @@ pub(crate) fn compute_path_partition(
 /// because boundary violation detection does not use it.
 pub(crate) fn graph_to_boundary_input(dg: &DependencyGraph) -> DependencyGraphInput {
     let n = dg.node_count();
+    // This loop assumes DependencyGraph maintains a contiguous 0..node_count() node-index space.
+    // If node removal is ever added to DependencyGraph, this assumption must be revisited to avoid silent node drops.
     let ids: Vec<String> = (0..n)
         .map(|i| {
             dg.node_path(i)

@@ -1,11 +1,13 @@
-//! WASM snapshot assembly / delta / trend tests, plus ADL verification.
+//! WASM snapshot assembly / delta / trend tests, plus M22 change-coupling tests.
 //!
 //! Run via `wasm-pack test --node`.
 
+use sdivi_wasm::change_coupling::{WasmChangeCouplingConfigInput, WasmCoChangeEventInput};
 use sdivi_wasm::types::{
-    WasmAssembleSnapshotInput, WasmLeidenConfigInput, WasmPatternMetricsResult, WasmQualityFunction,
+    WasmAssembleSnapshotInput, WasmChangeCouplingInput, WasmCoChangePairInput,
+    WasmLeidenConfigInput, WasmPatternMetricsResult, WasmQualityFunction,
 };
-use sdivi_wasm::{assemble_snapshot, compute_delta, compute_trend};
+use sdivi_wasm::{assemble_snapshot, compute_change_coupling, compute_delta, compute_trend};
 use serde_wasm_bindgen;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -44,6 +46,7 @@ fn make_assemble_input(density: f64, timestamp: &str) -> WasmAssembleSnapshotInp
         boundary_count: None,
         leiden_seed: Some(42),
         violation_count: None,
+        change_coupling: None,
     }
 }
 
@@ -125,7 +128,7 @@ fn test_compute_trend_with_multiple_snapshots_returns_nonzero_slopes() {
     assert!(result.community_count_slope.is_some());
 }
 
-// ── ADL-4 implemented (M21) & ADL-7 Verification Tests ──────────────────────
+// ── ADL-4 implemented (M21) & M22 change-coupling tests ─────────────────────
 
 /// M21: WasmLeidenConfigInput now has an optional `edge_weights` field.
 /// Unweighted callers pass `edge_weights: None`; the type system prevents
@@ -143,14 +146,67 @@ fn test_m21_wasm_leiden_config_input_edge_weights_optional() {
     assert!(config.edge_weights.is_none());
 }
 
-/// ADL-7 verification: assemble_snapshot must hardcode change_coupling to None in MVP.
+/// M22: omitting `change_coupling` produces a snapshot with `change_coupling: None`.
+/// This is the backward-compatible path — existing callers see no change.
 #[wasm_bindgen_test]
-fn test_adl7_assemble_snapshot_change_coupling_is_none() {
+fn test_assemble_snapshot_without_change_coupling_produces_none() {
     let snap_js = assemble_snapshot(make_assemble_input(0.25, "2026-05-01T00:00:00Z")).unwrap();
     let snap: sdivi_core::Snapshot =
         serde_wasm_bindgen::from_value(snap_js).expect("must deserialize as Snapshot");
     assert!(
         snap.change_coupling.is_none(),
-        "change_coupling must be None in MVP (ADL-7 — hardcoded to None)"
+        "change_coupling must be None when omitted from WasmAssembleSnapshotInput"
+    );
+}
+
+/// M22: passing `change_coupling: Some(...)` populates the assembled snapshot field.
+/// The round-trip uses compute_change_coupling output directly.
+#[wasm_bindgen_test]
+fn test_assemble_snapshot_with_change_coupling_round_trips() {
+    let events = vec![
+        WasmCoChangeEventInput {
+            commit_sha: "abc".into(),
+            commit_date: "2026-01-01T00:00:00Z".into(),
+            files: vec!["src/a.rs".into(), "src/b.rs".into()],
+        },
+        WasmCoChangeEventInput {
+            commit_sha: "def".into(),
+            commit_date: "2026-01-02T00:00:00Z".into(),
+            files: vec!["src/a.rs".into(), "src/b.rs".into()],
+        },
+    ];
+    let cfg = WasmChangeCouplingConfigInput {
+        min_frequency: 0.5,
+        history_depth: 10,
+    };
+    let cc_result = compute_change_coupling(events, cfg).unwrap();
+
+    let mut input = make_assemble_input(0.25, "2026-05-01T00:00:00Z");
+    input.change_coupling = Some(WasmChangeCouplingInput {
+        pairs: cc_result.pairs.iter().map(|p| WasmCoChangePairInput {
+            source: p.source.clone(),
+            target: p.target.clone(),
+            frequency: p.frequency,
+            cochange_count: p.cochange_count,
+        }).collect(),
+        commits_analyzed: cc_result.commits_analyzed,
+        distinct_files_touched: cc_result.distinct_files_touched,
+    });
+
+    let snap_js = assemble_snapshot(input).unwrap();
+    let snap: sdivi_core::Snapshot =
+        serde_wasm_bindgen::from_value(snap_js).expect("must deserialize as Snapshot");
+
+    let cc = snap
+        .change_coupling
+        .expect("change_coupling must be Some when supplied");
+    assert_eq!(cc.commits_analyzed, 2, "commits_analyzed must round-trip");
+    assert_eq!(cc.distinct_files_touched, 2, "distinct_files_touched must round-trip");
+    assert_eq!(cc.pairs.len(), 1, "one pair above min_frequency expected");
+    assert_eq!(cc.pairs[0].source, "src/a.rs");
+    assert_eq!(cc.pairs[0].target, "src/b.rs");
+    assert!(
+        (cc.pairs[0].frequency - 1.0).abs() < 1e-9,
+        "frequency must be 1.0 (both commits touched both files)"
     );
 }
