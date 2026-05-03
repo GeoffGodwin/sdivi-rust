@@ -968,6 +968,7 @@ name = "sdivi-core"
 version = "0.1.8"
 dependencies = [
  "chrono",
+ "globset",
  "proptest",
  "sdivi-config",
  "sdivi-detection",

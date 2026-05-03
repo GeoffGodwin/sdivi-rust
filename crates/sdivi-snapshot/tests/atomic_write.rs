@@ -29,6 +29,7 @@ fn empty_snap(ts: &str) -> sdivi_snapshot::Snapshot {
         ts,
         None,
         None,
+        0,
     )
 }
 

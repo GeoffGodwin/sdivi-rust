@@ -6,3 +6,5 @@ pub mod coupling;
 pub mod normalize;
 pub mod patterns;
 pub mod thresholds;
+mod stability;
+mod violation;

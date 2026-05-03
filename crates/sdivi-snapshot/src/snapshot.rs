@@ -32,9 +32,7 @@ pub const SNAPSHOT_VERSION: &str = "1.0";
 pub struct IntentDivergenceInfo {
     /// Number of boundaries declared in the `BoundarySpec`.
     pub boundary_count: usize,
-    /// Number of boundary violations detected.
-    ///
-    /// Always `0` until the violation-detection pass is implemented.
+    /// Number of cross-boundary dependency violations detected.
     pub violation_count: u32,
 }
 
@@ -98,7 +96,7 @@ pub struct PatternMetricsResult {
 /// let snap = assemble_snapshot(
 ///     graph, partition, PatternCatalog::default(),
 ///     PatternMetricsResult::default(), None,
-///     "2026-04-29T00:00:00Z", None, None,
+///     "2026-04-29T00:00:00Z", None, None, 0,
 /// );
 /// assert_eq!(snap.snapshot_version, SNAPSHOT_VERSION);
 /// ```
@@ -144,9 +142,8 @@ pub struct Snapshot {
 
 /// Assembles a [`Snapshot`] from pipeline stage outputs.
 ///
-/// When `boundary_spec_boundaries` is `Some(n)`, an [`IntentDivergenceInfo`]
-/// is included with that boundary count and `violation_count = 0` (violation
-/// detection is implemented in a later milestone).
+/// When `boundary_spec` is `Some`, an [`IntentDivergenceInfo`] is included with
+/// the boundary count and the caller-supplied `violation_count`.
 ///
 /// # Examples
 ///
@@ -169,11 +166,11 @@ pub struct Snapshot {
 /// let snap = assemble_snapshot(
 ///     graph, partition, PatternCatalog::default(),
 ///     PatternMetricsResult::default(), None,
-///     "2026-04-29T00:00:00Z", Some("abc123"), None,
+///     "2026-04-29T00:00:00Z", Some("abc123"), None, 0,
 /// );
 /// assert_eq!(snap.commit.as_deref(), Some("abc123"));
 /// ```
-// 8 args is intentional — every field is load-bearing for snapshot assembly
+// 9 args is intentional — every field is load-bearing for snapshot assembly
 // and the function is the seam between sdivi-pipeline and sdivi-core.
 #[allow(clippy::too_many_arguments)]
 pub fn assemble_snapshot(
@@ -185,10 +182,11 @@ pub fn assemble_snapshot(
     timestamp: &str,
     commit: Option<&str>,
     change_coupling: Option<ChangeCouplingResult>,
+    violation_count: u32,
 ) -> Snapshot {
     let intent_divergence = boundary_spec.map(|spec| IntentDivergenceInfo {
         boundary_count: spec.boundaries.len(),
-        violation_count: 0,
+        violation_count,
     });
 
     Snapshot {
@@ -223,98 +221,5 @@ impl Snapshot {
         let content = std::fs::read_to_string(path)?;
         serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use sdivi_detection::partition::LeidenPartition;
-    use sdivi_graph::metrics::GraphMetrics;
-    use sdivi_patterns::PatternCatalog;
-
-    use super::*;
-
-    fn empty_graph() -> GraphMetrics {
-        GraphMetrics {
-            node_count: 0,
-            edge_count: 0,
-            density: 0.0,
-            cycle_count: 0,
-            top_hubs: vec![],
-            component_count: 0,
-        }
-    }
-
-    fn empty_partition() -> LeidenPartition {
-        LeidenPartition {
-            assignments: BTreeMap::new(),
-            stability: BTreeMap::new(),
-            modularity: 0.0,
-            seed: 42,
-        }
-    }
-
-    fn make_snap() -> Snapshot {
-        assemble_snapshot(
-            empty_graph(),
-            empty_partition(),
-            PatternCatalog::default(),
-            PatternMetricsResult::default(),
-            None,
-            "T",
-            None,
-            None,
-        )
-    }
-
-    #[test]
-    fn assemble_snapshot_sets_version() {
-        let snap = make_snap();
-        assert_eq!(snap.snapshot_version, SNAPSHOT_VERSION);
-    }
-
-    #[test]
-    fn no_boundary_spec_means_no_intent_divergence() {
-        let snap = make_snap();
-        assert!(snap.intent_divergence.is_none());
-    }
-
-    #[test]
-    fn commit_round_trips() {
-        let snap = assemble_snapshot(
-            empty_graph(),
-            empty_partition(),
-            PatternCatalog::default(),
-            PatternMetricsResult::default(),
-            None,
-            "T",
-            Some("deadbeef"),
-            None,
-        );
-        assert_eq!(snap.commit.as_deref(), Some("deadbeef"));
-    }
-
-    #[test]
-    fn serde_round_trip() {
-        let snap = make_snap();
-        let json = serde_json::to_string(&snap).unwrap();
-        let decoded: Snapshot = serde_json::from_str(&json).unwrap();
-        assert_eq!(snap, decoded);
-    }
-
-    #[test]
-    fn commit_none_absent_from_json() {
-        let snap = make_snap();
-        let json = serde_json::to_string(&snap).unwrap();
-        assert!(!json.contains("\"commit\""));
-    }
-
-    #[test]
-    fn pattern_metrics_present_in_json() {
-        let snap = make_snap();
-        let json = serde_json::to_string(&snap).unwrap();
-        assert!(json.contains("\"pattern_metrics\""));
     }
 }

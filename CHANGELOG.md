@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.1.9] - 2026-05-02
+
+### Added
+- Implemented real `compute_boundary_violations` in `crates/sdivi-core/src/compute/boundaries.rs`: (M19)
+
+### Fixed
+
+- `compute_boundary_violations` now performs real violation detection instead of
+  always returning zero. Factor 4 (boundary violation velocity) is now active in
+  `sdivi check`. Adopters with a `.sdivi/boundaries.yaml` should expect the first
+  post-M19 snapshot to surface existing violations as a delta against the prior
+  always-zero baseline. See `docs/cli-integration.md` for the recommended
+  one-time `boundary_violation_rate` override to absorb the cutover.
+
+### Changed
+
+- `assemble_snapshot` now accepts a `violation_count: u32` parameter (M19).
+  All existing callers must pass the computed count (or `0` if no boundary spec
+  is present). This is a semver-minor change on `sdivi-snapshot`.
 
 ## [0.1.8] - 2026-05-02
 

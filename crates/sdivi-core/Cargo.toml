@@ -26,6 +26,8 @@ serde         = { workspace = true }
 # NaiveDate is in the features = ["serde"] set which is in workspace default.
 chrono        = { workspace = true }
 tracing       = { workspace = true }
+# globset compiles for wasm32-unknown-unknown (pure Rust, no OS deps).
+globset       = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

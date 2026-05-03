@@ -10,7 +10,9 @@ use std::path::Path;
 use crate::cache::{load_cached_partition, save_cached_partition};
 use crate::commit_extract::{commit_date_iso, extract_commit_tree, resolve_ref_to_sha};
 use crate::error::PipelineError;
-use crate::helpers::{build_edge_weight_map, compute_path_partition};
+use crate::helpers::{
+    build_edge_weight_map, compute_path_partition, graph_to_boundary_input, spec_to_boundary_input,
+};
 use crate::store::{enforce_retention, write_snapshot};
 pub use crate::time::current_timestamp;
 use sdivi_config::{BoundarySpec, Config};
@@ -226,6 +228,17 @@ impl Pipeline {
         let boundary_spec: Option<BoundarySpec> =
             BoundarySpec::load(&boundary_path).unwrap_or(None);
 
+        let violation_count = boundary_spec.as_ref().map_or(0, |spec| {
+            let g_input = graph_to_boundary_input(&dg);
+            let s_input = spec_to_boundary_input(spec);
+            sdivi_core::compute_boundary_violations(&g_input, &s_input)
+                .map(|r| r.violation_count)
+                .unwrap_or_else(|e| {
+                    tracing::warn!("boundary violation computation failed: {e}");
+                    0
+                })
+        });
+
         let commit_label = effective_sha.as_deref();
         let mut snapshot = assemble_snapshot(
             metrics,
@@ -236,6 +249,7 @@ impl Pipeline {
             &effective_ts,
             commit_label,
             change_coupling_result,
+            violation_count,
         );
         snapshot.path_partition = compute_path_partition(&dg, &snapshot.partition);
 

@@ -171,6 +171,7 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
         &input.timestamp,
         input.commit.as_deref(),
         None,
+        0,
     );
 
     if let Some(count) = input.boundary_count {

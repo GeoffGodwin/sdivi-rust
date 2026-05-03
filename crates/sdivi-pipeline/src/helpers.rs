@@ -2,6 +2,10 @@
 
 use std::collections::BTreeMap;
 
+use sdivi_config::BoundarySpec;
+use sdivi_core::input::{
+    BoundaryDefInput, BoundarySpecInput, DependencyGraphInput, EdgeInput, NodeInput,
+};
 use sdivi_detection::partition::LeidenPartition;
 use sdivi_graph::dependency_graph::DependencyGraph;
 use sdivi_snapshot::change_coupling::ChangeCouplingResult;
@@ -42,4 +46,55 @@ pub(crate) fn compute_path_partition(
         }
     }
     map
+}
+
+/// Converts a [`DependencyGraph`] to a [`DependencyGraphInput`] for pure-compute calls.
+///
+/// Node IDs use forward-slash-normalised repo-relative paths.  Language is left empty
+/// because boundary violation detection does not use it.
+pub(crate) fn graph_to_boundary_input(dg: &DependencyGraph) -> DependencyGraphInput {
+    let n = dg.node_count();
+    let ids: Vec<String> = (0..n)
+        .map(|i| {
+            dg.node_path(i)
+                .map(|p| p.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default()
+        })
+        .collect();
+    let nodes: Vec<NodeInput> = ids
+        .iter()
+        .map(|id| NodeInput {
+            id: id.clone(),
+            path: id.clone(),
+            language: String::new(),
+        })
+        .collect();
+    let edges: Vec<EdgeInput> = dg
+        .edges_as_pairs()
+        .into_iter()
+        .filter_map(|(f, t)| {
+            let src = ids.get(f)?.clone();
+            let tgt = ids.get(t)?.clone();
+            Some(EdgeInput {
+                source: src,
+                target: tgt,
+            })
+        })
+        .collect();
+    DependencyGraphInput { nodes, edges }
+}
+
+/// Converts a [`BoundarySpec`] to a [`BoundarySpecInput`] for pure-compute calls.
+pub(crate) fn spec_to_boundary_input(spec: &BoundarySpec) -> BoundarySpecInput {
+    BoundarySpecInput {
+        boundaries: spec
+            .boundaries
+            .iter()
+            .map(|b| BoundaryDefInput {
+                name: b.name.clone(),
+                modules: b.modules.clone(),
+                allow_imports_from: b.allow_imports_from.clone(),
+            })
+            .collect(),
+    }
 }

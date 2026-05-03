@@ -31,6 +31,7 @@ fn identical_snap() -> Snapshot {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     )
 }
 

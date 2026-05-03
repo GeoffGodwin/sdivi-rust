@@ -53,6 +53,7 @@ fn with_boundary_spec_intent_divergence_is_some() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     );
 
     assert!(
@@ -82,6 +83,7 @@ fn boundary_count_matches_spec_length() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     );
 
     let info = snap.intent_divergence.unwrap();
@@ -91,9 +93,9 @@ fn boundary_count_matches_spec_length() {
     );
 }
 
-/// violation_count is always 0 (detection pass not yet implemented).
+/// violation_count in intent_divergence matches the value passed to assemble_snapshot.
 #[test]
-fn violation_count_is_zero() {
+fn violation_count_threads_through() {
     let spec = BoundarySpec {
         version: None,
         boundaries: vec![make_boundary("core"), make_boundary("ui")],
@@ -108,12 +110,13 @@ fn violation_count_is_zero() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        7,
     );
 
     let info = snap.intent_divergence.unwrap();
     assert_eq!(
-        info.violation_count, 0,
-        "violation_count must be 0 until the detection pass is implemented"
+        info.violation_count, 7,
+        "violation_count must match the value passed to assemble_snapshot"
     );
 }
 
@@ -134,6 +137,7 @@ fn empty_boundary_spec_sets_intent_divergence_with_zero_count() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     );
 
     let info = snap
@@ -162,6 +166,7 @@ fn intent_divergence_present_in_json_when_spec_given() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     );
 
     let json = serde_json::to_string(&snap).unwrap();
@@ -187,6 +192,7 @@ fn intent_divergence_absent_from_json_when_no_spec() {
         "2026-04-29T00:00:00Z",
         None,
         None,
+        0,
     );
 
     let json = serde_json::to_string(&snap).unwrap();

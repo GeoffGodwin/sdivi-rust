@@ -34,6 +34,7 @@ fn make_snap(density: f64, communities: usize) -> sdivi_snapshot::snapshot::Snap
         "2026-01-01T00:00:00Z",
         None,
         None,
+        0,
     )
 }
 

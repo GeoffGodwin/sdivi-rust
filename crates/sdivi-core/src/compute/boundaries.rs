@@ -138,7 +138,7 @@ pub fn detect_boundaries(
         .map(|(&comm, &density)| (comm as u32, density))
         .collect();
 
-    let historical_stability = compute_historical_stability(prior);
+    let historical_stability = super::stability::compute_historical_stability(prior);
 
     let component_count = sdivi_graph::metrics::compute_metrics(&dg).component_count as u32;
 
@@ -150,47 +150,6 @@ pub fn detect_boundaries(
         historical_stability,
         disconnected_components: component_count,
     })
-}
-
-/// Computes the fraction of consecutive prior-partition pairs that agree with
-/// the current cluster assignments (by node-set membership).
-fn compute_historical_stability(prior: &[PriorPartition]) -> f64 {
-    if prior.len() < 2 {
-        return 0.0;
-    }
-
-    let n_pairs = (prior.len() - 1) as f64;
-    let mut matching = 0.0f64;
-
-    for pair in prior.windows(2) {
-        let prev = invert_assignments(&pair[0].cluster_assignments);
-        let next = invert_assignments(&pair[1].cluster_assignments);
-        // A pair "agrees" if the community sets are the same (regardless of numeric ID).
-        if community_sets_match(&prev, &next) {
-            matching += 1.0;
-        }
-    }
-
-    matching / n_pairs
-}
-
-fn invert_assignments(
-    assignments: &BTreeMap<String, u32>,
-) -> BTreeMap<u32, std::collections::BTreeSet<String>> {
-    let mut result: BTreeMap<u32, std::collections::BTreeSet<String>> = BTreeMap::new();
-    for (node, &comm) in assignments {
-        result.entry(comm).or_default().insert(node.clone());
-    }
-    result
-}
-
-fn community_sets_match(
-    a: &BTreeMap<u32, std::collections::BTreeSet<String>>,
-    b: &BTreeMap<u32, std::collections::BTreeSet<String>>,
-) -> bool {
-    let a_sets: std::collections::BTreeSet<_> = a.values().collect();
-    let b_sets: std::collections::BTreeSet<_> = b.values().collect();
-    a_sets == b_sets
 }
 
 /// Result of [`compute_boundary_violations`].
@@ -216,34 +175,105 @@ pub struct BoundaryViolationResult {
 
 /// Computes boundary violations against a [`BoundarySpecInput`].
 ///
-/// A violation occurs when an edge crosses from one declared boundary into
-/// another that is not listed in `allow_imports_from`.
+/// A violation occurs when an edge `(from, to)` crosses from one declared boundary
+/// into another AND `to`'s boundary name is absent from `from`-boundary's
+/// `allow_imports_from` list.  Edges where either endpoint is unscoped (matches
+/// no boundary glob) are silently skipped — unscoped is not a violation.
+///
+/// Nodes matching multiple boundary globs are assigned the **most specific** match
+/// (longest glob string by character length; ties broken by ascending boundary name).
+///
+/// `allow_imports_from` is NOT transitive: if `a` allows `b` and `b` allows `c`,
+/// an `a → c` edge is still a violation unless `a` explicitly lists `c`.
 ///
 /// # Errors
 ///
 /// Returns [`AnalysisError::InvalidNodeId`] if any node ID is invalid.
+/// Returns [`AnalysisError::InvalidConfig`] if a boundary glob fails to compile.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use sdivi_core::input::{DependencyGraphInput, BoundarySpecInput};
+/// use sdivi_core::input::{
+///     BoundaryDefInput, BoundarySpecInput, DependencyGraphInput, EdgeInput, NodeInput,
+/// };
 /// use sdivi_core::compute::boundaries::compute_boundary_violations;
 ///
+/// // Empty spec → zero violations regardless of graph content.
 /// let g = DependencyGraphInput { nodes: vec![], edges: vec![] };
-/// let spec = BoundarySpecInput { boundaries: vec![] };
-/// let result = compute_boundary_violations(&g, &spec).unwrap();
-/// assert_eq!(result.violation_count, 0);
+/// let r = compute_boundary_violations(&g, &BoundarySpecInput { boundaries: vec![] }).unwrap();
+/// assert_eq!(r.violation_count, 0);
+///
+/// // db → api: db has no allow_imports_from → one violation.
+/// let g2 = DependencyGraphInput {
+///     nodes: vec![
+///         NodeInput { id: "crates/db/f.rs".into(), path: "crates/db/f.rs".into(), language: "rust".into() },
+///         NodeInput { id: "crates/api/b.rs".into(), path: "crates/api/b.rs".into(), language: "rust".into() },
+///     ],
+///     edges: vec![EdgeInput { source: "crates/db/f.rs".into(), target: "crates/api/b.rs".into() }],
+/// };
+/// let spec2 = BoundarySpecInput { boundaries: vec![
+///     BoundaryDefInput { name: "api".into(), modules: vec!["crates/api/**".into()], allow_imports_from: vec!["db".into()] },
+///     BoundaryDefInput { name: "db".into(), modules: vec!["crates/db/**".into()], allow_imports_from: vec![] },
+/// ]};
+/// assert_eq!(compute_boundary_violations(&g2, &spec2).unwrap().violation_count, 1);
 /// ```
 pub fn compute_boundary_violations(
     graph: &DependencyGraphInput,
-    _spec: &BoundarySpecInput,
+    spec: &BoundarySpecInput,
 ) -> Result<BoundaryViolationResult, AnalysisError> {
     for node in &graph.nodes {
         validate_node_id(&node.id)?;
     }
-    // Full violation detection is implemented in Milestone 10.
+
+    if spec.boundaries.is_empty() {
+        return Ok(BoundaryViolationResult {
+            violation_count: 0,
+            violations: vec![],
+        });
+    }
+
+    let compiled = super::violation::compile_boundaries(spec)?;
+
+    let node_boundaries: BTreeMap<&str, &str> = graph
+        .nodes
+        .iter()
+        .filter_map(|n| {
+            super::violation::match_boundary(&n.id, &compiled).map(|b| (n.id.as_str(), b))
+        })
+        .collect();
+
+    let allow_map: BTreeMap<&str, &[String]> = compiled
+        .iter()
+        .map(|cb| (cb.name.as_str(), cb.allow_imports_from.as_slice()))
+        .collect();
+
+    let mut violations: Vec<(String, String)> = Vec::new();
+
+    for edge in &graph.edges {
+        let from_b = match node_boundaries.get(edge.source.as_str()) {
+            Some(&b) => b,
+            None => continue,
+        };
+        let to_b = match node_boundaries.get(edge.target.as_str()) {
+            Some(&b) => b,
+            None => continue,
+        };
+        if from_b == to_b {
+            continue;
+        }
+        let allowed = allow_map
+            .get(from_b)
+            .is_some_and(|list| list.iter().any(|a| a == to_b));
+        if !allowed {
+            violations.push((edge.source.clone(), edge.target.clone()));
+        }
+    }
+
+    violations.sort();
+    let violation_count = violations.len() as u32;
     Ok(BoundaryViolationResult {
-        violation_count: 0,
-        violations: vec![],
+        violation_count,
+        violations,
     })
 }
