@@ -179,24 +179,17 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
     let change_coupling: Option<sdivi_core::ChangeCouplingResult> =
         input.change_coupling.map(to_core).transpose()?;
 
-    let mut snap = sdivi_core::assemble_snapshot(
+    let snap = sdivi_core::assemble_snapshot(
         graph,
         partition,
         catalog,
         pm,
-        None,
+        input.boundary_count.map(|c| c as usize),
         &input.timestamp,
         input.commit.as_deref(),
         change_coupling,
-        0,
+        input.violation_count.unwrap_or(0),
     );
-
-    if let Some(count) = input.boundary_count {
-        snap.intent_divergence = Some(sdivi_core::IntentDivergenceInfo {
-            boundary_count: count as usize,
-            violation_count: input.violation_count.unwrap_or(0),
-        });
-    }
 
     serde_wasm_bindgen::to_value(&snap).map_err(err)
 }

@@ -15,10 +15,11 @@ use crate::change_coupling::ChangeCouplingResult;
 /// breaking change (Rule 16).
 pub const SNAPSHOT_VERSION: &str = "1.0";
 
-/// Intent-divergence summary computed from a `BoundarySpec`.
+/// Intent-divergence summary derived from the caller's boundary representation.
 ///
-/// Present in a [`Snapshot`] only when a `.sdivi/boundaries.yaml` was found at
-/// snapshot time.
+/// Present in a [`Snapshot`] only when the caller supplied a boundary count to
+/// [`assemble_snapshot`] (typically because a `.sdivi/boundaries.yaml` was
+/// found at snapshot time, but any source of a count is valid).
 ///
 /// # Examples
 ///
@@ -30,7 +31,7 @@ pub const SNAPSHOT_VERSION: &str = "1.0";
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IntentDivergenceInfo {
-    /// Number of boundaries declared in the `BoundarySpec`.
+    /// Number of boundaries declared by the caller.
     pub boundary_count: usize,
     /// Number of cross-boundary dependency violations detected.
     pub violation_count: u32,
@@ -117,9 +118,11 @@ pub struct Snapshot {
     pub catalog: PatternCatalog,
     /// Pattern metrics (entropy, convention drift) for this snapshot.
     pub pattern_metrics: PatternMetricsResult,
-    /// Intent divergence against the declared `BoundarySpec`.
+    /// Intent divergence against the caller-declared boundaries.
     ///
-    /// `None` (omitted from JSON) when no `.sdivi/boundaries.yaml` was present.
+    /// `None` (omitted from JSON) when no boundary count was supplied to
+    /// [`assemble_snapshot`] (typically because `.sdivi/boundaries.yaml` was
+    /// not present).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intent_divergence: Option<IntentDivergenceInfo>,
     /// File-path → community-ID assignments for boundary inference.
@@ -142,8 +145,12 @@ pub struct Snapshot {
 
 /// Assembles a [`Snapshot`] from pipeline stage outputs.
 ///
-/// When `boundary_spec` is `Some`, an [`IntentDivergenceInfo`] is included with
-/// the boundary count and the caller-supplied `violation_count`.
+/// When `boundary_count` is `Some`, an [`IntentDivergenceInfo`] is included with
+/// that count and the caller-supplied `violation_count`. The caller is responsible
+/// for deriving `boundary_count` from a `BoundarySpec` (or any equivalent source);
+/// this function is intentionally agnostic to the spec type so non-FS callers
+/// (WASM, embedders with their own boundary representation) can use it directly
+/// without constructing a `sdivi_config::BoundarySpec`.
 ///
 /// # Examples
 ///
@@ -178,14 +185,14 @@ pub fn assemble_snapshot(
     partition: LeidenPartition,
     catalog: PatternCatalog,
     pattern_metrics: PatternMetricsResult,
-    boundary_spec: Option<&sdivi_config::BoundarySpec>,
+    boundary_count: Option<usize>,
     timestamp: &str,
     commit: Option<&str>,
     change_coupling: Option<ChangeCouplingResult>,
     violation_count: u32,
 ) -> Snapshot {
-    let intent_divergence = boundary_spec.map(|spec| IntentDivergenceInfo {
-        boundary_count: spec.boundaries.len(),
+    let intent_divergence = boundary_count.map(|boundary_count| IntentDivergenceInfo {
+        boundary_count,
         violation_count,
     });
 

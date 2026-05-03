@@ -240,12 +240,13 @@ impl Pipeline {
         });
 
         let commit_label = effective_sha.as_deref();
+        let boundary_count = boundary_spec.as_ref().map(|spec| spec.boundaries.len());
         let mut snapshot = assemble_snapshot(
             metrics,
             partition,
             catalog,
             pattern_metrics,
-            boundary_spec.as_ref(),
+            boundary_count,
             &effective_ts,
             commit_label,
             change_coupling_result,

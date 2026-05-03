@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-03
+
+### Changed
+
+- **BREAKING:** `sdivi_snapshot::assemble_snapshot` (re-exported as
+  `sdivi_core::assemble_snapshot`) now takes `boundary_count: Option<usize>`
+  in place of the previous `boundary_spec: Option<&sdivi_config::BoundarySpec>`
+  parameter. Callers that previously passed `Some(&spec)` should now pass
+  `Some(spec.boundaries.len())`; callers that passed `None` are unaffected.
+  See `MIGRATION_NOTES.md` § 0.1.x → 0.2.0. The change eliminates the WASM
+  binding's post-call `intent_divergence` override seam (ADL-10) and removes
+  the dependency edge from `sdivi-snapshot` to `sdivi-config`.
+- `sdivi-snapshot` no longer depends on `sdivi-config`. The crate previously
+  imported `sdivi_config::BoundarySpec` only inside `assemble_snapshot`'s
+  signature; with that gone, the dep is dropped.
+- `bindings/sdivi-wasm`: the post-call override that manually constructed
+  `snap.intent_divergence` after calling `sdivi_core::assemble_snapshot` is
+  removed. The WASM `boundary_count` and `violation_count` fields now flow
+  through the canonical `assemble_snapshot` parameters, so there is a single
+  assembly seam shared with the native pipeline.
+
+### Added
+
+- ADL-10: `assemble_snapshot` takes `boundary_count`, not `&BoundarySpec`.
+  Recorded in `.tekhton/ARCHITECTURE_LOG.md` with the rationale for the
+  pre-1.0 breaking change.
+
 ## [0.1.14] - 2026-05-03
 
 ### Added
