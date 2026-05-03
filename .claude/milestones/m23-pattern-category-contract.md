@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "23"
-status: "todo"
+status: "pending"
 -->
 
 **Scope:** Establish the canonical pattern-category schema as a versioned, documented contract — the canonical category names (`error_handling`, `data_access`, `logging`, etc.), their expected tree-sitter node-kind shapes per language, and the normalization rules that produce a `blake3` fingerprint. Ship as `docs/pattern-categories.md` versioned to `snapshot_version "1.0"`. Add a `list_categories() -> CategoryCatalog` WASM export so embedders can discover the contract at runtime instead of hard-coding category names. Doc + runtime ship together so consumers can't drift from the contract.
