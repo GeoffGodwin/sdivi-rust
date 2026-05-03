@@ -97,7 +97,7 @@ pub struct AppliedOverrideInfo {
 /// ```rust
 /// use sdivi_core::compute::thresholds::{compute_thresholds_check, ThresholdCheckResult};
 /// use sdivi_core::input::ThresholdsInput;
-/// use sdivi_snapshot::delta::null_summary;
+/// use sdivi_core::null_summary;
 ///
 /// let result = compute_thresholds_check(&null_summary(), &ThresholdsInput::default());
 /// assert!(!result.breached);

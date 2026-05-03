@@ -60,6 +60,10 @@ pub(crate) fn graph_to_boundary_input(dg: &DependencyGraph) -> DependencyGraphIn
         .map(|i| {
             dg.node_path(i)
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
+                // Nodes without a path produce an empty-string ID.  These are
+                // filtered out by validate_node_id("") in compute_boundary_violations;
+                // the whole call returns Err, which pipeline.rs swallows with a
+                // warning and sets violation_count = 0.  Safe but silent by design.
                 .unwrap_or_default()
         })
         .collect();

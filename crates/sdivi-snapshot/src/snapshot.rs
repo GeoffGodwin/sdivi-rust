@@ -177,9 +177,7 @@ pub struct Snapshot {
 /// );
 /// assert_eq!(snap.commit.as_deref(), Some("abc123"));
 /// ```
-// 9 args is intentional — every field is load-bearing for snapshot assembly
-// and the function is the seam between sdivi-pipeline and sdivi-core.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // 9 args: every field is load-bearing; seam between sdivi-pipeline and sdivi-core
 pub fn assemble_snapshot(
     graph: GraphMetrics,
     partition: LeidenPartition,

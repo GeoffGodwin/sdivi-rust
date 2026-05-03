@@ -158,11 +158,11 @@ mod tests {
     #[test]
     fn weight_value_preserved_after_key_conversion() {
         let mut m = BTreeMap::new();
-        m.insert("x:y".to_string(), 3.14);
+        m.insert("x:y".to_string(), 2.5);
         let result = parse_wasm_edge_weights(m).unwrap();
         let key = sdivi_core::input::edge_weight_key("x", "y");
         assert_eq!(
-            result[&key], 3.14,
+            result[&key], 2.5,
             "weight value must survive the colon→NUL key conversion unchanged"
         );
     }

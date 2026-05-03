@@ -163,6 +163,15 @@ pub fn normalize_and_hash(
     Ok(sdivi_core::normalize_and_hash(node_kind, &c))
 }
 
+/// Return the canonical pattern-category contract for `snapshot_version "1.0"`.
+///
+/// Embedders that supply their own tree-sitter extractors should call this
+/// function to discover which category names are valid instead of hard-coding them.
+#[wasm_bindgen]
+pub fn list_categories() -> Result<WasmCategoryCatalog, JsError> {
+    from_core(sdivi_core::list_categories())
+}
+
 // ── assemble_snapshot ────────────────────────────────────────────────────────
 
 /// Assemble a Snapshot from compute-function outputs.
@@ -242,15 +251,6 @@ fn build_leiden_partition(
         modularity: input.modularity,
         seed: input.leiden_seed.unwrap_or(42),
     })
-}
-
-/// Return the canonical pattern-category contract for `snapshot_version "1.0"`.
-///
-/// Embedders that supply their own tree-sitter extractors should call this
-/// function to discover which category names are valid instead of hard-coding them.
-#[wasm_bindgen]
-pub fn list_categories() -> Result<WasmCategoryCatalog, JsError> {
-    from_core(sdivi_core::list_categories())
 }
 
 fn build_pattern_catalog(

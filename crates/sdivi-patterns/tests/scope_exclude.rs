@@ -40,9 +40,11 @@ fn excluded_file_absent_from_catalog_present_in_records() {
         record("src/lib.rs", normal_hints),
     ];
 
-    let mut config = PatternsConfig::default();
-    config.min_pattern_nodes = 1;
-    config.scope_exclude = vec!["src/vendor/**".to_string()];
+    let config = PatternsConfig {
+        min_pattern_nodes: 1,
+        scope_exclude: vec!["src/vendor/**".to_string()],
+        ..PatternsConfig::default()
+    };
 
     let catalog = build_catalog(&records, &config);
 
@@ -76,9 +78,11 @@ fn non_excluded_file_present_in_catalog() {
     let hints = vec![hint("try_expression"), hint("try_expression")];
     let records = vec![record("src/lib.rs", hints)];
 
-    let mut config = PatternsConfig::default();
-    config.min_pattern_nodes = 1;
-    config.scope_exclude = vec!["src/vendor/**".to_string()];
+    let config = PatternsConfig {
+        min_pattern_nodes: 1,
+        scope_exclude: vec!["src/vendor/**".to_string()],
+        ..PatternsConfig::default()
+    };
 
     let catalog = build_catalog(&records, &config);
     assert!(
@@ -93,9 +97,11 @@ fn empty_scope_exclude_applies_no_filtering() {
     let hints = vec![hint("try_expression")];
     let records = vec![record("src/vendor/foo.rs", hints)];
 
-    let mut config = PatternsConfig::default();
-    config.min_pattern_nodes = 1;
-    config.scope_exclude = vec![];
+    let config = PatternsConfig {
+        min_pattern_nodes: 1,
+        scope_exclude: vec![],
+        ..PatternsConfig::default()
+    };
 
     let catalog = build_catalog(&records, &config);
     assert!(
@@ -113,9 +119,11 @@ fn multiple_scope_exclude_patterns() {
 
     let records = vec![vendor, gen, normal];
 
-    let mut config = PatternsConfig::default();
-    config.min_pattern_nodes = 1;
-    config.scope_exclude = vec!["vendor/**".to_string(), "generated/**".to_string()];
+    let config = PatternsConfig {
+        min_pattern_nodes: 1,
+        scope_exclude: vec!["vendor/**".to_string(), "generated/**".to_string()],
+        ..PatternsConfig::default()
+    };
 
     let catalog = build_catalog(&records, &config);
 

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
 /// Metadata for a single canonical pattern category — WASM wrapper.
-#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
+#[derive(Tsify, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmCategoryInfo {
     /// Canonical category name.
@@ -20,7 +20,7 @@ pub struct WasmCategoryInfo {
 /// Runtime representation of the canonical pattern-category contract — WASM wrapper.
 ///
 /// Returned by [`list_categories`](crate::exports::list_categories).
-#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
+#[derive(Tsify, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmCategoryCatalog {
     /// The `snapshot_version` string this contract applies to (`"1.0"`).

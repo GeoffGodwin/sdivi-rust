@@ -9,6 +9,7 @@ use chrono::NaiveDate;
 use proptest::prelude::*;
 use sdivi_core::compute::thresholds::{compute_thresholds_check, THRESHOLD_EPSILON};
 use sdivi_core::input::{ThresholdOverrideInput, ThresholdsInput};
+use sdivi_core::null_summary;
 use sdivi_snapshot::delta::DivergenceSummary;
 
 fn arb_summary() -> impl Strategy<Value = DivergenceSummary> {
@@ -202,17 +203,9 @@ proptest! {
         limit in 0.1f64..10.0,
         delta in -5.0f64..15.0,
     ) {
-        let mut cfg = ThresholdsInput::default();
-        cfg.pattern_entropy_rate = limit;
-        let summary = DivergenceSummary {
-            pattern_entropy_delta: Some(delta),
-            convention_drift_delta: None,
-            coupling_delta: None,
-            community_count_delta: None,
-            boundary_violation_delta: None,
-            pattern_entropy_per_category_delta: None,
-            convention_drift_per_category_delta: None,
-        };
+        let cfg = ThresholdsInput { pattern_entropy_rate: limit, ..ThresholdsInput::default() };
+        let mut summary = null_summary();
+        summary.pattern_entropy_delta = Some(delta);
         let r = compute_thresholds_check(&summary, &cfg);
         let expected = delta > limit + THRESHOLD_EPSILON;
         prop_assert_eq!(
@@ -232,17 +225,9 @@ proptest! {
         limit in 0.1f64..10.0,
         delta in -5.0f64..15.0,
     ) {
-        let mut cfg = ThresholdsInput::default();
-        cfg.convention_drift_rate = limit;
-        let summary = DivergenceSummary {
-            pattern_entropy_delta: None,
-            convention_drift_delta: Some(delta),
-            coupling_delta: None,
-            community_count_delta: None,
-            boundary_violation_delta: None,
-            pattern_entropy_per_category_delta: None,
-            convention_drift_per_category_delta: None,
-        };
+        let cfg = ThresholdsInput { convention_drift_rate: limit, ..ThresholdsInput::default() };
+        let mut summary = null_summary();
+        summary.convention_drift_delta = Some(delta);
         let r = compute_thresholds_check(&summary, &cfg);
         let expected = delta > limit + THRESHOLD_EPSILON;
         prop_assert_eq!(
@@ -262,17 +247,9 @@ proptest! {
         limit in 0.01f64..1.0,
         delta in -1.0f64..2.0,
     ) {
-        let mut cfg = ThresholdsInput::default();
-        cfg.coupling_delta_rate = limit;
-        let summary = DivergenceSummary {
-            pattern_entropy_delta: None,
-            convention_drift_delta: None,
-            coupling_delta: Some(delta),
-            community_count_delta: None,
-            boundary_violation_delta: None,
-            pattern_entropy_per_category_delta: None,
-            convention_drift_per_category_delta: None,
-        };
+        let cfg = ThresholdsInput { coupling_delta_rate: limit, ..ThresholdsInput::default() };
+        let mut summary = null_summary();
+        summary.coupling_delta = Some(delta);
         let r = compute_thresholds_check(&summary, &cfg);
         let expected = delta > limit + THRESHOLD_EPSILON;
         prop_assert_eq!(
@@ -294,17 +271,9 @@ proptest! {
         limit in 0.1f64..10.0,
         delta in -10i64..20,
     ) {
-        let mut cfg = ThresholdsInput::default();
-        cfg.boundary_violation_rate = limit;
-        let summary = DivergenceSummary {
-            pattern_entropy_delta: None,
-            convention_drift_delta: None,
-            coupling_delta: None,
-            community_count_delta: None,
-            boundary_violation_delta: Some(delta),
-            pattern_entropy_per_category_delta: None,
-            convention_drift_per_category_delta: None,
-        };
+        let cfg = ThresholdsInput { boundary_violation_rate: limit, ..ThresholdsInput::default() };
+        let mut summary = null_summary();
+        summary.boundary_violation_delta = Some(delta);
         let r = compute_thresholds_check(&summary, &cfg);
         let delta_f = delta as f64;
         let expected = delta_f > limit + THRESHOLD_EPSILON;

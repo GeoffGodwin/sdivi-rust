@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Recorded in `.tekhton/ARCHITECTURE_LOG.md` with the rationale for the
   pre-1.0 breaking change.
 
+- All 19 open non-blocking notes addressed:
 ## [0.1.14] - 2026-05-03
 
 ### Added
