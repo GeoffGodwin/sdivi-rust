@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-02
-- Runs since audit: 2
+- Runs since audit: 3
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -30,6 +30,9 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] `tests/node_smoke/package.json` `"test"` script uses `node --input-type=module < index.mjs` (stdin redirect) while the CI step uses `node index.mjs` directly. Both work, but running `npm test` locally exercises a different invocation path than CI. Align to `node index.mjs` for consistency.
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] `bindings/sdivi-wasm/package.json` (the old single-target manifest at the binding root) is superseded by `pkg-template/package.json` but was intentionally left in place (noted in CODER_SUMMARY Observed Issues). It will cause confusion for contributors. A follow-up cleanup PR should delete or annotate it.
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] Prior cycle observations not addressed (out of scope for M24, carry forward): `WasmCategoryInfo`/`WasmCategoryCatalog` missing `PartialEq`; `list_categories()` placement in `exports.rs`; `CATEGORIES`/`CATEGORY_DESCRIPTIONS` parallel arrays.
 - [2026-05-03 | "Implement Milestone 23: Pattern Category Contract + WASM `list_categories()`"] `crates/sdivi-core/src/categories.rs:24,35` — `CATEGORIES` and `CATEGORY_DESCRIPTIONS` are two parallel arrays that must stay in sync (same names, same order) with no compile-time enforcement. The runtime tests catch drift. A single combined source-of-truth array (e.g. `const CATALOG_ENTRIES: &[(&str, &str)]`) iterated by both `list_categories()` and `CATEGORIES` would eliminate the possibility of the two diverging silently between tests runs.
 
 ## Decisions (Declined / Will Not Implement)

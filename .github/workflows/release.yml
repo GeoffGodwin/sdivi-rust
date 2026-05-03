@@ -243,15 +243,27 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build WASM bundle (release-wasm profile)
+      - name: Build WASM bundler target (release profile)
         working-directory: bindings/sdivi-wasm
-        run: wasm-pack build --target bundler --profile release-wasm
+        # wasm-pack 0.13.x conflicts between --release and --profile; use --release only.
+        run: wasm-pack build --target bundler --release --out-dir pkg/bundler
 
-      - name: Report WASM bundle size
-        working-directory: bindings/sdivi-wasm/pkg
+      - name: Build WASM nodejs target (release profile)
+        working-directory: bindings/sdivi-wasm
+        run: wasm-pack build --target nodejs --release --out-dir pkg/node
+
+      - name: Report WASM bundle sizes
+        working-directory: bindings/sdivi-wasm
         run: |
-          SIZE=$(wc -c < sdivi_wasm_bg.wasm)
-          echo "WASM bundle size: ${SIZE} bytes ($(( SIZE / 1024 )) KiB)"
+          SIZE_BUNDLER=$(wc -c < pkg/bundler/sdivi_wasm_bg.wasm)
+          SIZE_NODE=$(wc -c < pkg/node/sdivi_wasm_bg.wasm)
+          echo "bundler .wasm: ${SIZE_BUNDLER} bytes ($(( SIZE_BUNDLER / 1024 )) KiB)"
+          echo "nodejs  .wasm: ${SIZE_NODE} bytes ($(( SIZE_NODE / 1024 )) KiB)"
+          echo "combined:      $(( SIZE_BUNDLER + SIZE_NODE )) bytes"
+
+      - name: Assemble pkg/package.json from template
+        working-directory: bindings/sdivi-wasm
+        run: cp pkg-template/package.json pkg/package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

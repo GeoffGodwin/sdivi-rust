@@ -4,7 +4,7 @@
  * Demonstrates the init-then-call pattern.  In real use the caller supplies
  * extracted graph/pattern data; here we use a small inline fixture.
  *
- * Run (after `wasm-pack build --target bundler --release` in bindings/sdivi-wasm):
+ * Run (after `./build.sh` in bindings/sdivi-wasm — builds both bundler and nodejs targets):
  *   npx tsx examples/binding_node.ts
  */
 import init, {

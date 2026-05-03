@@ -3,7 +3,10 @@
 WASM bindings for the [Structural Divergence Indexer](https://github.com/geoffgodwin/sdivi-rust) pure-compute API.
 
 All `compute_*` functions from `sdivi-core` are exported with `tsify`-derived TypeScript types.
-The package is **WASM-only** — no Node.js native code, no FS, no network.
+The package is **WASM-only** — no Node.js native code, no FS access beyond loading the `.wasm` file.
+
+**Node.js minimum: 18.** The conditional `exports` map is ignored by Node < 18, which falls back
+to the `main` field (bundler build) — use the explicit `/node` subpath on older runtimes.
 
 ## Installation
 
@@ -11,7 +14,61 @@ The package is **WASM-only** — no Node.js native code, no FS, no network.
 npm install @geoffgodwin/sdivi-wasm
 ```
 
-## Usage
+## Bundler consumers (webpack, vite, rollup)
+
+Use the default import path. The bundler target uses `import.meta.url`-style WASM loading
+and requires a bundler to resolve the `.wasm` asset.
+
+```ts
+import init, {
+  detect_boundaries,
+  compute_coupling_topology,
+  list_categories,
+} from '@geoffgodwin/sdivi-wasm';
+
+// Must await init() once before calling any other function.
+await init();
+
+const catalog = list_categories();
+console.log(catalog.schema_version); // "1.0"
+
+const metrics = compute_coupling_topology(graph);
+console.log(metrics.density);
+```
+
+Or be explicit with the `/bundler` subpath:
+
+```ts
+import init, { list_categories } from '@geoffgodwin/sdivi-wasm/bundler';
+await init();
+```
+
+## Node.js consumers (CLI, server)
+
+Use `require('@geoffgodwin/sdivi-wasm')` or the explicit `/node` subpath. The nodejs target
+uses `require('fs')` to load the `.wasm` file **synchronously** — no `init()` call needed,
+and no bundler required.
+
+```js
+// CommonJS — no init() needed; wasm loads synchronously.
+const { list_categories, compute_coupling_topology } = require('@geoffgodwin/sdivi-wasm');
+
+const catalog = list_categories();
+console.log(catalog.schema_version); // "1.0"
+for (const cat of catalog.categories) {
+  console.log(cat.name); // "async_patterns", "error_handling", ...
+}
+```
+
+```ts
+// TypeScript with explicit subpath (for TS moduleResolution: "bundler" or "node16"):
+const { list_categories } = require('@geoffgodwin/sdivi-wasm/node');
+```
+
+**Important:** Do NOT use the `/node` build with webpack/vite. It uses `require('fs')` which
+bundlers cannot resolve in a browser context.
+
+## Full usage example (bundler)
 
 ```ts
 import init, {
@@ -19,9 +76,11 @@ import init, {
   compute_coupling_topology,
   compute_pattern_metrics,
   normalize_and_hash,
+  compute_change_coupling,
+  assemble_snapshot,
+  list_categories,
 } from '@geoffgodwin/sdivi-wasm';
 
-// Must await init() once before calling any other function.
 await init();
 
 const graph = {
@@ -33,7 +92,7 @@ const graph = {
 };
 
 const metrics = compute_coupling_topology(graph);
-console.log(metrics.density); // graph density
+console.log(metrics.density);
 
 // Unweighted Leiden.
 const cfg = { seed: 42, gamma: 1.0, iterations: 100, quality: 'Modularity' };
@@ -64,7 +123,7 @@ const changeCoupling = compute_change_coupling(events, { min_frequency: 0.5, his
 const snapshot = assemble_snapshot({
   // ... graph / partition / pattern fields ...
   timestamp: new Date().toISOString(),
-  change_coupling: changeCoupling, // pass the result directly
+  change_coupling: changeCoupling,
 });
 ```
 
@@ -114,6 +173,7 @@ including per-language node-kind tables and normalization rules.
 - All input/output types are derived via `tsify` — the `.d.ts` is generated at build time, not hand-maintained.
 - Compatible with `--strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes`.
 - Optional fields are `T | undefined`, never `T | null`.
+- The `types` field in `exports["."]` points to the bundler `.d.ts`; `exports["./node"]` points to the node `.d.ts`.
 
 ## `normalize_and_hash` determinism
 
@@ -123,11 +183,11 @@ The blake3 digest produced in WASM is **bit-identical** to the digest produced b
 
 ```bash
 # Prerequisites: cargo install wasm-pack && apt install binaryen
-./build.sh          # release build + wasm-opt
-./build.sh --dev    # dev build (no optimisation)
+./build.sh          # release build: both bundler + nodejs targets + wasm-opt
+./build.sh --dev    # dev build: both targets, no optimisation
 ```
 
-Output is in `pkg/`.
+Output is in `pkg/bundler/` and `pkg/node/`, with `pkg/package.json` assembled from `pkg-template/`.
 
 ## Version note
 

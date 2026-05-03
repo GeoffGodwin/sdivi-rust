@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "24"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Ship `@geoffgodwin/sdivi-wasm` as a single npm package with conditional exports — `./bundler` for webpack/vite consumers (current default), `./node` for Node 18+ CLI consumers (Meridian's case). Updates `bindings/sdivi-wasm/build.sh` to produce both `wasm-pack` outputs, the npm `package.json` `exports` map to route by environment, and adds a Node-import smoke test to CI. Does not bump the package's major version because the existing `bundler` import path remains the default.

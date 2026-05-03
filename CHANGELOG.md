@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-05-03
+
+### Added
+
+- `@geoffgodwin/sdivi-wasm`: dual-target npm distribution. The package now ships both a
+  `bundler` target (webpack, vite, rollup — ESM with `import.meta.url`-style wasm loading)
+  and a `nodejs` target (Node 18+ CLI/server — CJS with synchronous `require('fs')` wasm
+  loading). Conditional `exports` in `pkg/package.json` route `require()` callers to the
+  `node/` build and `import`/`import()` callers to the `bundler/` build automatically.
+  Explicit subpaths `/node` and `/bundler` are available for callers that want to be explicit.
+  Node consumers no longer need a `WebAssembly.instantiate` shim. (M24)
+- `bindings/sdivi-wasm/build.sh`: updated to produce both targets under `pkg/bundler/` and
+  `pkg/node/`. A top-level `pkg/package.json` is assembled from `pkg-template/package.json`
+  after each build. (M24)
+- `bindings/sdivi-wasm/pkg-template/package.json`: conditional-exports template with `main`,
+  `module`, `types`, and `exports` map covering `.`, `./node`, and `./bundler` subpaths. (M24)
+- `bindings/sdivi-wasm/tests/node_smoke/`: minimal Node 18+ smoke-test project (`index.cjs`,
+  `index.mjs`, `package.json`) that exercises the `require` and `import` conditional export
+  paths and asserts `list_categories()` returns consistent results under both. Run in CI on
+  `ubuntu-latest` after every successful build. (M24)
+- `.github/workflows/wasm.yml`: extended to build both targets, check combined bundle size
+  (5 MB budget), run the Node CJS/ESM smoke tests, compare category lists across both, and
+  verify `npm pack --dry-run` lists both `bundler/` and `node/` subdirectories. (M24)
+
+- [MILESTONE 23 ✓] feat: Implement Milestone 23: Pattern Category Contract + WASM `list_categorie (M24)
 ## [0.1.13] - 2026-05-03
 
 ### Added
