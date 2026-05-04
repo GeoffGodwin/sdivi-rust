@@ -45,9 +45,9 @@ await init();
 
 ## Node.js consumers (CLI, server)
 
-Use `require('@geoffgodwin/sdivi-wasm')` or the explicit `/node` subpath. The nodejs target
-uses `require('fs')` to load the `.wasm` file **synchronously** — no `init()` call needed,
-and no bundler required.
+Both `require(...)` (CJS) and `import` (ESM) resolve to the nodejs target in Node 18+ via
+the `node` environment condition in `exports`. The nodejs target uses `require('fs')` to load
+the `.wasm` file **synchronously** — no `init()` call needed, and no bundler required.
 
 ```js
 // CommonJS — no init() needed; wasm loads synchronously.
@@ -60,13 +60,26 @@ for (const cat of catalog.categories) {
 }
 ```
 
+```js
+// ESM — the `node` condition routes to the nodejs (CJS) target. Default-import
+// then destructure works on every Node 18+ version; named imports also work via
+// Node's cjs-module-lexer interop but default-import is the most portable shape.
+import sdivi from '@geoffgodwin/sdivi-wasm';
+const { list_categories } = sdivi;
+
+const catalog = list_categories();
+console.log(catalog.schema_version); // "1.0"
+```
+
 ```ts
 // TypeScript with explicit subpath (for TS moduleResolution: "bundler" or "node16"):
 const { list_categories } = require('@geoffgodwin/sdivi-wasm/node');
 ```
 
-**Important:** Do NOT use the `/node` build with webpack/vite. It uses `require('fs')` which
-bundlers cannot resolve in a browser context.
+**Important:** Do NOT use the `/node` build with webpack/vite in browser-target builds. It
+uses `require('fs')` which bundlers cannot resolve in a browser context. The default
+`@geoffgodwin/sdivi-wasm` import already routes browser/bundler builds to the bundler target
+(via `import`/`default` conditions) and Node builds to the nodejs target (via `node`).
 
 ## Full usage example (bundler)
 

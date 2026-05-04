@@ -7,11 +7,13 @@
   "types": "./bundler/sdivi_wasm.d.ts",
   "exports": {
     ".": {
+      "node": "./node/sdivi_wasm.js",
       "import": "./bundler/sdivi_wasm.js",
       "require": "./node/sdivi_wasm.js",
       "types": "./bundler/sdivi_wasm.d.ts"
     },
     "./node": {
+      "import": "./node/sdivi_wasm.js",
       "require": "./node/sdivi_wasm.js",
       "types": "./node/sdivi_wasm.d.ts"
     },

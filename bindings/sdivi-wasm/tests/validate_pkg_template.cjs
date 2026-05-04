@@ -81,6 +81,21 @@ if (!pkg.exports || typeof pkg.exports !== 'object' || Array.isArray(pkg.exports
     } else {
         ok('exports["."]["require"] references node/ target');
     }
+
+    // The "node" environment condition must route Node consumers (both ESM
+    // and CJS) to the nodejs wasm-pack target. Without this, Node ESM
+    // consumers resolve via "import" to the bundler target, which can't be
+    // loaded by raw Node — `import * as wasm from './foo.wasm'` fails with
+    // ERR_UNKNOWN_FILE_EXTENSION since wasm-bindgen's bundler output relies
+    // on bundler-specific module handling.
+    const nodeCond = (pkg.exports['.'] || {})['node'];
+    if (typeof nodeCond !== 'string') {
+        fail('exports["."]["node"] is missing or not a string — Node ESM consumers will fail');
+    } else if (!nodeCond.includes('node/')) {
+        fail('exports["."]["node"] does not reference node/ target: ' + nodeCond);
+    } else {
+        ok('exports["."]["node"] = ' + nodeCond + ' (routes Node ESM+CJS to nodejs target)');
+    }
 }
 
 // engines.node must be >=18
