@@ -1,6 +1,6 @@
 {
   "name": "@geoffgodwin/sdivi-wasm",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "WASM bindings for the Structural Divergence Indexer pure-compute API",
   "main": "./bundler/sdivi_wasm.js",
   "module": "./bundler/sdivi_wasm.js",
@@ -26,7 +26,8 @@
     "bundler/",
     "node/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=18"

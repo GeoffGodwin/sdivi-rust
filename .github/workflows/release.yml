@@ -309,6 +309,16 @@ jobs:
         working-directory: bindings/sdivi-wasm
         run: cp pkg-template/package.json pkg/package.json
 
+      - name: Ship LICENSE + NOTICE + README at package root
+        # Without these at pkg root, license-compliance scanners (Artifactory
+        # Xray, etc.) flag the tarball as "license declared without text
+        # shipped" and may quarantine. The outer pkg/package.json `files`
+        # field already declares these — this step makes good on the promise.
+        run: |
+          cp LICENSE bindings/sdivi-wasm/pkg/LICENSE
+          cp NOTICE  bindings/sdivi-wasm/pkg/NOTICE
+          cp bindings/sdivi-wasm/README.md bindings/sdivi-wasm/pkg/README.md
+
       - name: Remove wasm-pack auto-generated .gitignore files
         working-directory: bindings/sdivi-wasm
         # wasm-pack writes a `.gitignore` containing `*` into each --out-dir.

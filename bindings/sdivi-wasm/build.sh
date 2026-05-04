@@ -62,6 +62,19 @@ fi
 echo "==> Assembling pkg/package.json from pkg-template/…"
 cp pkg-template/package.json pkg/package.json
 
+# Ship LICENSE + README at the package root. The outer pkg/package.json
+# `files` field declares both, but wasm-pack only generates inner copies
+# inside bundler/ and node/. Without the root copies, license-compliance
+# scanners (Artifactory Xray, etc.) flag the tarball as "license declared
+# without text shipped" and may quarantine.
+echo "==> Copying LICENSE and README to pkg/ root…"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cp "$REPO_ROOT/LICENSE" pkg/LICENSE
+cp "$REPO_ROOT/NOTICE"  pkg/NOTICE
+# A WASM-binding-specific README is more useful to npm consumers than the
+# whole-workspace README. Use the existing one in this directory.
+cp "$SCRIPT_DIR/README.md" pkg/README.md
+
 # wasm-pack writes a `.gitignore` containing `*` into each out-dir. `npm pack`
 # honors it and silently drops bundler/ and node/ from the tarball despite the
 # `files` field. Remove them so the published tarball actually contains the
@@ -72,3 +85,6 @@ echo "==> Build complete."
 echo "    bundler target : $SCRIPT_DIR/pkg/bundler/"
 echo "    nodejs target  : $SCRIPT_DIR/pkg/node/"
 echo "    package.json   : $SCRIPT_DIR/pkg/package.json"
+echo "    LICENSE        : $SCRIPT_DIR/pkg/LICENSE"
+echo "    NOTICE         : $SCRIPT_DIR/pkg/NOTICE"
+echo "    README.md      : $SCRIPT_DIR/pkg/README.md"
