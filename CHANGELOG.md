@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-05-04
+
+### Changed
+
+- Release pipeline: every `cargo publish -p X` in the
+  `publish-crates` job now goes through `scripts/publish-or-skip.sh`,
+  which treats "crate version is already uploaded" as idempotent
+  success. Lets the job resume from a partial publish on rerun
+  instead of aborting on the first already-published crate.
+  Particularly relevant for the initial set of publishes where
+  crates.io's new-crate rate limit (1 new crate per ~10 min after
+  burst) may stop the run partway. Other failure modes (auth,
+  compile, network, true rate-limit-without-already-uploaded)
+  still propagate as failures.
+
+### Notes
+
+- Already published to crates.io from prior runs:
+  `sdivi-config@0.2.9`, `sdivi-parsing@0.2.9`,
+  `sdivi-lang-{rust,python,typescript,javascript,go}@0.2.9`.
+  v0.2.10 republishes those (1/min version-bump rate limit) and
+  publishes the remaining 9 crates as their first version (still
+  hitting the new-crate rate limit, but reruns will resume cleanly).
+
 ## [0.2.9] - 2026-05-04
 
 ### Fixed

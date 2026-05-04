@@ -194,59 +194,67 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
+      # All `cargo publish` calls go through scripts/publish-or-skip.sh,
+      # which treats "crate version is already uploaded" as success. This
+      # makes the job idempotent: if a publish fails partway through (e.g.
+      # crates.io's new-crate rate limit, transient 5xx), the partial set
+      # is recorded as published, and rerunning the job picks up where the
+      # last attempt left off instead of failing immediately on the first
+      # already-published crate.
+
       - name: Publish sdivi-config
-        run: cargo publish -p sdivi-config
+        run: ./scripts/publish-or-skip.sh sdivi-config
       - run: sleep 30
 
       - name: Publish sdivi-parsing
-        run: cargo publish -p sdivi-parsing
+        run: ./scripts/publish-or-skip.sh sdivi-parsing
       - run: sleep 30
 
       - name: Publish language adapters
         run: |
-          cargo publish -p sdivi-lang-rust
+          ./scripts/publish-or-skip.sh sdivi-lang-rust
           sleep 10
-          cargo publish -p sdivi-lang-python
+          ./scripts/publish-or-skip.sh sdivi-lang-python
           sleep 10
-          cargo publish -p sdivi-lang-typescript
+          ./scripts/publish-or-skip.sh sdivi-lang-typescript
           sleep 10
-          cargo publish -p sdivi-lang-javascript
+          ./scripts/publish-or-skip.sh sdivi-lang-javascript
           sleep 10
-          cargo publish -p sdivi-lang-go
+          ./scripts/publish-or-skip.sh sdivi-lang-go
           sleep 10
-          cargo publish -p sdivi-lang-java
+          ./scripts/publish-or-skip.sh sdivi-lang-java
       - run: sleep 30
 
       - name: Publish sdivi-graph
-        run: cargo publish -p sdivi-graph
+        run: ./scripts/publish-or-skip.sh sdivi-graph
       - run: sleep 30
 
       - name: Publish sdivi-detection
-        run: cargo publish -p sdivi-detection
+        run: ./scripts/publish-or-skip.sh sdivi-detection
       - run: sleep 30
 
       - name: Publish sdivi-patterns
-        run: cargo publish -p sdivi-patterns
+        run: ./scripts/publish-or-skip.sh sdivi-patterns
       - run: sleep 30
 
       - name: Publish sdivi-snapshot
-        run: cargo publish -p sdivi-snapshot
+        run: ./scripts/publish-or-skip.sh sdivi-snapshot
       - run: sleep 30
 
       - name: Publish sdivi-core
-        run: cargo publish -p sdivi-core
+        run: ./scripts/publish-or-skip.sh sdivi-core
       - run: sleep 30
 
       - name: Publish sdivi-pipeline
-        run: cargo publish -p sdivi-pipeline
+        run: ./scripts/publish-or-skip.sh sdivi-pipeline
       - run: sleep 30
 
       - name: Publish sdivi-cli
-        run: cargo publish -p sdivi-cli
+        run: ./scripts/publish-or-skip.sh sdivi-cli
       - run: sleep 30
 
       - name: Publish sdivi-rust (install-discovery meta-crate)
-        run: cargo publish -p sdivi-rust
+        run: ./scripts/publish-or-skip.sh sdivi-rust
 
   # ── Publish to npm (manual approval gate) ────────────────────────────────
   # Uses npm Trusted Publishing (OIDC). Configured at
