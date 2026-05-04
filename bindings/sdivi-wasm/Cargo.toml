@@ -6,6 +6,12 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "WASM bindings for the Structural Divergence Indexer — wraps sdivi-core via wasm-bindgen + tsify"
+# This crate is published to npm only (as @geoffgodwin/sdivi-wasm via the
+# release.yml `publish-npm` job). It must NOT be published to crates.io —
+# wasm-bindgen output is meaningless without the JS glue layer that npm
+# delivers. Setting publish = false guards against accidental
+# `cargo publish --workspace` from including this crate.
+publish = false
 
 # `cdylib` is required for wasm-pack to produce a .wasm bundle; `rlib` is
 # required so integration tests in tests/*.rs can `use sdivi_wasm::*`.
