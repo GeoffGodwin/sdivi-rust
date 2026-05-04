@@ -1,8 +1,9 @@
 //! WASM smoke tests — run via `wasm-pack test --node`.
 //!
 //! Each test verifies that an exported function is callable and produces
-//! non-trivial output.  Cross-platform hash determinism for `normalize_and_hash`
-//! is also verified here (same fixture → same 64-char hex on all platforms).
+//! non-trivial output.  The dedicated CI cross-platform hash capture lives in
+//! `normalize_hash_deterministic.rs` so the workflow's `--test
+//! normalize_hash_deterministic` filter resolves to its own target.
 //! Snapshot assembly / delta / trend tests live in `wasm_snapshot.rs`.
 
 use sdivi_wasm::types::{
@@ -229,16 +230,6 @@ fn test_normalize_and_hash_differs_by_kind() {
     let a = normalize_and_hash("try_expression", vec![]).unwrap();
     let b = normalize_and_hash("match_expression", vec![]).unwrap();
     assert_ne!(a, b);
-}
-
-/// Dedicated test for CI cross-platform hash determinism check.
-/// Prints hash in CI_HASH format so CI can grep and compare across platforms.
-#[wasm_bindgen_test]
-fn normalize_hash_deterministic() {
-    let hash = normalize_and_hash("try_expression", vec![]).unwrap();
-    println!("CI_HASH:{}", hash);
-    assert_eq!(hash.len(), 64);
-    assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
 /// list_categories returns schema_version "1.0" and the expected number of categories.

@@ -82,21 +82,22 @@ fn weighted_cfg(weights: BTreeMap<String, f64>) -> WasmLeidenConfigInput {
 
 // ── Acceptance tests ──────────────────────────────────────────────────────────
 
-/// Weighted run with dominant weights on (a,b) and (c,d) produces a different
-/// partition than the unweighted run on the same graph.
+/// Weighted run with dominant weights on the cross-cut edges (a,c) and (b,c)
+/// produces a different partition than the unweighted run on the same graph.
 #[wasm_bindgen_test]
 fn test_detect_boundaries_weighted_differs_from_unweighted() {
     let graph = four_node_graph();
 
     let unweighted = detect_boundaries(graph.clone(), unweighted_cfg(), vec![]).unwrap();
 
+    // Weight the edges that *cross* the unweighted {a,b} | {c,d} partition.
+    // Reinforcing edges already inside a community is a no-op; pulling on
+    // cross-cut edges is what actually moves nodes between communities.
     let mut weights = BTreeMap::new();
-    weights.insert("a:b".to_string(), 100.0);
-    weights.insert("c:d".to_string(), 100.0);
+    weights.insert("a:c".to_string(), 100.0);
+    weights.insert("b:c".to_string(), 100.0);
     let weighted = detect_boundaries(graph, weighted_cfg(weights), vec![]).unwrap();
 
-    // Partitions should differ: the heavy weights on (a,b) and (c,d) pull those
-    // pairs into shared communities more strongly than the uniform-weight run.
     assert_ne!(
         unweighted.cluster_assignments, weighted.cluster_assignments,
         "weighted Leiden should produce a different partition than unweighted on this graph"
