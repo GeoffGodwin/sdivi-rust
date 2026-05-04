@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-04
+
+### Fixed
+
+- Release pipeline: `Build (x86_64-apple-darwin)` runner moved from `macos-13`
+  (retired by GitHub Actions, no runners in pool — jobs sat queued indefinitely)
+  to `macos-latest` (Apple Silicon) with a cross-compile to the x86_64 target.
+  Apple's toolchain supports both arches on Apple Silicon hosts; no `cross`
+  needed for Mac→Mac targets. `dtolnay/rust-toolchain@stable`'s `targets:`
+  input already installs the cross target, so no other workflow changes
+  required.
+
 ## [0.2.1] - 2026-05-04
 
 ### Fixed

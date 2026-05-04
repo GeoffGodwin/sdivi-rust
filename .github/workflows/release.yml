@@ -74,7 +74,11 @@ jobs:
             cross: true
             bin: sdivi
             artifact: sdivi-aarch64-unknown-linux-gnu
-          - os: macos-13
+          # macos-13 (Intel) was retired by GitHub Actions. We build the
+          # x86_64-apple-darwin binary by cross-compiling from the Apple
+          # Silicon runner — the Rust toolchain installs the x86_64 target
+          # and the Apple SDK supports both arches natively. No `cross` needed.
+          - os: macos-latest
             target: x86_64-apple-darwin
             cross: false
             bin: sdivi
