@@ -26,5 +26,5 @@ petgraph    = { workspace = true }
 tracing     = { workspace = true }
 
 [dev-dependencies]
-sdivi-lang-rust = { path = "../sdivi-lang-rust" }
+sdivi-lang-rust = { workspace = true }
 tempfile      = { workspace = true }

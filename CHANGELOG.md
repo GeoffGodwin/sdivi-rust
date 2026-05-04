@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-05-04
+
+### Fixed
+
+- crates.io publish: every internal `sdivi-*` workspace crate that
+  depends on another `sdivi-*` workspace crate now records both
+  `path` and `version`, so `cargo publish` can write a valid
+  dependency constraint into the published Cargo.toml. v0.2.7
+  blocked at sdivi-parsing with:
+  > error: all dependencies must have a version specified when publishing.
+  > dependency `sdivi-config` does not specify a version
+  Fix in `[workspace.dependencies]` (root Cargo.toml). Two
+  dev-dependency stragglers in `crates/sdivi-parsing/Cargo.toml`
+  and `crates/sdivi-graph/Cargo.toml` that bypassed workspace
+  inheritance (`sdivi-lang-rust = { path = "..." }`) were
+  converted to `{ workspace = true }`.
+
+### Notes
+
+- `sdivi-config@0.2.7` did successfully land on crates.io in the
+  v0.2.7 run before the publish-crates job aborted on
+  sdivi-parsing. Rest of the crates skipped 0.2.7 entirely. v0.2.8
+  publishes the full set together.
+
 ## [0.2.7] - 2026-05-04
 
 ### Fixed

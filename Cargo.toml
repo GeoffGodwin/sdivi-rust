@@ -35,7 +35,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.package]
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -43,26 +43,31 @@ repository = "https://github.com/geoffgodwin/sdivi-rust"
 
 [workspace.dependencies]
 # ── internal crates ──────────────────────────────────────────────────────────
-sdivi-core     = { path = "crates/sdivi-core" }
-sdivi-cli      = { path = "crates/sdivi-cli" }
-sdivi-pipeline = { path = "crates/sdivi-pipeline" }
+# Internal sdivi-* deps need both `path` (so workspace dev resolves them
+# locally) and `version` (so `cargo publish` can record the dependency
+# constraint for crates.io consumers — without `version` cargo errors out
+# with "all dependencies must have a version specified when publishing").
+# Keep `version` in lockstep with [workspace.package].version each release.
+sdivi-core     = { path = "crates/sdivi-core",     version = "0.2.8" }
+sdivi-cli      = { path = "crates/sdivi-cli",      version = "0.2.8" }
+sdivi-pipeline = { path = "crates/sdivi-pipeline", version = "0.2.8" }
 # default-features = false so crates can opt into features explicitly.
 # sdivi-config: loader feature gates load_or_default / BoundarySpec::load.
 # sdivi-graph, sdivi-patterns: pipeline-records gates sdivi-parsing dep + from-records paths.
 # sdivi-detection: pipeline-records is empty but listed for uniformity.
 # sdivi-snapshot: pipeline-records gates tempfile + write/retention FS paths.
-sdivi-config    = { path = "crates/sdivi-config",    default-features = false }
-sdivi-parsing   = { path = "crates/sdivi-parsing" }
-sdivi-graph     = { path = "crates/sdivi-graph",     default-features = false }
-sdivi-detection = { path = "crates/sdivi-detection", default-features = false }
-sdivi-patterns  = { path = "crates/sdivi-patterns",  default-features = false }
-sdivi-snapshot  = { path = "crates/sdivi-snapshot",  default-features = false }
-sdivi-lang-rust       = { path = "crates/sdivi-lang-rust" }
-sdivi-lang-python     = { path = "crates/sdivi-lang-python" }
-sdivi-lang-typescript = { path = "crates/sdivi-lang-typescript" }
-sdivi-lang-javascript = { path = "crates/sdivi-lang-javascript" }
-sdivi-lang-go         = { path = "crates/sdivi-lang-go" }
-sdivi-lang-java       = { path = "crates/sdivi-lang-java" }
+sdivi-config    = { path = "crates/sdivi-config",    version = "0.2.8", default-features = false }
+sdivi-parsing   = { path = "crates/sdivi-parsing",   version = "0.2.8" }
+sdivi-graph     = { path = "crates/sdivi-graph",     version = "0.2.8", default-features = false }
+sdivi-detection = { path = "crates/sdivi-detection", version = "0.2.8", default-features = false }
+sdivi-patterns  = { path = "crates/sdivi-patterns",  version = "0.2.8", default-features = false }
+sdivi-snapshot  = { path = "crates/sdivi-snapshot",  version = "0.2.8", default-features = false }
+sdivi-lang-rust       = { path = "crates/sdivi-lang-rust",       version = "0.2.8" }
+sdivi-lang-python     = { path = "crates/sdivi-lang-python",     version = "0.2.8" }
+sdivi-lang-typescript = { path = "crates/sdivi-lang-typescript", version = "0.2.8" }
+sdivi-lang-javascript = { path = "crates/sdivi-lang-javascript", version = "0.2.8" }
+sdivi-lang-go         = { path = "crates/sdivi-lang-go",         version = "0.2.8" }
+sdivi-lang-java       = { path = "crates/sdivi-lang-java",       version = "0.2.8" }
 
 # ── serialization ────────────────────────────────────────────────────────────
 serde      = { version = "1", features = ["derive"] }
