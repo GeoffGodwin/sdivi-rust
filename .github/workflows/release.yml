@@ -265,6 +265,13 @@ jobs:
         working-directory: bindings/sdivi-wasm
         run: cp pkg-template/package.json pkg/package.json
 
+      - name: Remove wasm-pack auto-generated .gitignore files
+        working-directory: bindings/sdivi-wasm
+        # wasm-pack writes a `.gitignore` containing `*` into each --out-dir.
+        # `npm publish` honors those and silently strips bundler/ and node/
+        # from the tarball even though they appear in the `files` field.
+        run: rm -f pkg/bundler/.gitignore pkg/node/.gitignore pkg/.gitignore
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

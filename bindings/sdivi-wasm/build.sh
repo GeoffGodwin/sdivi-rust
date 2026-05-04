@@ -62,6 +62,12 @@ fi
 echo "==> Assembling pkg/package.json from pkg-template/…"
 cp pkg-template/package.json pkg/package.json
 
+# wasm-pack writes a `.gitignore` containing `*` into each out-dir. `npm pack`
+# honors it and silently drops bundler/ and node/ from the tarball despite the
+# `files` field. Remove them so the published tarball actually contains the
+# build artifacts.
+rm -f pkg/bundler/.gitignore pkg/node/.gitignore pkg/.gitignore
+
 echo "==> Build complete."
 echo "    bundler target : $SCRIPT_DIR/pkg/bundler/"
 echo "    nodejs target  : $SCRIPT_DIR/pkg/node/"

@@ -105,6 +105,14 @@ jobs:
         working-directory: bindings/sdivi-wasm
         run: cp pkg-template/package.json pkg/package.json
 
+      - name: Remove wasm-pack auto-generated .gitignore files
+        working-directory: bindings/sdivi-wasm
+        # wasm-pack writes a `.gitignore` containing `*` into each --out-dir.
+        # `npm pack` honors those, so without this step the `bundler/` and
+        # `node/` directories are silently excluded from the tarball even
+        # though they appear in `files` in our pkg-template/package.json.
+        run: rm -f pkg/bundler/.gitignore pkg/node/.gitignore pkg/.gitignore
+
       - name: Capture normalize_and_hash output for cross-platform check
         working-directory: bindings/sdivi-wasm
         run: |
