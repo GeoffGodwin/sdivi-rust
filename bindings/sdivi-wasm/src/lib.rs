@@ -11,9 +11,11 @@
 //! ```
 
 pub mod assemble_types;
+pub mod category_types;
 pub mod change_coupling;
 mod exports;
 pub mod types;
+pub(crate) mod weight_keys;
 
 pub use change_coupling::*;
 pub use exports::*;

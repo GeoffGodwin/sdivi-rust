@@ -923,7 +923,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-cli"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-config"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "dirs",
@@ -965,9 +965,10 @@ dependencies = [
 
 [[package]]
 name = "sdivi-core"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "chrono",
+ "globset",
  "proptest",
  "sdivi-config",
  "sdivi-detection",
@@ -982,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-detection"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "proptest",
  "rand",
@@ -999,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-graph"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "petgraph",
  "sdivi-config",
@@ -1014,7 +1015,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-go"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-parsing",
  "tree-sitter",
@@ -1023,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-java"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-parsing",
  "tree-sitter",
@@ -1032,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-javascript"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-parsing",
  "tree-sitter",
@@ -1041,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-python"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-parsing",
  "tree-sitter",
@@ -1050,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-rust"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-config",
  "sdivi-parsing",
@@ -1061,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-lang-typescript"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-parsing",
  "tree-sitter",
@@ -1070,7 +1071,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-parsing"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "globset",
  "ignore",
@@ -1088,7 +1089,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-patterns"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "globset",
@@ -1103,7 +1104,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-pipeline"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "proptest",
@@ -1124,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-rust"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "sdivi-cli",
  "sdivi-core",
@@ -1132,11 +1133,10 @@ dependencies = [
 
 [[package]]
 name = "sdivi-snapshot"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "proptest",
- "sdivi-config",
  "sdivi-detection",
  "sdivi-graph",
  "sdivi-patterns",
@@ -1149,7 +1149,7 @@ dependencies = [
 
 [[package]]
 name = "sdivi-wasm"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom 0.2.17",

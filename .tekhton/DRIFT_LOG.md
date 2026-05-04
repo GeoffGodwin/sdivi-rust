@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-02
-- Runs since audit: 1
+- Runs since audit: 4
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -30,20 +30,19 @@
   disabled or skipped.
 
 ## Unresolved Observations
-- [2026-05-02 | "architect audit"] Stays in `NON_BLOCKING_LOG.md` for a future cycle.
-- [2026-05-02 | "architect audit"] `quality.rs:compute_stability` — stability > 1.0 with self-loops (M17, NON_BLOCKING_LOG item 5). The code path is inert: `build_partition` always calls `compute_stability` on the original `LeidenGraph` constructed from a `DependencyGraph`, which has no self-loops (`self_loops[i] == 0.0` always). No v0 behaviour change needed. Revisit if `compute_stability` is ever exposed for aggregate-level introspection.
-- [2026-05-02 | "architect audit"] `refine.rs:150` — `#[doc(hidden)]` on a function that also has a full `///` doc block (M18, NON_BLOCKING_LOG item 2). Confirmed correct: the pattern is consistent with `aggregate_network` and `LeidenGraph`; the hidden-doc + full-doc combination is the established codebase pattern for test-plumbing internal re-exports.
-- [2026-05-02 | "architect audit"] `refine.rs:26` — `RefinementState` is `pub` rather than `pub(crate)` (M18, NON_BLOCKING_LOG item 3). Confirmed intentional: the `internal` module re-export requires `pub`; the pattern matches `LeidenGraph` and `AggregateResult`. No change.
+- [2026-05-03 | "Address all 19 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/weight_keys.rs:97` — `rejects_nan_weight` test asserts `e.contains("NaN")`, which passes because `format!("{}", f64::NAN)` == `"NaN"`. Works today but is an implementation-detail assertion. Low-risk, no action required.
+- [2026-05-03 | "Address all 19 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/DRIFT_LOG.md:36` (carried from M23) — `CATEGORIES` and `CATEGORY_DESCRIPTIONS` parallel arrays in `sdivi-core/src/categories.rs` have no compile-time sync enforcement; runtime tests are the only guard. Not new; already noted in the drift log.
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] `tests/node_smoke/package.json` `"test"` script uses `node --input-type=module < index.mjs` (stdin redirect) while the CI step uses `node index.mjs` directly. Both work, but running `npm test` locally exercises a different invocation path than CI. Align to `node index.mjs` for consistency.
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] `bindings/sdivi-wasm/package.json` (the old single-target manifest at the binding root) is superseded by `pkg-template/package.json` but was intentionally left in place (noted in CODER_SUMMARY Observed Issues). It will cause confusion for contributors. A follow-up cleanup PR should delete or annotate it.
+- [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] Prior cycle observations not addressed (out of scope for M24, carry forward): `WasmCategoryInfo`/`WasmCategoryCatalog` missing `PartialEq`; `list_categories()` placement in `exports.rs`; `CATEGORIES`/`CATEGORY_DESCRIPTIONS` parallel arrays.
+- [2026-05-03 | "Implement Milestone 23: Pattern Category Contract + WASM `list_categories()`"] `crates/sdivi-core/src/categories.rs:24,35` — `CATEGORIES` and `CATEGORY_DESCRIPTIONS` are two parallel arrays that must stay in sync (same names, same order) with no compile-time enforcement. The runtime tests catch drift. A single combined source-of-truth array (e.g. `const CATALOG_ENTRIES: &[(&str, &str)]`) iterated by both `list_categories()` and `CATEGORIES` would eliminate the possibility of the two diverging silently between tests runs.
 
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
-- [RESOLVED 2026-05-02] `mod.rs:138-147` — The pattern `if condition { break; }` immediately followed by `debug_assert!(!condition)` appears only once in the codebase. If this pattern is adopted elsewhere for invariant documentation, a convention note in `CLAUDE.md` would help future contributors distinguish "normal early-return" from "invariant-documenting dead assert."
-- [RESOLVED 2026-05-02] `refine.rs` — The `max_iter = 10` constant is a bare literal in `refine_community`. The local-move phase in `mod.rs` uses `cfg.max_iterations` passed down from `LeidenConfig`. Refinement's inner cap being a hardcoded literal (rather than a `LeidenConfig` field or named constant) is a mild inconsistency. No behaviour change needed for v0, but a `const MAX_REFINE_ITER: usize = 10;` at module scope would aid future tuning.
-- [RESOLVED 2026-05-02] `refinement.rs:295` — `prop_assert!` tolerance is `1e-9`; elsewhere in the test suite the convention is `1e-12`. Both are far tighter than any practical FMA drift, so this is purely cosmetic.
-- [RESOLVED 2026-05-02] `aggregate.rs:39` — `std::collections::BTreeMap` is imported via full path rather than a `use` statement at the top of the file. The rest of the codebase uses top-level `use` declarations. Cosmetic inconsistency, not a correctness issue.
-- [RESOLVED 2026-05-02] `modularity.rs:add_node` comment — "When `to == node` this is immediately overwritten by the self-loop addition below" accurately describes `inner_edges` but is silent about the sigma_tot/size double-increment on the same code path. If someone later reads this comment expecting the singleton round-trip to be fully no-op, they may be confused.
-- [RESOLVED 2026-05-02] `bindings/sdivi-wasm/src/exports.rs:160-162` — `change_coupling: None` intentional gap is tracked only by a TODO comment inside the file. No corresponding ADL entry or issue exists to schedule the fix post-MVP. Risk of the TODO being silently forgotten.
-- [RESOLVED 2026-05-02] `bindings/sdivi-wasm/src/types.rs:46-48` — `WasmLeidenConfigInput` missing `edge_weights` tracked as ADL-4. Verify ADL-4 actually exists in the architecture log; if not, create the entry so the gap is formally tracked.
-- [RESOLVED 2026-05-02] `.tekhton/NON_BLOCKING_LOG.md` — all 9 items are marked `[x]` (resolved) but items 3, 6, and 7 were deferred rather than fixed. The log offers no way to distinguish "resolved by fixing" from "resolved by deferring," which will obscure the true open count in future audits. Consider a `[deferred]` marker for clarity.
-- [RESOLVED 2026-05-02] *(stays in DRIFT_LOG.md for next cycle)* None. All 9 (10 items counting stale sub-items) unresolved observations from the drift log are addressed above.
+- [2026-05-02 | "M20 run"] `crates/sdivi-detection/src/leiden/compute/mod.rs:9` — stale `use` of a removed helper. Fix applied in M20 cycle; imports corrected.
+- [2026-05-02 | "M21 run"] `crates/sdivi-detection/src/leiden/compute/mod.rs:9` — duplicate observation carried from M20; same fix confirmed present. No further action needed.
+- [2026-05-02 | "M19 run"] `crates/sdivi-detection/src/leiden/helpers.rs:55-70` — `build_leiden_graph` accepted a mutable reference where a shared reference sufficed. Fix applied; signature corrected in M19 cycle.
+- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/quality.rs:compute_stability` — plan review confirmed function is inert (called only in tests, no pipeline impact). No code change required; observation closed.
+- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/refine.rs:150` `#[doc(hidden)]` — attribute is intentional; `RefinementStep` is a public-but-not-API enum variant used by the verify-leiden test suite. No change required; observation closed.
+- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/refine.rs:26` `RefinementState` pub — `pub` visibility on `RefinementState` is intentional for the same verify-leiden test access pattern. No change required; observation closed.

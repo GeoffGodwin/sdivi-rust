@@ -68,7 +68,8 @@ Distribution shapes:
 
 - **crates.io** for `sdivi-core` and `sdivi-cli`
 - **GitHub Releases** for single-binary builds on Linux/macOS/Windows (the "no Python install" requirement)
-- **PyPI** (PyO3 wheel) and **npm** (napi-rs prebuilt) for bindings, post-MVP
+- **npm** (`@geoffgodwin/sdivi-wasm`) — ships as a single package with conditional exports covering two wasm-pack targets: `bundler` (webpack/vite/rollup consumers) and `nodejs` (Node 18+ CLI/server consumers). The `require()` condition routes to the nodejs target; the `import` condition routes to the bundler target. Explicit `/node` and `/bundler` subpaths are available for callers who want to be explicit. (M24)
+- **PyPI** (PyO3 wheel) for bindings, post-MVP
 
 ### Invocation Frequency
 
@@ -167,7 +168,7 @@ GitHub Actions, matrix on (Linux, macOS, Windows) × (stable, MSRV). Lint + buil
 - **crates.io:** `sdivi-core`, `sdivi-cli`, and language adapter crates as needed. Crate name reservation is open question #5.
 - **GitHub Releases:** prebuilt `sdivi` binaries for Linux/macOS/Windows.
 - **PyPI / npm:** binding wheels via PyO3 / napi-rs (post-MVP).
-- **WASM:** post-MVP per KD14 — only when a real consumer exists.
+- **WASM / npm:** `@geoffgodwin/sdivi-wasm` ships with dual wasm-pack targets (bundler + nodejs) under a single package with conditional exports. Node 18+ consumers use `require()` for the CJS path; bundler consumers use `import` for the ESM path. (KD13, M24)
 
 ## Public API Surface
 
@@ -546,7 +547,7 @@ None at MVP. If a critical bug needs a fork patch, we vendor via `[patch.crates-
 - Native Rust consumers via crates.io (`sdivi-core` library)
 - Python via PyO3 wheel (`sdi-py` binding, post-MVP)
 - Node via napi-rs prebuilt (`sdivi-node` binding, post-MVP)
-- Browser / WASM: **not MVP** (KD14). Lands when a real consumer exists.
+- **Browser / WASM** (`@geoffgodwin/sdivi-wasm`): bundler target for webpack/vite/rollup consumers; nodejs target for Node 18+ CLI/server consumers. Single npm package with conditional exports. (M24)
 
 ### Compatibility With sdi-py Artifacts (KD13)
 

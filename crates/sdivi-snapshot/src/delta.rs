@@ -117,7 +117,7 @@ pub fn null_summary() -> DivergenceSummary {
 ///         modularity: 0.0, seed: 42,
 ///     };
 ///     assemble_snapshot(graph, partition, PatternCatalog::default(),
-///         PatternMetricsResult::default(), None, "T", None, None)
+///         PatternMetricsResult::default(), None, "T", None, None, 0)
 /// }
 ///
 /// let delta = compute_delta(&make_snap(0.1), &make_snap(0.3));
@@ -222,6 +222,7 @@ mod tests {
             "T",
             None,
             None,
+            0,
         )
     }
 

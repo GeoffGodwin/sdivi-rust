@@ -30,6 +30,7 @@ fn snap_at(ts: &str) -> sdivi_snapshot::Snapshot {
         ts,
         None,
         None,
+        0,
     )
 }
 

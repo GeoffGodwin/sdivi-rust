@@ -70,8 +70,8 @@ fn wasm_package_json_version() -> String {
 fn workspace_version_is_v0_semver() {
     let v = workspace_package_version();
     assert!(
-        v.starts_with("0.1."),
-        "workspace [workspace.package] version must be a 0.1.x release for v0 (got {v:?})"
+        v.starts_with("0."),
+        "workspace [workspace.package] version must be a 0.x.y release pre-1.0 (got {v:?})"
     );
 }
 

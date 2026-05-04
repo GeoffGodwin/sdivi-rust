@@ -1,0 +1,12 @@
+{
+  "name": "sdivi-wasm-node-smoke",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Smoke tests for @geoffgodwin/sdivi-wasm Node.js distribution target",
+  "scripts": {
+    "test": "node index.cjs && node index.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

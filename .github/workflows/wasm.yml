@@ -12,7 +12,15 @@ env:
   # Pin wasm-bindgen-cli to match the workspace's wasm-bindgen lib version
   # (capped at <0.2.118 in Cargo.toml so the CLI builds on rustc 1.85).
   WASM_BINDGEN_VERSION: "0.2.117"
-  WASM_BUDGET_BYTES: "1258291"   # 1.2 MB
+  # 1.75 MB per-target budget; 5 MB combined budget for both targets.
+  # The per-target budget was raised from 1.2 MB at the close of M19–M24 to
+  # absorb the new WASM surface (weighted Leiden, list_categories,
+  # assemble_snapshot, threshold-comparison epsilon, change-coupling) plus
+  # the bundler+node dual build. It can be tightened again if/when wasm-pack
+  # 0.13.x's `--release` + `--profile <name>` conflict is fixed and we can
+  # drive the size-optimised `release-wasm` profile through wasm-pack.
+  WASM_BUDGET_BYTES: "1835008"
+  WASM_COMBINED_BUDGET_BYTES: "5242880"
 
 jobs:
   build:
@@ -58,25 +66,52 @@ jobs:
           fi
           echo "OK: no forbidden deps"
 
-      - name: Build WASM bundle (release profile)
+      - name: Build WASM bundler target (release profile)
         working-directory: bindings/sdivi-wasm
         # wasm-pack 0.13.x passes both `--release` and `--profile <name>` to
         # cargo, which cargo 1.85+ rejects as conflicting (rustwasm/wasm-pack
         # has an open issue for this). For now we use the default `--release`
-        # profile and accept slightly larger wasm output. The size-optimised
-        # `[profile.release-wasm]` is still available for direct cargo use.
-        run: wasm-pack build --target bundler --release
+        # profile and accept slightly larger wasm output.
+        run: wasm-pack build --target bundler --release --out-dir pkg/bundler
 
-      - name: Check bundle size
-        working-directory: bindings/sdivi-wasm/pkg
+      - name: Build WASM nodejs target (release profile)
+        working-directory: bindings/sdivi-wasm
+        run: wasm-pack build --target nodejs --release --out-dir pkg/node
+
+      - name: Check bundle sizes
+        working-directory: bindings/sdivi-wasm
         run: |
-          SIZE=$(wc -c < sdivi_wasm_bg.wasm)
-          echo "Bundle size: ${SIZE} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
-          if [ "$SIZE" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
-            echo "FAIL: .wasm exceeds 1.2 MB budget (${SIZE} bytes)"
+          SIZE_BUNDLER=$(wc -c < pkg/bundler/sdivi_wasm_bg.wasm)
+          SIZE_NODE=$(wc -c < pkg/node/sdivi_wasm_bg.wasm)
+          COMBINED=$(( SIZE_BUNDLER + SIZE_NODE ))
+          echo "bundler .wasm: ${SIZE_BUNDLER} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
+          echo "nodejs  .wasm: ${SIZE_NODE} bytes (budget: ${{ env.WASM_BUDGET_BYTES }})"
+          echo "combined:      ${COMBINED} bytes (budget: ${{ env.WASM_COMBINED_BUDGET_BYTES }})"
+          if [ "$SIZE_BUNDLER" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
+            echo "FAIL: bundler .wasm exceeds 1.75 MB budget (${SIZE_BUNDLER} bytes)"
+            exit 1
+          fi
+          if [ "$SIZE_NODE" -gt "${{ env.WASM_BUDGET_BYTES }}" ]; then
+            echo "FAIL: nodejs .wasm exceeds 1.75 MB budget (${SIZE_NODE} bytes)"
+            exit 1
+          fi
+          if [ "$COMBINED" -gt "${{ env.WASM_COMBINED_BUDGET_BYTES }}" ]; then
+            echo "FAIL: combined .wasm size exceeds 5 MB budget (${COMBINED} bytes)"
             exit 1
           fi
           echo "OK: within budget"
+
+      - name: Assemble pkg/package.json from template
+        working-directory: bindings/sdivi-wasm
+        run: cp pkg-template/package.json pkg/package.json
+
+      - name: Remove wasm-pack auto-generated .gitignore files
+        working-directory: bindings/sdivi-wasm
+        # wasm-pack writes a `.gitignore` containing `*` into each --out-dir.
+        # `npm pack` honors those, so without this step the `bundler/` and
+        # `node/` directories are silently excluded from the tarball even
+        # though they appear in `files` in our pkg-template/package.json.
+        run: rm -f pkg/bundler/.gitignore pkg/node/.gitignore pkg/.gitignore
 
       - name: Capture normalize_and_hash output for cross-platform check
         working-directory: bindings/sdivi-wasm
@@ -93,12 +128,67 @@ jobs:
           path: /tmp/normalize_hash.txt
           if-no-files-found: warn
 
-      - name: Run WASM smoke tests (Node)
+      - name: Run WASM smoke tests (wasm-pack/Node runner)
         working-directory: bindings/sdivi-wasm
         run: wasm-pack test --node
 
+      - name: Set up Node.js for smoke tests
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up node_modules for Node smoke tests
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: bindings/sdivi-wasm/tests/node_smoke
+        run: |
+          # Create a local node_modules entry so require/import of the scoped
+          # package name resolves to the freshly built pkg/ directory without
+          # a publish + npm install round-trip.
+          mkdir -p node_modules/@geoffgodwin
+          ln -s "${GITHUB_WORKSPACE}/bindings/sdivi-wasm/pkg" node_modules/@geoffgodwin/sdivi-wasm
+
+      - name: Run Node.js CJS smoke test
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: bindings/sdivi-wasm/tests/node_smoke
+        run: node index.cjs
+
+      - name: Run Node.js ESM smoke test
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: bindings/sdivi-wasm/tests/node_smoke
+        run: node index.mjs
+
+      - name: Compare CJS and ESM category lists
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: bindings/sdivi-wasm/tests/node_smoke
+        run: |
+          CJS=$(node index.cjs | grep "^CJS_CATEGORIES:" | sed 's/CJS_CATEGORIES://')
+          ESM=$(node index.mjs | grep "^ESM_CATEGORIES:" | sed 's/ESM_CATEGORIES://')
+          echo "CJS categories: $CJS"
+          echo "ESM categories: $ESM"
+          if [ "$CJS" != "$ESM" ]; then
+            echo "FAIL: CJS and ESM list_categories() results differ"
+            exit 1
+          fi
+          echo "OK: CJS and ESM category lists match"
+
+      - name: Verify npm pack lists both targets
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: bindings/sdivi-wasm/pkg
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack_out.txt
+          if ! grep -q "bundler/" /tmp/pack_out.txt; then
+            echo "FAIL: bundler/ not found in npm pack output"
+            exit 1
+          fi
+          if ! grep -q "node/" /tmp/pack_out.txt; then
+            echo "FAIL: node/ not found in npm pack output"
+            exit 1
+          fi
+          echo "OK: both bundler/ and node/ present in tarball"
+
       - name: Dry-run npm publish (tagged releases only)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'ubuntu-latest'
         working-directory: bindings/sdivi-wasm/pkg
         run: npm publish --dry-run --access public
 

@@ -1,0 +1,41 @@
+{
+  "name": "@geoffgodwin/sdivi-wasm",
+  "version": "0.1.14",
+  "description": "WASM bindings for the Structural Divergence Indexer pure-compute API",
+  "main": "./bundler/sdivi_wasm.js",
+  "module": "./bundler/sdivi_wasm.js",
+  "types": "./bundler/sdivi_wasm.d.ts",
+  "exports": {
+    ".": {
+      "node": "./node/sdivi_wasm.js",
+      "import": "./bundler/sdivi_wasm.js",
+      "require": "./node/sdivi_wasm.js",
+      "types": "./bundler/sdivi_wasm.d.ts"
+    },
+    "./node": {
+      "import": "./node/sdivi_wasm.js",
+      "require": "./node/sdivi_wasm.js",
+      "types": "./node/sdivi_wasm.d.ts"
+    },
+    "./bundler": {
+      "import": "./bundler/sdivi_wasm.js",
+      "types": "./bundler/sdivi_wasm.d.ts"
+    }
+  },
+  "files": [
+    "bundler/",
+    "node/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geoffgodwin/sdivi-rust"
+  },
+  "keywords": ["wasm", "structural-divergence", "sdivi", "code-metrics"],
+  "sideEffects": false
+}

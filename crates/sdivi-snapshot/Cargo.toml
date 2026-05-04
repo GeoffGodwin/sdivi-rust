@@ -17,7 +17,6 @@ pipeline-records = ["dep:tempfile"]
 default = ["pipeline-records"]
 
 [dependencies]
-sdivi-config    = { workspace = true }
 sdivi-graph     = { workspace = true }
 sdivi-detection = { workspace = true }
 sdivi-patterns  = { workspace = true }

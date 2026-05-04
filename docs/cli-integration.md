@@ -256,3 +256,25 @@ history_depth = 500
 Note: files renamed in git register as separate delete/add events, which
 inflates the change-coupling signal for rename-heavy histories. This is by
 design for v0 (see `docs/migrating-from-sdi-py.md`).
+
+## Absorbing the M19 boundary violation cutover
+
+Before M19, `sdivi check` never triggered on `boundary_violation_rate` because
+`compute_boundary_violations` always returned zero. After upgrading, the first
+snapshot taken against a repo with a `.sdivi/boundaries.yaml` will surface all
+existing violations at once. The delta from zero to N violations may exceed
+`boundary_violation_rate` and fail the CI gate unexpectedly.
+
+To absorb the cutover without a surprise gate failure, add a short-lived
+per-category override before taking the first M19 snapshot:
+
+```toml
+[thresholds.overrides.boundary_violations]
+boundary_violation_rate = 9999.0
+expires = "2026-06-30"
+reason = "M19 cutover — re-baselining boundary violation count"
+```
+
+Remove the override (or let it expire) once the team has reviewed and accepted
+the surfaced violations as the new baseline.
+

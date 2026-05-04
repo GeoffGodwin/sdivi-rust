@@ -43,9 +43,7 @@ pub enum WasmQualityFunction {
     Cpm,
 }
 
-/// Leiden algorithm configuration. INTENTIONAL GAP: omits `LeidenConfigInput.edge_weights` —
-/// WASM bindings expose unweighted Leiden only (ADL-4). When adding fields to
-/// `LeidenConfigInput`, mirror here unless the field is pipeline-only.
+/// Leiden algorithm configuration.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmLeidenConfigInput {
@@ -53,6 +51,11 @@ pub struct WasmLeidenConfigInput {
     pub gamma: f64,
     pub iterations: usize,
     pub quality: WasmQualityFunction,
+    /// Per-edge weights keyed `"source:target"` (first colon splits source/target). `None` = unweighted.
+    /// Weights must be `>= 0.0` and finite. Edges absent from the graph are silently ignored.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub edge_weights: Option<BTreeMap<String, f64>>,
 }
 
 /// A prior partition for stability scoring.
@@ -294,4 +297,6 @@ pub struct WasmTrendResult {
 }
 
 // ── assemble_snapshot input (moved to assemble_types.rs) ─────────────────────
-pub use crate::assemble_types::WasmAssembleSnapshotInput;
+pub use crate::assemble_types::{
+    WasmAssembleSnapshotInput, WasmChangeCouplingInput, WasmCoChangePairInput,
+};

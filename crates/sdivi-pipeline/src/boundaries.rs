@@ -92,6 +92,7 @@ mod tests {
             "2026-04-29T00:00:00Z",
             None,
             None,
+            0,
         );
         snap.path_partition = pp;
         let json = serde_json::to_string(&snap).unwrap();

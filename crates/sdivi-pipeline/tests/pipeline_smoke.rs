@@ -18,7 +18,7 @@ fn fixture_root() -> &'static Path {
 }
 
 /// Copies the read-only fixture into a fresh tempdir and returns the tempdir
-/// + the copied repo root. Tests must not write directly into the fixture
+///   and the copied repo root. Tests must not write directly into the fixture
 /// — on Windows, parallel tests writing identical filenames into the
 /// fixture's `.sdivi/snapshots/` race on file creation and one panics with
 /// `Access is denied` (sharing violation). Per-test tempdirs sidestep this.

@@ -1540,3 +1540,419 @@ The simplified version is sufficient for partition quality on the verify-leiden 
 - **Test coverage gap closed.** Going forward, every modularity-affecting change to `sdivi-detection` is gated by `verify-leiden.yml`. Don't merge a `crates/sdivi-detection/**` change with verify-leiden disabled or skipped.
 
 ---
+
+---
+
+## Archived: 2026-05-02 — Unknown Initiative
+
+#### Milestone 19: `compute_boundary_violations` Implementation
+
+<!-- milestone-meta
+id: "19"
+status: "done"
+-->
+
+**Scope:** Replace the M10 stub at `crates/sdivi-core/src/compute/boundaries.rs:237` with a real implementation that walks the `DependencyGraphInput`'s edges, classifies each endpoint's boundary via `BoundaryDefInput.modules` glob matching, and emits a `(from, to)` pair when the target's boundary is not in the source boundary's `allow_imports_from` whitelist. This unblocks Factor 4 (boundary violation velocity) for both native consumers and the WASM consumer-app integration — the WASM wrapper already calls into `sdivi-core::compute_boundary_violations` and inherits the fix automatically.
+
+**Why this milestone exists:** The function currently returns `BoundaryViolationResult { violation_count: 0, violations: vec![] }` with the comment "Full violation detection is implemented in Milestone 10" (boundaries.rs:244). M10 shipped boundary inference and the `boundaries` CLI subcommand, but the violation-counting compute itself was never wired up. Result: `boundary_violation_delta` is always `0`, so `compute_thresholds_check`'s `boundary_violation_rate` gate can never trigger. From the consumer app's perspective, Factor 4 is dead on arrival — Meridian's CI gate would happily pass codebases with arbitrary cross-layer import sprawl.
+
+**Deliverables:**
+- Implement `compute_boundary_violations(graph, spec)` using `globset::GlobSet` (already a workspace dep) to compile each `BoundaryDefInput.modules` glob set once. Match every node's `id` against the compiled sets to produce a `BTreeMap<String, &str>` of `node_id → boundary_name`. Nodes that match zero boundaries are unscoped and produce no violation regardless of edge direction.
+- Walk `graph.edges`. For each edge `(from, to)` where both endpoints are scoped to a boundary AND the boundaries differ AND `to`'s boundary is not in `from`-boundary's `allow_imports_from`, push `(from.clone(), to.clone())` onto `violations`.
+- Nodes matching multiple boundary globs: pick the **most specific** match (longest matching glob string by character length, ties broken by sort order of the boundary name). Document the rule in the rustdoc with a `# Determinism` note.
+- Return `BoundaryViolationResult { violation_count: violations.len() as u32, violations }`. Sort `violations` by `(from, to)` lexicographically before returning to preserve the `BTreeMap`-style determinism contract (Rule 5 / KDD-10).
+- Update the doc-test at boundaries.rs:228 to also exercise a non-empty case (two boundaries, one violation).
+- Update `crates/sdivi-snapshot/src/lib.rs` (or wherever `intent_divergence` is assembled) so `IntentDivergenceInfo.violation_count` reflects the real number, not the stub `0`. Verify the assembly path that already calls `compute_boundary_violations` — no new call sites needed; the function's return value just becomes meaningful.
+
+**Migration Impact:** Snapshots produced after M19 with a non-empty `BoundarySpec` will report non-zero `intent_divergence.violation_count` where they previously reported `0`. This is a *correctness fix*, not a schema change — `snapshot_version` stays `"1.0"`. Adopters with a `.sdivi/boundaries.yaml` should expect the first post-M19 snapshot to surface their existing violations as a single large delta against the prior (always-zero) baseline. Document in CHANGELOG that adopters may want to re-baseline at the M19 boundary or use a one-time `boundary_violation_rate` override with `expires` set 1–2 weeks out to absorb the cutover.
+
+**Files to create or modify:**
+- **Modify:** `crates/sdivi-core/src/compute/boundaries.rs` — real `compute_boundary_violations` body. Add private helper `match_boundary(node_id, compiled_specs) -> Option<&str>` for the most-specific-wins lookup.
+- **Modify:** `crates/sdivi-core/Cargo.toml` — add `globset` if not already a direct dep (verify via `cargo tree -p sdivi-core`). Note the WASM-build constraint: `globset` must compile for `wasm32-unknown-unknown` with default features. Verify; if a feature flag is needed, gate it.
+- **Modify:** `crates/sdivi-snapshot/src/` — wherever `assemble_snapshot` receives the violation count, ensure it threads through unchanged. The compute call already exists; only the returned value changes.
+- **Modify:** `CHANGELOG.md` — Fixed: "compute_boundary_violations now performs real violation detection; previously stubbed to return zero. Factor 4 (boundary violation velocity) is now active in `sdivi check`."
+
+**Acceptance criteria:**
+- `cargo test -p sdivi-core` passes, including a new test with two boundaries (`api` modules `crates/api/**`, `db` modules `crates/db/**`, `api` allows imports from `db` only) and an edge from `crates/db/foo.rs` to `crates/api/bar.rs` produces exactly one violation.
+- The boundary-lifecycle integration test under `tests/` (already present) is extended with a violation-emitting fixture and asserts `violation_count > 0` in the resulting snapshot.
+- `cargo build -p sdivi-core --target wasm32-unknown-unknown --no-default-features` still succeeds (no new forbidden deps).
+- `cargo tree -p sdivi-core --target wasm32-unknown-unknown --no-default-features` shows zero entries for `tree-sitter*`, `walkdir`, `ignore`, `rayon`, `tempfile` — preserved per Rule 21 / KDD-12.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- WASM smoke tests in `bindings/sdivi-wasm/tests/` continue to pass with no signature change.
+
+**Tests:**
+- Unit: `match_boundary` selects the most-specific matching glob. Hand-built case: glob `crates/**` and glob `crates/api/**` both match `crates/api/foo.rs`; longer-match (`crates/api/**`) wins.
+- Unit: an edge between two unscoped nodes produces no violation; an edge from a scoped node to an unscoped node produces no violation; an edge between two nodes in the same boundary produces no violation.
+- Unit: `allow_imports_from` whitelist semantics — a → b allowed when `a.allow_imports_from` contains `b.name`. Reverse direction (b → a) is independent and depends on `b.allow_imports_from`.
+- Property (proptest): for any graph + boundary spec, `violation_count == violations.len()`. Trivial but catches future drift.
+- Property (proptest): `violations` is sorted lexicographically by `(from, to)` (determinism gate).
+- Integration: extend `tests/boundary_lifecycle.rs` with a fixture that has known violations; assert the snapshot's `intent_divergence.violation_count` matches the hand-counted value.
+
+**Watch For:**
+- **Glob compilation cost.** Compile each boundary's `GlobSet` once at the top of `compute_boundary_violations`, not per-node. For a 10k-node graph with 8 boundaries, naive recompilation per call is the difference between sub-millisecond and seconds.
+- **Most-specific tie-break must be deterministic.** Two globs of equal length matching the same node: break by sorted boundary name (BTreeMap iteration order). Document in rustdoc.
+- **Self-loops.** An edge `(n, n)` where both endpoints resolve to the same boundary is not a violation. Skip same-boundary edges before checking the whitelist.
+- **`allow_imports_from` not a transitive closure.** If `a` allows `b` and `b` allows `c`, `a → c` is still a violation unless `a.allow_imports_from` explicitly contains `c`. Do not synthesise transitive permissions.
+- **Empty `boundaries` spec is normal operation (Rule 16).** Return `BoundaryViolationResult { violation_count: 0, violations: vec![] }` immediately without iterating edges.
+- **Doc-comment placement.** Per CLAUDE.md, ensure a blank line separates the new `match_boundary` doc block from the existing `compute_boundary_violations` doc block — `#![deny(missing_docs)]` will catch a re-attached comment as a missing-docs error.
+- **WASM dep tree.** `globset` pulls `regex`-family crates. Verify all transitively compile to `wasm32-unknown-unknown` before merging; if not, gate the implementation on a default-on Cargo feature and provide a plain-string-match fallback for the WASM build.
+
+**Seeds Forward:**
+- Extends Factor 4 to per-boundary breakdown if/when a future milestone adds `boundary_violation_per_boundary` to `DivergenceSummary`. The current implementation returns the flat `(from, to)` list; a downstream aggregator can group by boundary without changing this signature.
+- Adopters in flight with a `.sdivi/boundaries.yaml` will benefit from a one-time `boundary_violation_rate` override; document the pattern in `docs/cli-integration.md` as part of M19.
+
+---
+
+---
+
+## Archived: 2026-05-02 — Unknown Initiative
+
+#### Milestone 20: Threshold-Comparison Epsilon for Cross-Arch Stability
+
+<!-- milestone-meta
+id: "20"
+status: "done"
+-->
+
+**Scope:** Add a small fixed epsilon (`1e-9`) inside `compute_thresholds_check` so that the strict `>` comparisons against threshold rates cannot flip sign across platforms purely from documented per-arch ULP drift in upstream `compute_delta` / `compute_trend` outputs. Raw `DivergenceSummary` and trend values are left untouched — only the gate-comparison is rounded. Document the new contract in `docs/determinism.md`.
+
+**Why this milestone exists:** `docs/determinism.md` (M11) accepts that aggregate float results may diverge by ~1 ULP between x86_64 and aarch64 runners due to FMA differences. That's fine for display, but `compute_thresholds_check` uses raw `delta > limit` comparisons — so a user-configured threshold of *exactly* `0.05` could return `breached: false` on x86_64 (where the delta computed as `0.04999999999999998`) and `breached: true` on aarch64 (`0.05000000000000001`). For a CI gate, that's a flaky test. The Meridian consumer-app integration is the first concrete user that runs `compute_thresholds_check` on multiple architectures from the same snapshot inputs; getting ahead of this before adopters report it.
+
+**Theoretical basis:** The thresholds are user-facing dial values typically expressed to 1–2 decimal places (e.g. `coupling_delta_rate = 0.15`). A `1e-9` epsilon is ~7 orders of magnitude smaller than any plausible user-meaningful precision; it absorbs ULP drift without changing semantics for any user who isn't already at sub-nanounit precision (and we have no such user). The epsilon is added to `limit`, not subtracted from `delta`, so the gate still triggers on any genuine breach: `breached := delta > limit + EPSILON`. A delta of `limit + 2e-9` still trips; a delta of `limit + 5e-10` does not. The asymmetry is deliberate — false positives (CI gates flapping on noise) are more costly than false negatives at the ULP scale.
+
+**Deliverables:**
+- Add `pub const THRESHOLD_EPSILON: f64 = 1e-9;` at the top of `crates/sdivi-core/src/compute/thresholds.rs` with a doc comment explaining the rationale and citing `docs/determinism.md`.
+- Replace each of the four aggregate-dimension `delta > limit` comparisons (lines ~155, ~167, ~179, ~192 in current thresholds.rs) with `delta > limit + THRESHOLD_EPSILON`. Same for the per-category comparison around line 209 and any remaining sites within the function.
+- The `boundary_violation_delta` comparison: `delta` is integer-valued (`i64` cast to `f64`). Apply the epsilon for consistency, but note in a code comment that it has no functional effect for integer deltas.
+- Document the epsilon in `docs/determinism.md` under a new "Threshold gate stability" subsection: state the constant, the rationale, the asymmetric application, and the guarantee that *any* real breach above ULP noise still trips the gate.
+- Re-export `THRESHOLD_EPSILON` from `sdivi-core::lib` so consumers (including the WASM bindings) can reference the same constant when documenting their own gates.
+
+**Migration Impact:** Behaviour change is bounded by `1e-9` per dimension. A user whose threshold is `0.05` and whose computed delta is exactly `0.05000000000000001` will see `breached: false` post-M20 where they saw `breached: true` pre-M20 (or vice versa, depending on which arch they were on). Anyone running the gate on the same arch consistently sees no behavioural change beyond the epsilon's 1e-9 margin. CHANGELOG entry: "Threshold gate now applies a 1e-9 epsilon to the limit, eliminating cross-arch flap from documented per-arch ULP drift in delta computations. Behaviour for any user-meaningful threshold is unchanged."
+
+**Files to create or modify:**
+- **Modify:** `crates/sdivi-core/src/compute/thresholds.rs` — add constant, replace comparisons.
+- **Modify:** `crates/sdivi-core/src/lib.rs` — re-export `THRESHOLD_EPSILON`.
+- **Modify:** `docs/determinism.md` — add "Threshold gate stability" subsection.
+- **Modify:** `CHANGELOG.md` — under Changed.
+
+**Acceptance criteria:**
+- `cargo test -p sdivi-core` passes, with a new test asserting a delta of `limit + 5e-10` does not breach and a delta of `limit + 2e-9` does breach.
+- Existing threshold-check tests continue to pass without modification (the epsilon does not affect any test that uses non-borderline values).
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- `cargo doc --workspace --no-deps` passes with `RUSTDOCFLAGS=-D warnings`.
+- The `THRESHOLD_EPSILON` constant appears in the public docs of `sdivi-core` (visible on docs.rs after publish).
+
+**Tests:**
+- Unit (thresholds.rs): two cases per dimension — `limit + 5e-10` not breached, `limit + 2e-9` breached. Includes the per-category override path.
+- Unit: `THRESHOLD_EPSILON` is exactly `1e-9` (regression gate; changing the value is a deliberate decision).
+- Property (proptest): for any `limit > 0` and any `delta`, `breached(delta, limit) == (delta > limit + THRESHOLD_EPSILON)`. Trivially true given the implementation but catches accidental refactors.
+
+**Watch For:**
+- **Don't apply epsilon to the actual reported `delta`.** The `ThresholdBreachInfo.actual` field is the raw delta, unrounded. Only the gate comparison is rounded. A user reading the breach report sees the true value.
+- **Don't subtract the epsilon from `delta` instead of adding to `limit`.** Mathematically equivalent in IEEE-754 only if both are representable; `limit + EPSILON` is the cleaner form and avoids subtracting at the dimension boundary.
+- **Don't apply per-arch conditional epsilons.** The epsilon is a constant. Branching on `cfg!(target_arch = "aarch64")` would create a new flap source.
+- **Don't bump the epsilon casually.** `1e-9` was chosen because it's well above documented per-arch FMA drift (typically 1 ULP on values near 1.0, ~`2.2e-16`) and well below any plausible user-meaningful threshold. Bumping to `1e-6` would mask legitimate drift in a "true breach is 0.150001 vs limit 0.15" scenario. Keep it small.
+- **Documentation must call out the asymmetry.** A user reading `docs/determinism.md` should understand that the gate is *slightly more lenient* by an absorbed 1 ULP, not symmetric.
+
+**Seeds Forward:**
+- A future milestone could expose `THRESHOLD_EPSILON` as a config-overridable knob (`[determinism] threshold_epsilon = 1e-9`) if a downstream user has unusual precision needs. Not in scope for v0.
+- If a future delta-dimension is added to `DivergenceSummary`, it must use the same epsilon. Document this in the rustdoc on `THRESHOLD_EPSILON` so the next contributor doesn't miss a comparison site.
+- The epsilon does not address per-snapshot non-determinism (which Rule 1 forbids outright). It only addresses the documented cross-arch ULP variance after the snapshot is produced.
+
+---
+
+---
+
+## Archived: 2026-05-02 — Unknown Initiative
+
+#### Milestone 21: Weighted Leiden on WASM
+
+<!-- milestone-meta
+id: "21"
+status: "done"
+-->
+
+**Scope:** Expose weighted-edge Leiden community detection through the WASM bindings by adding `edge_weights: Option<HashMap<String, f64>>` (keyed `"source_node_id:target_node_id"`) to `WasmLeidenConfigInput` and routing the value into the existing native `run_leiden_with_weights` path. Removes ADL-4 from `bindings/sdivi-wasm/src/types.rs:46`. Native `LeidenConfigInput.edge_weights` already exists and works (M15); this milestone is purely the binding-layer surface.
+
+**Why this milestone exists:** Meridian (the consumer app — see memory) carries git churn data per file pair and wants to use it as edge weights so co-frequently-changed files get nudged into the same Leiden community. The native `sdivi-pipeline` Rust path can already do this via `LeidenConfigInput.edge_weights`; the WASM binding intentionally omitted the field at M12 with the comment "WASM bindings expose unweighted Leiden only (ADL-4)." That gap is now blocking the consumer-app integration.
+
+**Deliverables:**
+- Add `pub edge_weights: Option<BTreeMap<String, f64>>` to `WasmLeidenConfigInput` in `bindings/sdivi-wasm/src/types.rs`. Keyed by `"source:target"` strings (matching the existing native serde representation when round-tripped through JSON). Use `BTreeMap` not `HashMap` to preserve determinism across iteration sites, even though only `tsify` is consuming the type at the boundary.
+- Mark the field `#[tsify(optional)]` so existing TS callers (passing no weights) compile unchanged.
+- In `bindings/sdivi-wasm/src/exports.rs`, the `detect_boundaries` (or equivalent) entry point that consumes `WasmLeidenConfigInput`: when `edge_weights` is `Some`, build the native `LeidenConfigInput.edge_weights` value and call `run_leiden_with_weights`; when `None`, keep the existing unweighted call path. Single branch, no behaviour change for existing callers.
+- Validation: a key not parseable as `"source:target"` (no colon, or empty source/target) returns `JsError` with a message naming the offending key. A weight value of `NaN` or negative is rejected; `0.0` is accepted (treated as edge absent for weighting purposes).
+- Remove the ADL-4 comment block at types.rs:46–48. Remove the corresponding entry from `.tekhton/DESIGN.md` (or wherever ADL-4 is canonically logged) — replace with an "Implemented in M21" pointer.
+- Update `bindings/sdivi-wasm/README.md` example snippet to demonstrate passing `edge_weights`.
+
+**Migration Impact:** Strictly additive. Existing TS/JS callers that omit the field see no behavioural change. Snapshots produced with `edge_weights: None` are bit-identical to pre-M21 snapshots. Snapshots produced *with* weights will produce different `LeidenPartition.cluster_assignments` than unweighted — this is the desired outcome and is the user's explicit choice. `snapshot_version` stays `"1.0"`.
+
+**Files to create or modify:**
+- **Modify:** `bindings/sdivi-wasm/src/types.rs` — add field to `WasmLeidenConfigInput`; remove ADL-4 comment.
+- **Modify:** `bindings/sdivi-wasm/src/exports.rs` — branch on `edge_weights.is_some()`; route to weighted or unweighted Leiden.
+- **Modify:** `bindings/sdivi-wasm/tests/` — add a JS-level test that passes weights and asserts a different cluster assignment than the unweighted run on the same graph (existence of difference, not specific assignment).
+- **Modify:** `bindings/sdivi-wasm/README.md` — usage example.
+- **Modify:** `.tekhton/DESIGN.md` (or wherever ADLs live) — mark ADL-4 implemented.
+- **Modify:** `CHANGELOG.md` — under Added.
+
+**Acceptance criteria:**
+- `wasm-pack test --node bindings/sdivi-wasm` passes, including a new test that:
+  1. Builds a 4-node graph with edges `(a,b), (a,c), (b,c), (c,d)`.
+  2. Runs unweighted Leiden, records the partition.
+  3. Runs weighted Leiden with weights `{"a:b": 100.0, "c:d": 100.0}`, records the partition.
+  4. Asserts the two partitions differ (the weighted run should pull `a,b` into one community and `c,d` into another more strongly).
+- A test passing a malformed weight key (e.g. `"a-b"` with no colon) gets a `JsError` with a clear message.
+- A test passing `NaN` or negative weight is rejected with a clear `JsError`.
+- TS type generation: `tsc --noEmit` against the published `.d.ts` shows `edge_weights?: Record<string, number>` (or the BTreeMap equivalent tsify produces) on `WasmLeidenConfigInput`.
+- Existing WASM tests pass unchanged.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+
+**Tests:**
+- Unit (Rust): the conversion helper from `BTreeMap<String, f64>` to native `LeidenConfigInput.edge_weights` correctly parses `"src:dst"` keys and propagates errors.
+- Unit (Rust): malformed key `"no_colon_here"` returns an error naming the key.
+- Unit (Rust): `NaN` weight rejected; `-0.5` weight rejected; `0.0` accepted (edge effectively unweighted); positive weight passed through.
+- Integration (JS): the weighted-vs-unweighted differ test described above.
+- Determinism: same seed + same weights → same partition across two runs (existing seeded-determinism test extended with weights).
+
+**Watch For:**
+- **Key parsing must handle node IDs that themselves contain colons.** Path-shaped node IDs like `crates/foo:bar.rs` would break naïve `split(':')`. Use `splitn(2, ':')` (split into source / rest) and treat anything after the first colon as the target. Document this in the rustdoc on the field. Alternative: use a different separator (e.g. `"\u{0001}"`); rejected because the `"src:dst"` form is what `LeidenConfigInput.edge_weights` already serialises to natively.
+- **Edge missing from the graph but present in `edge_weights`.** Silently ignore — the weight is informational; if the edge isn't in the graph it can't influence the partition. Don't error; weights produced from coupling history may name pairs that no longer exist as imports.
+- **Determinism contract holds with weights.** Same `seed` + same `gamma` + same `edge_weights` map (BTreeMap iteration order!) → bit-identical partition. Verify in the determinism test.
+- **`HashMap<String, f64>` in TS calls.** TS-side users pass plain JS objects (`{ "a:b": 1.0 }`); `tsify` deserialises these as `BTreeMap` on the Rust side. Iteration order in JS object literals is insertion-order; the `BTreeMap` re-sorts. So `{ "b:c": 1, "a:b": 2 }` and `{ "a:b": 2, "b:c": 1 }` produce the same partition. Document.
+- **Doc-comment placement.** Per CLAUDE.md, ensure a blank line separates the new `edge_weights` doc from the existing `quality` field doc.
+
+**Seeds Forward:**
+- M22 lands the change-coupling field in `WasmAssembleSnapshotInput` — the natural pairing for weighted Leiden, since coupling data is what makes good edge weights.
+- A future milestone could derive weights automatically from a passed-in coupling-events array, removing the requirement that the consumer hand-build the `"src:dst"` map. Not in scope here; the manual map is the lower-friction primitive for v0.
+- If a real user reports the colon-in-node-id ambiguity hitting them, switch to a structured `Vec<{from: String, to: String, weight: f64}>` representation in a future binding bump. Tracked as a possible binding-API v2 concern; not blocking.
+
+---
+
+---
+
+## Archived: 2026-05-02 — Unknown Initiative
+
+#### Milestone 22: Change Coupling in WASM `assemble_snapshot`
+
+<!-- milestone-meta
+id: "22"
+status: "done"
+-->
+
+**Scope:** Add an optional `change_coupling: Option<WasmChangeCouplingInput>` field to `WasmAssembleSnapshotInput` and thread it through the WASM `assemble_snapshot` call to the 5th positional argument of native `sdivi_core::assemble_snapshot` (currently passed as `None` at `bindings/sdivi-wasm/src/exports.rs:170`). Removes ADL-7. WASM consumers can now produce snapshots that carry their own change-coupling analysis output, parallel to what `sdivi-pipeline` does for native callers.
+
+**Why this milestone exists:** M15 (Change-Coupling Analyzer) added the native `compute_change_coupling` function and threaded the result through `assemble_snapshot` for the pipeline path. The WASM binding stayed at the M12 surface — `compute_change_coupling` is exposed as a standalone WASM function, but its output cannot be included in a WASM-built snapshot because `WasmAssembleSnapshotInput` has no field for it. Meridian needs the full snapshot to include change-coupling metrics so its CI gate can read them from a single artifact instead of stitching two outputs together.
+
+**Deliverables:**
+- Define `WasmChangeCouplingInput` in `bindings/sdivi-wasm/src/types.rs` mirroring the shape of native `sdivi_core::ChangeCouplingResult` (or whatever type the 5th arg of `assemble_snapshot` accepts — verify before writing). Likely shape: `coupling_score: f64`, `top_pairs: Vec<{from: String, to: String, frequency: f64}>` and any additional summary fields the native struct carries. Tsify-derive both the wrapper and any nested types.
+- Add `pub change_coupling: Option<WasmChangeCouplingInput>` to `WasmAssembleSnapshotInput`. Mark `#[tsify(optional)]`.
+- In `exports.rs::assemble_snapshot`, replace the `None` at the 5th positional argument (line 170) with `input.change_coupling.map(to_core).transpose()?`. Convert via the standard `to_core` pattern already used for the other input types in the file.
+- Remove the TODO comment block at exports.rs:162–164. Remove ADL-7 from `.tekhton/DESIGN.md` (or wherever it's logged) — replace with an "Implemented in M22" pointer.
+- Update `bindings/sdivi-wasm/README.md` example snippet to demonstrate the round-trip: call `compute_change_coupling`, pass the result into `assemble_snapshot`.
+
+**Migration Impact:** Strictly additive. Existing TS/JS callers that omit `change_coupling` see no behavioural change — the field defaults to `None`, the snapshot's `change_coupling` field is absent (or `null`, depending on the native serde representation), exactly matching pre-M22 output. Callers that supply `change_coupling` get a snapshot with the field populated, identical to what the native pipeline produces. `snapshot_version` stays `"1.0"` — the field already exists in the schema; only the WASM path was previously unable to populate it.
+
+**Files to create or modify:**
+- **Modify:** `bindings/sdivi-wasm/src/types.rs` — add `WasmChangeCouplingInput` (and any nested types). Add field to `WasmAssembleSnapshotInput`.
+- **Modify:** `bindings/sdivi-wasm/src/exports.rs` — replace the hardcoded `None` at line 170 with the threaded value. Remove TODO/ADL-7 comment block.
+- **Modify:** `bindings/sdivi-wasm/tests/` — add a test asserting that a snapshot built with `change_coupling: Some(...)` has the expected field populated in the output JSON; a snapshot built with `None` does not.
+- **Modify:** `bindings/sdivi-wasm/README.md` — round-trip example.
+- **Modify:** `.tekhton/DESIGN.md` — mark ADL-7 implemented.
+- **Modify:** `CHANGELOG.md` — under Added.
+
+**Acceptance criteria:**
+- `wasm-pack test --node bindings/sdivi-wasm` passes, including a new test that:
+  1. Calls `compute_change_coupling` with a fixture coupling-events array.
+  2. Passes the result into `assemble_snapshot` via the new field.
+  3. Asserts the returned snapshot's `change_coupling` field matches the input value (round-trip).
+- A test omitting the field produces a snapshot whose `change_coupling` field is absent / null — bit-identical to the pre-M22 behaviour.
+- TS type generation: `tsc --noEmit` against the published `.d.ts` shows `change_coupling?: WasmChangeCouplingInput` on `WasmAssembleSnapshotInput`.
+- Existing WASM tests pass unchanged.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+
+**Tests:**
+- Unit (Rust): the `to_core` conversion from `WasmChangeCouplingInput` to the native type round-trips correctly for representative shapes (empty top_pairs, populated top_pairs, edge-case scores).
+- Integration (JS): the round-trip test above.
+- Integration (JS): omit-the-field test asserting absent / null in output.
+- Determinism: same `change_coupling` input produces bit-identical snapshot bytes across two `assemble_snapshot` calls (determinism gate).
+
+**Watch For:**
+- **Verify the exact native type at the 5th argument before defining the wrapper.** The signature is `assemble_snapshot(graph, partition, catalog, pm, change_coupling: Option<???>, timestamp, commit, ...)`. Read `crates/sdivi-snapshot/src/lib.rs` (or wherever `assemble_snapshot` lives) to confirm the type name and field shape; do not guess. The wrapper must be field-equivalent so `to_core` is mechanical.
+- **Deeply-nested types must all be tsify-derived.** If `ChangeCouplingResult` contains `Vec<CouplingPair>` and `CouplingPair` is its own struct, the WASM mirror needs both. Missing one fails compilation at the macro layer with a less-than-helpful error.
+- **Field-naming convention.** `tsify` produces TS field names matching the Rust serde representation. If the native type uses `#[serde(rename = "...")]` anywhere, mirror that exactly so the JSON output is bit-identical to the native pipeline's output for the same input.
+- **Snapshot output bytes must match the native pipeline.** Compare a WASM-assembled snapshot byte-for-byte against a `sdivi-pipeline` snapshot for the same graph + partition + catalog + change-coupling inputs; any divergence is a serde-config bug. This is the determinism contract per Rule 23.
+- **Doc-comment placement.** Per CLAUDE.md, ensure a blank line separates the new `change_coupling` doc from the next field's doc.
+
+**Seeds Forward:**
+- With M21 (weighted Leiden) and M22 (change coupling) both shipped, the WASM surface fully matches the native pipeline's `assemble_snapshot` capabilities. Document this state in `bindings/sdivi-wasm/README.md` as "WASM API parity reached for snapshot assembly" so future contributors don't reintroduce gaps.
+- M23 (pattern category contract) is the last remaining WASM-surface gap — once that lands, the consumer-app integration story is complete from the binding-API side and only the distribution work (M24) remains.
+
+---
+
+---
+
+## Archived: 2026-05-03 — Unknown Initiative
+
+
+#### Milestone 23: Pattern Category Contract + WASM `list_categories()`
+
+<!-- milestone-meta
+id: "23"
+status: "done"
+-->
+<!-- PM-tweaked: 2026-05-02 -->
+
+**Scope:** Establish the canonical pattern-category schema as a versioned, documented contract — the canonical category names (`error_handling`, `data_access`, `logging`, etc.), their expected tree-sitter node-kind shapes per language, and the normalization rules that produce a `blake3` fingerprint. Ship as `docs/pattern-categories.md` versioned to `snapshot_version "1.0"`. Add a `list_categories() -> CategoryCatalog` WASM export so embedders can discover the contract at runtime instead of hard-coding category names. Doc + runtime ship together so consumers can't drift from the contract.
+
+**Why this milestone exists:** Currently the canonical category list lives implicitly in `crates/sdivi-patterns/src/` as match-arm strings — readable to a sdivi-rust contributor, opaque to an embedder. Meridian is building its own tree-sitter extractors (it doesn't go through `sdivi-parsing`) and needs to know exactly which AST subtrees map to which category so its extracted `PatternInstanceInput.category` strings match what `compute_pattern_metrics` expects. Without a shared contract, Meridian's categories diverge silently from sdivi-rust's, and `convention_drift_rate` becomes meaningless across the boundary.
+
+**Deliverables:**
+- Audit `crates/sdivi-patterns/src/` to enumerate every canonical category name in current use. Confirm with a grep across the workspace that no category string appears outside the patterns crate without crossing this contract. Capture the exhaustive list.
+- Write `docs/pattern-categories.md`. Sections:
+  1. **Versioning** — bound to `snapshot_version "1.0"`; categories are reserved forever once introduced (Rule 10 spillover); changes within a snapshot version may add but never remove or rename.
+  2. **Canonical category list** — table with category name, one-paragraph definition, the kinds of code constructs it covers.
+  3. **Per-language node-kind mappings** — for each supported language, a table of tree-sitter node-kind strings that count as instances of each category. Where a category requires a specific child structure (e.g. `try_statement` → `error_handling` only when paired with a `catch_clause`), document the structural constraint.
+  4. **Normalization rules** — the `NormalizeNode` shape, what subtrees are stripped or canonicalised before fingerprint computation, the `blake3` key constant. Cross-reference `normalize_and_hash` rustdoc.
+  5. **Embedder responsibilities** — what an embedder must do to produce `PatternInstanceInput` values that round-trip with native sdivi-rust output: same category strings, same normalization, same fingerprint computation via `normalize_and_hash`.
+- Add a `pub fn list_categories() -> CategoryCatalog` in `sdivi-core` that returns a `CategoryCatalog` struct containing the canonical category list plus version metadata. Source of truth lives in code (`const CATEGORIES: &[&str] = &[...]`), not docs — the docs render from the constant via a doc-test snippet to keep them in sync.
+- Define `CategoryCatalog`:
+  ```rust
+  pub struct CategoryCatalog {
+      pub schema_version: &'static str, // matches snapshot_version
+      pub categories: Vec<CategoryInfo>,
+  }
+  pub struct CategoryInfo {
+      pub name: String,
+      pub description: String,
+  }
+  ```
+  Tsify-derive for WASM use.
+- Export `list_categories()` from `bindings/sdivi-wasm/src/exports.rs` as a `#[wasm_bindgen]` function returning `CategoryCatalog`.
+- Add a CI gate `tests/category_contract.rs` that asserts every category string used inside `crates/sdivi-patterns/src/` (discovered via grep at test time) is present in `list_categories()` output. Catches drift between code and contract.
+
+**Migration Impact:** Strictly additive. The category strings already in use are unchanged. Existing snapshots and existing embedders that hard-coded category names continue to work — the contract simply documents what they were already doing. New embedders should consume `list_categories()` instead of hard-coding. `snapshot_version` stays `"1.0"`.
+
+**Files to create or modify:**
+- **Create:** `docs/pattern-categories.md` — the versioned contract.
+- **Create:** `crates/sdivi-core/src/categories.rs` — `CategoryCatalog`, `CategoryInfo`, `list_categories()`, `const CATEGORIES`.
+- **Modify:** `crates/sdivi-core/src/lib.rs` — re-export the catalog types and the function.
+- **Modify:** `crates/sdivi-patterns/src/` — [PM: The original instruction ("replace inline category-string literals with references to `sdivi-core::categories::CATEGORIES`") creates a dependency cycle: `sdivi-core` already depends on `sdivi-patterns`, so `sdivi-patterns` cannot in turn depend on `sdivi-core`. **Do not attempt that import.** Instead, keep the category string literals where they are in `sdivi-patterns`. The `category_contract.rs` test (below) is the enforcement mechanism: it greps `sdivi-patterns/src/` at test time and asserts every discovered string is present in `list_categories()` output. No code-level cross-reference is needed or safe to add. If a single source of truth for the constant set itself is desired, consider moving `CATEGORIES` to `sdivi-config` (a leaf crate that both `sdivi-core` and `sdivi-patterns` already depend on) — but that is optional for this milestone; the test gate is sufficient.]
+- **Create:** `bindings/sdivi-wasm/src/exports.rs` — add `list_categories()` `#[wasm_bindgen]` wrapper.
+- **Create:** `crates/sdivi-core/tests/category_contract.rs` — drift-detection test.
+- **Modify:** `bindings/sdivi-wasm/README.md` — show `list_categories()` usage.
+- **Modify:** `CHANGELOG.md` — under Added.
+
+**Acceptance criteria:**
+- `cargo test -p sdivi-core` passes, including the new `category_contract.rs` test.
+- `cargo build -p sdivi-core --target wasm32-unknown-unknown --no-default-features` succeeds.
+- `wasm-pack test --node bindings/sdivi-wasm` passes, including a test that calls `list_categories()` and asserts the returned `schema_version === "1.0"` and the `categories` array length matches the expected count.
+- The `docs/pattern-categories.md` doc-test (which calls `list_categories()` and pretty-prints the table) renders the same set of categories as the markdown table earlier in the file. Test framework: a Rust integration test that parses the markdown table and compares to `list_categories()` output.
+- `cargo doc --workspace --no-deps` passes with `RUSTDOCFLAGS=-D warnings`.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+
+**Tests:**
+- Unit: `list_categories()` returns `schema_version == "1.0"` and a non-empty `categories` vec.
+- Unit: `list_categories()` is referentially transparent — two calls return equal values.
+- Integration (`category_contract.rs`): every category string discovered via grep across `crates/sdivi-patterns/src/` is present in `list_categories()` output. (This is the drift gate.)
+- Integration: the markdown table in `docs/pattern-categories.md` and the runtime `list_categories()` output enumerate the same set of categories.
+- Integration (JS): `list_categories()` callable from WASM, returns expected shape.
+
+**Watch For:**
+- **Single source of truth in code, not docs.** The `const CATEGORIES` array drives the markdown table (via doc-test or a one-off generator script committed to `tools/`). Docs that drift from code are inevitable; tests that catch drift are the only durable solution.
+- **Per-language node-kind mappings are language-specific and may grow.** A new language adapter (post-MVP) will add new node-kind strings for the same categories. The schema version `"1.0"` covers the *category set*; per-language node-kinds are an implementation detail that can grow within a snapshot version. Document this distinction.
+- **Reserved-forever invariant.** Once a category name appears in `list_categories()`, it cannot be removed within a `snapshot_version`. A category that becomes obsolete must be marked deprecated in the description but still returned — Meridian or any other embedder may have stored snapshots referencing it, and `compute_delta` must keep working.
+- **Tsify derivation for `CategoryCatalog` and `CategoryInfo`.** Both must be `Tsify` so the WASM consumer gets the strict-TS type. Test by running `tsc --noEmit` against the generated `.d.ts`.
+- **`#![deny(missing_docs)]` on `sdivi-core`.** The new `categories` module, every pub item in it, every field of `CategoryInfo` needs a doc comment with an `# Examples` block where meaningful (`list_categories` definitely needs one).
+- **Don't add a "category" enum.** Use `String` for category names. An enum couples the binding ABI to the category set and forces a binding bump every time a category is added; a string is open-ended and the contract is enforced at the higher `list_categories()` layer.
+- **Doc-comment placement.** Per CLAUDE.md, when inserting `CategoryCatalog` and `CategoryInfo` adjacent to existing items in `categories.rs`, ensure blank lines separate the doc blocks.
+- **[PM: No circular dep.] `sdivi-patterns` must not import from `sdivi-core`.** The dependency direction is `sdivi-core` → `sdivi-patterns`, never the reverse. The contract is enforced purely through the `category_contract.rs` grep test, not through a shared import.
+
+**Seeds Forward:**
+- A `categories.json` machine-readable export (sibling to `list_categories()`, generated at build time and shipped under `docs/`) becomes worthwhile if a non-WASM, non-Rust consumer (e.g. a shell-script CI integration) needs to enumerate categories. Defer until requested.
+- Per-language node-kind tables in `docs/pattern-categories.md` are written by hand for the v0 supported languages. A future milestone could derive them from the tree-sitter queries themselves to eliminate the doc/code drift surface area entirely. Out of scope here — the manual table plus the contract test are sufficient for v0.
+- If a category is ever truly retired (vs deprecated), that requires a `snapshot_version` bump per Rule 16 — not a small decision. Document the bump procedure in `docs/pattern-categories.md` Versioning section so the cost is visible to future contributors.
+- If moving `CATEGORIES` to `sdivi-config` (to share the constant between `sdivi-patterns` and `sdivi-core` without a cycle) becomes worthwhile in a future cleanup pass, that is a safe mechanical move — `sdivi-config` is already a leaf crate that both depend on.
+
+---
+
+## Archived: 2026-05-03 — Unknown Initiative
+
+#### Milestone 24: Node.js WASM Distribution Target
+
+<!-- milestone-meta
+id: "24"
+status: "done"
+-->
+
+**Scope:** Ship `@geoffgodwin/sdivi-wasm` as a single npm package with conditional exports — `./bundler` for webpack/vite consumers (current default), `./node` for Node 18+ CLI consumers (Meridian's case). Updates `bindings/sdivi-wasm/build.sh` to produce both `wasm-pack` outputs, the npm `package.json` `exports` map to route by environment, and adds a Node-import smoke test to CI. Does not bump the package's major version because the existing `bundler` import path remains the default.
+
+**Why this milestone exists:** The current `bindings/sdivi-wasm/build.sh` invokes `wasm-pack --target bundler`, which produces output that webpack and vite consume natively but requires a manual `WebAssembly.instantiate` shim to run under Node.js. Meridian runs as a Node CLI without a bundler in the loop and currently has to hand-write that shim — fragile and friction. The cleanest fix is to publish both targets under one package and let Node.js callers `require('@geoffgodwin/sdivi-wasm/node')` while bundler callers continue with `import from '@geoffgodwin/sdivi-wasm'`.
+
+**Deliverables:**
+- Update `bindings/sdivi-wasm/build.sh` to produce both targets:
+  - `wasm-pack build --release --target bundler --out-dir pkg/bundler` (existing path, moved to subdir).
+  - `wasm-pack build --release --target nodejs --out-dir pkg/node`.
+  - Both outputs share the same Rust source; only the JS shim differs.
+- Restructure `pkg/` (the npm publish root) to host both subdirs and a top-level `package.json` with conditional exports:
+  ```json
+  {
+    "name": "@geoffgodwin/sdivi-wasm",
+    "version": "...",
+    "main": "./bundler/sdivi_wasm.js",
+    "module": "./bundler/sdivi_wasm.js",
+    "types": "./bundler/sdivi_wasm.d.ts",
+    "exports": {
+      ".":      { "import": "./bundler/sdivi_wasm.js", "require": "./node/sdivi_wasm.js", "types": "./bundler/sdivi_wasm.d.ts" },
+      "./node": { "require": "./node/sdivi_wasm.js", "types": "./node/sdivi_wasm.d.ts" },
+      "./bundler": { "import": "./bundler/sdivi_wasm.js", "types": "./bundler/sdivi_wasm.d.ts" }
+    },
+    "files": ["bundler/", "node/", "README.md", "LICENSE"]
+  }
+  ```
+  The `.` conditional exports route Node `require` to the nodejs build automatically without the consumer specifying `/node` — the explicit `/node` and `/bundler` subpaths remain for callers who want to be explicit.
+- Update the npm publish step in the existing release workflow (`release.yml`, the M13 publish job) to publish the restructured `pkg/` rather than the single-target output.
+- Add a CI smoke test under `bindings/sdivi-wasm/tests/node_smoke/`: a small Node 18+ project (`package.json` + `index.cjs` + `index.mjs`) that does `require('@geoffgodwin/sdivi-wasm')` (CommonJS path) and `import from '@geoffgodwin/sdivi-wasm'` (ESM path) and calls `list_categories()`. Run in CI on `ubuntu-latest` after a successful build.
+- Update `bindings/sdivi-wasm/README.md` with two usage sections: "Bundler consumers (webpack, vite, rollup)" and "Node.js consumers (CLI, server)". Each shows the import pattern plus a runnable snippet.
+- Verify the existing `wasm.yml` CI workflow continues to build cleanly. If it currently builds only the bundler target, extend it to build both.
+
+**Migration Impact:** Existing bundler consumers see no change — the default `import from '@geoffgodwin/sdivi-wasm'` continues to resolve to the bundler build (now under `pkg/bundler/`). Node consumers who were hand-writing a `WebAssembly.instantiate` shim can delete it and switch to the standard `require`. The package's major version does not bump because the public interface is strictly additive (a new `/node` subpath and a new `require` resolution); the existing default path remains the bundler build. `snapshot_version` is unaffected.
+
+**Files to create or modify:**
+- **Modify:** `bindings/sdivi-wasm/build.sh` — produce both targets.
+- **Create:** `bindings/sdivi-wasm/pkg-template/package.json` — the conditional-exports template (rendered or copied into `pkg/` after build).
+- **Modify:** `.github/workflows/release.yml` — publish the restructured pkg/.
+- **Modify:** `.github/workflows/wasm.yml` — build both targets in CI; run the Node smoke test.
+- **Create:** `bindings/sdivi-wasm/tests/node_smoke/package.json`, `index.cjs`, `index.mjs` — minimal smoke-test project.
+- **Modify:** `bindings/sdivi-wasm/README.md` — dual-target usage docs.
+- **Modify:** `CHANGELOG.md` — under Added.
+
+**Acceptance criteria:**
+- Running `bindings/sdivi-wasm/build.sh` produces `pkg/bundler/sdivi_wasm.js` AND `pkg/node/sdivi_wasm.js` (and the corresponding `.d.ts` and `.wasm` files for each).
+- The `pkg/package.json` `exports` map resolves correctly: in a CI smoke test, `node -e "require('@geoffgodwin/sdivi-wasm')"` succeeds (uses node target via `require` conditional); `node --input-type=module -e "import('@geoffgodwin/sdivi-wasm').then(m => m.list_categories())"` succeeds (uses bundler target via `import` conditional, which works on Node 18+ with synchronous WASM).
+- The existing bundler consumer test (whatever asserts that vite/webpack can consume the package) continues to pass.
+- The `wasm.yml` CI workflow runs both builds and the Node smoke test on `ubuntu-latest`. Total wall-clock under 5 minutes; if it grows past that, investigate.
+- `npm pack --dry-run` from the `pkg/` directory lists both `bundler/` and `node/` subdirectories in the tarball contents. No extraneous files.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` continue to pass (no Rust source changes; this is a packaging milestone).
+- The `.tekhton/DESIGN.md` (or wherever distribution-target decisions live) is updated to reflect the dual-target shape.
+
+**Tests:**
+- CI smoke (`tests/node_smoke/`): CommonJS `require` succeeds, returns a working module with `list_categories` callable.
+- CI smoke (`tests/node_smoke/`): ESM `import` succeeds, returns a working module with `list_categories` callable.
+- CI smoke: assert `list_categories()` returns the same array under CJS and ESM (sanity — same underlying wasm).
+- Bundler test: existing webpack/vite/rollup smoke (whichever the M12/M13 era set up) continues to pass against the new `pkg/bundler/` path.
+- Manual (release dry run): `npm pack` produces a tarball; extract and verify the `exports` map matches the template.
+
+**Watch For:**
+- **Conditional `exports` precedence on Node 18+.** Node resolves `require` and `import` conditions independently of the `main` / `module` legacy fields. Verify on Node 18, 20, 22 (LTS line). Older Node versions (<18) ignore the `exports` map and fall back to `main`, getting the bundler build — they need to use the explicit `/node` subpath. Document the Node-18 minimum.
+- **`wasm-pack --target nodejs` produces a CJS module.** It uses `require('fs')` to load the `.wasm` file synchronously. Webpack/vite consumers must NOT use this build (they expect ESM with import-based wasm loading). The conditional exports map prevents this — verify nothing leaks.
+- **`wasm-pack --target bundler` does NOT work in Node.js by default.** The bundler target uses `import.meta.url` style loading that Node 18+ supports for ESM but with caveats. The `.` `import` conditional points to the bundler build for Node ESM users; the `.` `require` conditional points to the node build for Node CJS users. Test both.
+- **The `.d.ts` files differ slightly between targets.** `wasm-pack` generates target-specific TypeScript declarations. The `types` field in the conditional export should point to the bundler `.d.ts` for the default `.` import (TS resolves `types` from the `import` condition's directory) and the node `.d.ts` for the `/node` subpath. Verify with `tsc --noEmit` against both consumption patterns.
+- **Package size budget.** Two builds doubles the published package size. Verify the published tarball stays under a sensible cap (e.g. 5 MB for the combined wasm + JS shims). If it bloats, investigate `wasm-opt` settings.
+- **Don't publish a separate npm package.** A single package with conditional exports is the modern (post-Node 14) idiomatic way; avoid `@geoffgodwin/sdivi-wasm-node` as a sibling. Single-package keeps versioning aligned and reduces the matrix consumers need to track.
+- **The `release.yml` manual approval gate.** This milestone changes what gets published — re-verify the gate prompt clearly indicates "both bundler and node targets" so the approver isn't surprised by a 2× size jump.
+
+**Seeds Forward:**
+- A `--target deno` build is a plausible v1 follow-up if a Deno consumer appears. Same conditional-exports machinery extends naturally with a `"deno"` condition.
+- Cloudflare Workers / edge-runtime consumers may need yet another target (`--target web` with specific glue). Defer until requested.
+- If the smoke-test surface grows, factor it into its own minimal npm package under `bindings/sdivi-wasm/tests/` rather than inlining; for v0 the inline `index.cjs` + `index.mjs` is sufficient.
+
+---

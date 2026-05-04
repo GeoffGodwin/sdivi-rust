@@ -31,6 +31,7 @@ fn sample_snap() -> Snapshot {
         "2026-04-29T09:00:00Z",
         Some("deadbeefdeadbeefdeadbeef"),
         None,
+        0,
     )
 }
 

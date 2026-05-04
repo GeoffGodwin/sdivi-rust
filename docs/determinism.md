@@ -107,6 +107,40 @@ If a consumer needs bit-identical results across platforms, they can:
 Both options are supported but not the default. They will be revisited if a
 real adopter requires cross-platform bit identity.
 
+## Threshold Gate Stability
+
+`compute_thresholds_check` uses `delta > limit + THRESHOLD_EPSILON` rather than
+`delta > limit` for every dimension comparison. The constant is:
+
+```rust
+pub const THRESHOLD_EPSILON: f64 = 1e-9;
+```
+
+**Rationale:** User-configured thresholds are typically expressed to 1–2 decimal
+places (e.g. `coupling_delta_rate = 0.15`). Documented per-arch FMA drift
+between x86_64 and aarch64 is ≤ 1 ULP ≈ `2.2e-16` near 1.0. A delta computed
+as `0.04999…` on x86_64 and `0.05000…01` on aarch64 for the same logical value
+would cause the CI gate to flip sign across platforms — a flaky test with no
+user-meaningful cause. The `1e-9` epsilon is ~7 orders of magnitude larger than
+per-arch FMA drift and ~7 orders of magnitude smaller than any plausible user
+precision, so it absorbs the noise without changing semantics.
+
+**Asymmetry:** the epsilon is added to `limit`, not subtracted from `delta`. The
+gate is *slightly more lenient* by at most `1e-9`. A genuine breach of
+`limit + 2e-9` or more still trips. False positives from ULP noise are
+suppressed; false negatives at the ULP scale are acceptable.
+
+**Raw delta is unaffected:** `ThresholdBreachInfo.actual` always holds the
+unrounded delta value. Consumers reading the JSON breach report see the true
+computed value.
+
+**Integer dimensions:** `boundary_violation_delta` is cast from `i64` to `f64`
+before comparison, so it is always an exact integer. The epsilon has no
+functional effect there but is applied for consistency.
+
+Re-exported as `sdivi_core::THRESHOLD_EPSILON` so WASM callers and other
+embedders can reference the same constant in their own documentation.
+
 ## Pure-Function Guarantee
 
 Every `sdivi_core::compute_*` function is referentially transparent:

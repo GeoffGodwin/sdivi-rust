@@ -11,7 +11,9 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use crate::category_types::*;
 use crate::types::*;
+use crate::weight_keys::parse_wasm_edge_weights;
 
 // ── Conversion helpers ────────────────────────────────────────────────────────
 
@@ -44,6 +46,11 @@ pub fn compute_coupling_topology(
 }
 
 /// Run Leiden community detection and return cluster assignments + stability.
+///
+/// When `cfg.edge_weights` is `Some`, runs weighted Leiden. Keys must be
+/// `"source:target"` strings (first colon separates source from target, so
+/// node IDs that themselves contain colons are fully supported). Weights must
+/// be `>= 0.0` and finite; edges absent from the graph are silently ignored.
 #[wasm_bindgen]
 pub fn detect_boundaries(
     graph: WasmDependencyGraphInput,
@@ -51,7 +58,17 @@ pub fn detect_boundaries(
     prior: Vec<WasmPriorPartition>,
 ) -> Result<WasmBoundaryDetectionResult, JsError> {
     let g = to_core(graph)?;
-    let c = to_core(cfg)?;
+    // Extract edge_weights before serde round-trip (WASM uses "src:tgt" colon keys;
+    // native LeidenConfigInput uses NUL-separated keys via edge_weight_key).
+    let wasm_weights = cfg.edge_weights.clone();
+    let cfg_no_weights = WasmLeidenConfigInput {
+        edge_weights: None,
+        ..cfg
+    };
+    let mut c: sdivi_core::LeidenConfigInput = to_core(cfg_no_weights)?;
+    if let Some(ew) = wasm_weights {
+        c.edge_weights = Some(parse_wasm_edge_weights(ew).map_err(|e| JsError::new(&e))?);
+    }
     let p: Vec<sdivi_core::PriorPartition> =
         prior.into_iter().map(to_core).collect::<Result<_, _>>()?;
     let result = sdivi_core::detect_boundaries(&g, &c, &p).map_err(err)?;
@@ -146,6 +163,15 @@ pub fn normalize_and_hash(
     Ok(sdivi_core::normalize_and_hash(node_kind, &c))
 }
 
+/// Return the canonical pattern-category contract for `snapshot_version "1.0"`.
+///
+/// Embedders that supply their own tree-sitter extractors should call this
+/// function to discover which category names are valid instead of hard-coding them.
+#[wasm_bindgen]
+pub fn list_categories() -> Result<WasmCategoryCatalog, JsError> {
+    from_core(sdivi_core::list_categories())
+}
+
 // ── assemble_snapshot ────────────────────────────────────────────────────────
 
 /// Assemble a Snapshot from compute-function outputs.
@@ -159,26 +185,20 @@ pub fn assemble_snapshot(input: WasmAssembleSnapshotInput) -> Result<JsValue, Js
     let catalog = build_pattern_catalog(&input.pattern_instances)?;
     let pm: sdivi_core::PatternMetricsResult = to_core(input.pattern_metrics)?;
 
-    // TODO: `change_coupling` is hardcoded to `None` (MVP limitation, see ADL-7).
-    // WASM consumers who call `compute_change_coupling` cannot include the result here.
-    // Post-MVP: add field to `WasmAssembleSnapshotInput` and expose the compute function.
-    let mut snap = sdivi_core::assemble_snapshot(
+    let change_coupling: Option<sdivi_core::ChangeCouplingResult> =
+        input.change_coupling.map(to_core).transpose()?;
+
+    let snap = sdivi_core::assemble_snapshot(
         graph,
         partition,
         catalog,
         pm,
-        None,
+        input.boundary_count.map(|c| c as usize),
         &input.timestamp,
         input.commit.as_deref(),
-        None,
+        change_coupling,
+        input.violation_count.unwrap_or(0),
     );
-
-    if let Some(count) = input.boundary_count {
-        snap.intent_divergence = Some(sdivi_core::IntentDivergenceInfo {
-            boundary_count: count as usize,
-            violation_count: input.violation_count.unwrap_or(0),
-        });
-    }
 
     serde_wasm_bindgen::to_value(&snap).map_err(err)
 }
