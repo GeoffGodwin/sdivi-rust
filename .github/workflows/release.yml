@@ -36,15 +36,23 @@ jobs:
           echo "OK: tag $TAG base ($TAG_BASE) matches Cargo.toml $CARGO_VER"
 
   # ── Security audit ────────────────────────────────────────────────────────
+  # NOTE: rust-toolchain.toml pins 1.85.0 for the workspace, but cargo-audit's
+  # transitive deps now require >=1.86–1.89. We install cargo-audit using the
+  # `stable` toolchain explicitly (with --locked, so cargo-audit's bundled
+  # lockfile is used and we don't pick up a fresher transitive that bumps MSRV
+  # again). `cargo audit` itself is a pre-built binary — once installed, it
+  # doesn't need a Rust compiler to run, so it works fine against the workspace.
   audit:
     name: Security audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit (stable toolchain, locked)
+        run: cargo +stable install cargo-audit --locked
+      - name: Run cargo audit
+        run: cargo audit
 
   # ── Matrix binary build ───────────────────────────────────────────────────
   build:
@@ -93,7 +101,9 @@ jobs:
 
       - name: Install cross (Linux aarch64 only)
         if: matrix.cross
-        run: cargo install cross
+        # See audit job: rust-toolchain.toml's 1.85.0 pin is too old for
+        # cross's transitive deps. --locked + +stable avoids the MSRV bump.
+        run: cargo +stable install cross --locked
 
       - name: Build with cross
         if: matrix.cross

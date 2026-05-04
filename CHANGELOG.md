@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-04
+
+### Fixed
+
+- Release pipeline: `audit` job replaced `rustsec/audit-check@v2` with an
+  explicit `cargo +stable install cargo-audit --locked` + `cargo audit`.
+  The action compiled cargo-audit from source under the workspace's
+  `rust-toolchain.toml`-pinned 1.85.0, which fails because cargo-audit's
+  transitive deps (`home`, `icu_*`, `smol_str`, `time`) now require
+  rustc ≥1.86–1.89. Same root-cause fix applied to `cargo install cross`
+  in the aarch64-linux build matrix entry, and to the scheduled `audit.yml`.
+- WASM npm package version: `bindings/sdivi-wasm/pkg-template/package.json`
+  was stuck at `0.1.14` while the workspace had moved to `0.2.x`. Synced
+  to `0.2.1` so the npm tarball matches the release tag. Without this fix,
+  the v0.2.0 release would have published `@geoffgodwin/sdivi-wasm@0.1.14`
+  to npm regardless of the tag.
+
 ## [0.2.0] - 2026-05-03
 
 ### Changed
