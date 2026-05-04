@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-05-04
+
+### Fixed
+
+- `scripts/publish-or-skip.sh`: regex previously matched only one of
+  cargo's two "already published" error phrasings. Cargo emits
+  *"crate version `X.Y.Z` is already uploaded"* when the registry
+  server rejects, but *"crate X@Y.Z already exists on crates.io
+  index"* when the LOCAL index check catches the conflict before
+  upload (which is what reruns of an already-published version
+  actually trigger). v0.2.11 reruns silently failed at the very
+  first crate because the script didn't recognise the local-index
+  form. Broadened the regex to match both phrasings.
+
+### Added
+
+- `bindings/sdivi-wasm/Cargo.toml`: `publish = false`. Defensive
+  guard against future workflow changes that might use
+  `cargo publish --workspace` — sdivi-wasm publishes to npm only
+  and would be meaningless on crates.io.
+
 ## [0.2.11] - 2026-05-04
 
 ### Fixed

@@ -36,10 +36,13 @@ if [[ $ec -eq 0 ]]; then
     exit 0
 fi
 
-# crates.io's "already uploaded" message is the only failure mode we treat
-# as idempotent success. Every other failure (rate limit, auth, network,
-# compile error) must still propagate.
-if echo "$out" | grep -qE 'crate version .* is already uploaded|already uploaded'; then
+# Cargo emits two distinct messages for "this version is already published",
+# depending on which check catches it:
+#   1. "crate version `X.Y.Z` is already uploaded"  — registry server response
+#   2. "crate X@Y.Z already exists on crates.io index"  — local index check
+# Either is idempotent success for us. Everything else (rate limit, auth,
+# network, compile error) must still propagate.
+if echo "$out" | grep -qE 'already uploaded|already exists on crates\.io index'; then
     echo "::notice::$crate is already published — skipping (idempotent rerun)"
     exit 0
 fi
