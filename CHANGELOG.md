@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-04
+
+### Fixed
+
+- npm publish: replace `Node 22 + npm install -g npm@latest` with
+  `Node 24` (which bundles npm 11.x natively — the version trusted
+  publishing requires). The self-upgrade step in v0.2.4 broke the
+  install with `MODULE_NOT_FOUND: promise-retry` because npm rewrites
+  its own files mid-execution.
+
+### Notes
+
+- Crates.io publish in v0.2.4 failed because `CARGO_REGISTRY_TOKEN`
+  was added to the `crates-io-publish` GitHub Environment after the
+  v0.2.4 run started. Token is now in place; the v0.2.5 run will
+  pick it up.
+
 ## [0.2.4] - 2026-05-04
 
 ### Changed

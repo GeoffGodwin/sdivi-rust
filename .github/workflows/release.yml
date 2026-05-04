@@ -308,16 +308,16 @@ jobs:
         # from the tarball even though they appear in the `files` field.
         run: rm -f pkg/bundler/.gitignore pkg/node/.gitignore pkg/.gitignore
 
+      # Node 24 ships with npm 11.x bundled, which is what trusted publishing
+      # needs (>= 11.5.1 for the OIDC token exchange). Self-upgrading via
+      # `npm install -g npm@latest` is unreliable — npm rewrites its own
+      # files mid-execution and can leave the install in a broken state
+      # (MODULE_NOT_FOUND for `promise-retry` in v0.2.4 release run).
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
-
-      # Node 22 ships with npm 10.x, but trusted publishing requires npm
-      # >= 11.5.1 for the OIDC token exchange. Upgrade to latest npm.
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
 
       - name: Dry-run (pre-release tags only)
         if: contains(github.ref_name, '-rc')
