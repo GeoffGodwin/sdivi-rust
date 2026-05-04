@@ -37,7 +37,8 @@ walkdir = { workspace = true }
 [dev-dependencies]
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
-sdivi-config = { workspace = true }
+# Path-only — see sdivi-detection's dev-deps for rationale.
+sdivi-config = { path = "../sdivi-config" }
 tempfile   = { workspace = true }
 serde_json = { workspace = true }
 serde_yml  = { workspace = true }

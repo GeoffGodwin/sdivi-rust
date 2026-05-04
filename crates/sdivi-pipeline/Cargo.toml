@@ -28,6 +28,7 @@ chrono        = { workspace = true }
 
 [dev-dependencies]
 tempfile      = { workspace = true }
-sdivi-config    = { workspace = true }
-sdivi-lang-rust = { workspace = true }
+# Path-only — see sdivi-detection's dev-deps for rationale.
+sdivi-config    = { path = "../sdivi-config" }
+sdivi-lang-rust = { path = "../sdivi-lang-rust" }
 proptest      = { workspace = true }

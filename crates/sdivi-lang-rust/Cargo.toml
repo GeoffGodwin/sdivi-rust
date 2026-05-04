@@ -21,5 +21,6 @@ tree-sitter      = { workspace = true }
 tree-sitter-rust = { workspace = true }
 
 [dev-dependencies]
-sdivi-config = { workspace = true }
+# Path-only — see sdivi-detection's dev-deps for rationale.
+sdivi-config = { path = "../sdivi-config" }
 tempfile   = { workspace = true }

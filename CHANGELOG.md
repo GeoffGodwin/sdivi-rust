@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-05-04
+
+### Fixed
+
+- crates.io publish: convert all internal `sdivi-*` dev-dependencies
+  from `{ workspace = true }` to direct `{ path = "../<crate>" }`.
+  Workspace inheritance picks up the version constraint set in
+  `[workspace.dependencies]` (needed for regular deps), but
+  dev-dependencies don't need a version when using `path` and the
+  inherited version constraint causes `cargo publish` to fail when
+  the dev-dep crate hasn't been published to crates.io yet (e.g.
+  sdivi-detection's dev-dep on sdivi-pipeline, which publishes
+  later in the order). v0.2.10 published 9 of 16 crates before
+  hitting this on sdivi-detection. 13 entries fixed across 6
+  crates (sdivi-detection, sdivi-snapshot, sdivi-patterns,
+  sdivi-pipeline, sdivi-cli, sdivi-lang-rust).
+
+### Notes
+
+- 9 crates already published to crates.io at @0.2.10:
+  sdivi-config, sdivi-parsing, sdivi-lang-{rust,python,typescript,
+  javascript,go,java}, sdivi-graph. v0.2.11 republishes those
+  (idempotent skip via scripts/publish-or-skip.sh) and publishes
+  the remaining 7 first-timers (still subject to crates.io's
+  new-crate rate limit, but reruns are now safe).
+
 ## [0.2.10] - 2026-05-04
 
 ### Changed

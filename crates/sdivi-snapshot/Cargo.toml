@@ -30,6 +30,7 @@ tracing       = { workspace = true }
 [dev-dependencies]
 tempfile      = { workspace = true }
 proptest      = { workspace = true }
-sdivi-graph     = { workspace = true }
-sdivi-detection = { workspace = true }
-sdivi-patterns  = { workspace = true }
+# Path-only — see sdivi-detection's dev-deps for rationale.
+sdivi-graph     = { path = "../sdivi-graph" }
+sdivi-detection = { path = "../sdivi-detection" }
+sdivi-patterns  = { path = "../sdivi-patterns" }

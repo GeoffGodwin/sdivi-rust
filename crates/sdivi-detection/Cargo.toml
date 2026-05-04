@@ -30,6 +30,11 @@ tracing     = { workspace = true }
 [dev-dependencies]
 proptest     = { workspace = true }
 tempfile     = { workspace = true }
-sdivi-graph    = { workspace = true, features = ["pipeline-records"] }
-sdivi-parsing  = { workspace = true }
-sdivi-pipeline = { workspace = true }
+# Internal sdivi-* dev-deps must use direct path (no workspace inheritance):
+# workspace.dependencies has version constraints used during cargo publish, but
+# dev-deps publish through cargo without their crates needing to exist on
+# crates.io yet. Path-only avoids the chicken-and-egg of dev-deps on
+# later-published siblings (e.g. sdivi-pipeline publishes after sdivi-detection).
+sdivi-graph    = { path = "../sdivi-graph",    features = ["pipeline-records"] }
+sdivi-parsing  = { path = "../sdivi-parsing" }
+sdivi-pipeline = { path = "../sdivi-pipeline" }
