@@ -1,6 +1,6 @@
 {
   "name": "@geoffgodwin/sdivi-wasm",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "WASM bindings for the Structural Divergence Indexer pure-compute API",
   "main": "./bundler/sdivi_wasm.js",
   "module": "./bundler/sdivi_wasm.js",
@@ -36,6 +36,6 @@
     "type": "git",
     "url": "git+https://github.com/GeoffGodwin/sdivi-rust.git"
   },
-  "keywords": ["wasm", "structural-divergence", "sdivi", "code-metrics"],
+  "keywords": ["wasm", "code-divergence", "sdivi", "code-metrics"],
   "sideEffects": false
 }

@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Python language adapter for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "tree-sitter", "parsing", "python"]
+keywords = ["sdivi", "code-divergence", "tree-sitter", "parsing", "python"]
 categories = ["development-tools", "parser-implementations"]
 
 [features]

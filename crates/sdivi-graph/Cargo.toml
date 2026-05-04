@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Dependency graph construction for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "graph", "dependency", "coupling"]
+keywords = ["sdivi", "code-divergence", "graph", "dependency", "coupling"]
 categories = ["development-tools", "algorithms", "data-structures"]
 
 [features]

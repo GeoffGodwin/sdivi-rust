@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "TypeScript language adapter for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "tree-sitter", "parsing", "typescript"]
+keywords = ["sdivi", "code-divergence", "tree-sitter", "parsing", "typescript"]
 categories = ["development-tools", "parser-implementations"]
 
 [features]

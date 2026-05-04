@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Command-line interface for the Structural Divergence Indexer"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "metrics", "code-analysis", "drift"]
+keywords = ["sdivi", "code-divergence", "metrics", "code-analysis", "drift"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]

@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "File discovery and AST parsing stage for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "parsing", "tree-sitter", "ast"]
+keywords = ["sdivi", "code-divergence", "parsing", "tree-sitter", "ast"]
 categories = ["development-tools", "parser-implementations"]
 
 [features]

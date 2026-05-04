@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Configuration loading and validation for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "config", "configuration", "metrics"]
+keywords = ["sdivi", "code-divergence", "config", "configuration", "metrics"]
 categories = ["development-tools"]
 
 [features]

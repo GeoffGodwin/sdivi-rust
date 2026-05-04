@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-05-04
+
+### Fixed
+
+- crates.io publish: keyword `"structural-divergence"` (22 chars)
+  exceeded crates.io's 20-character keyword limit, blocking the
+  first crate (`sdivi-config`) at publish time. Replaced with
+  `"code-divergence"` (15 chars) across all 14 per-crate
+  `Cargo.toml` files; also synced the same keyword in the WASM
+  package.json files for consistency.
+
 ## [0.2.6] - 2026-05-04
 
 ### Fixed

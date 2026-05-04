@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Pattern fingerprinting and catalog for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "patterns", "fingerprint", "catalog"]
+keywords = ["sdivi", "code-divergence", "patterns", "fingerprint", "catalog"]
 categories = ["development-tools", "algorithms"]
 
 [features]

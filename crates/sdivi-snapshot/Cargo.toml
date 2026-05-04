@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Snapshot assembly, delta, and persistence for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "snapshot", "delta", "drift"]
+keywords = ["sdivi", "code-divergence", "snapshot", "delta", "drift"]
 categories = ["development-tools"]
 
 [features]

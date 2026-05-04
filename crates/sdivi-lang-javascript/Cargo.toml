@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "JavaScript language adapter for sdivi-rust"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "tree-sitter", "parsing", "javascript"]
+keywords = ["sdivi", "code-divergence", "tree-sitter", "parsing", "javascript"]
 categories = ["development-tools", "parser-implementations"]
 
 [features]

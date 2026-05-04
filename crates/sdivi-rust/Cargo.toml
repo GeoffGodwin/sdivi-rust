@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Structural Divergence Indexer — install-discovery meta-crate (see sdivi-cli for the binary)"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "metrics", "code-analysis", "drift"]
+keywords = ["sdivi", "code-divergence", "metrics", "code-analysis", "drift"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]

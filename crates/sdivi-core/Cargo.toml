@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 description = "Pure-compute facade for the Structural Divergence Indexer — WASM-compatible, no I/O"
 readme = "README.md"
-keywords = ["sdivi", "structural-divergence", "wasm", "metrics", "code-analysis"]
+keywords = ["sdivi", "code-divergence", "wasm", "metrics", "code-analysis"]
 categories = ["development-tools", "algorithms"]
 
 [dependencies]
