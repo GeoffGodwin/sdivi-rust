@@ -26,6 +26,6 @@ rayon      = { workspace = true }
 rayon-core = { workspace = true }   # explicit cap on transitive dep MSRV
 
 [dev-dependencies]
-sdivi-lang-rust = { workspace = true, features = ["test-tree-counter"] }
+sdivi-lang-rust = { path = "../sdivi-lang-rust", features = ["test-tree-counter"] }
 tempfile      = { workspace = true }
 proptest      = { workspace = true }

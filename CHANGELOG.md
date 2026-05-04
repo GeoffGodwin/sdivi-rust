@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-05-04
+
+### Fixed
+
+- crates.io publish: revert v0.2.8's "convert dev-dep to workspace
+  inheritance" change for the two `sdivi-lang-rust` dev-dependencies
+  in `sdivi-parsing` and `sdivi-graph`. Workspace inheritance picks
+  up the v0.2.8 `version = "..."` constraint added to
+  `[workspace.dependencies]`, but `sdivi-lang-rust` publishes
+  AFTER `sdivi-parsing` in the dependency order, so it isn't on
+  crates.io yet when sdivi-parsing tries to resolve it. cargo
+  publish failed with:
+  > error: failed to prepare local package for uploading
+  > no matching package named `sdivi-lang-rust` found
+  Path-only dev-deps are valid for cargo publish (dev-dependencies
+  don't require `version` when using `path`), so reverting to the
+  original direct `path = "..."` form. The workspace `[workspace.dependencies]`
+  versions added in v0.2.8 still apply to all regular `[dependencies]`.
+
+### Notes
+
+- `sdivi-config@0.2.8` landed on crates.io from the v0.2.8 run
+  before publish-crates aborted on sdivi-parsing. v0.2.9 publishes
+  the rest of the crates (and a fresh sdivi-config@0.2.9).
+
 ## [0.2.8] - 2026-05-04
 
 ### Fixed
