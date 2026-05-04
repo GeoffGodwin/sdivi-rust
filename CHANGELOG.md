@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-04
+
+### Fixed
+
+- Release pipeline: cross-compile `x86_64-apple-darwin` from
+  `macos-latest` (Apple Silicon) failed with `can't find crate for
+  core`. Root cause: `dtolnay/rust-toolchain@stable` with `targets:`
+  adds the cross target to the `stable` toolchain, but
+  `rust-toolchain.toml` overrides the active toolchain to 1.85.0 for
+  `cargo build`. Added an explicit `rustup target add` step (skipped
+  for cross-rs jobs) so the cross target lands on the toolchain
+  cargo actually uses. No-op for native target==host builds.
+
 ## [0.2.2] - 2026-05-04
 
 ### Fixed

@@ -103,6 +103,18 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # rust-toolchain.toml pins the workspace to 1.85.0, which overrides the
+      # `stable` toolchain installed above for `cargo build` invocations. The
+      # action's `targets:` input added the cross target to `stable`, not to
+      # 1.85.0, so a cross-compile (e.g. arm64-host -> x86_64-apple-darwin)
+      # fails with "can't find crate for `core`". Add the target to the
+      # toolchain that cargo will actually use. This is a no-op for native
+      # builds where target == host, since rustup installs the host target
+      # by default. Skip for cross-rs jobs which manage their own targets.
+      - name: Install cross target on workspace toolchain
+        if: "!matrix.cross"
+        run: rustup target add ${{ matrix.target }}
+
       - name: Install cross (Linux aarch64 only)
         if: matrix.cross
         # See audit job: rust-toolchain.toml's 1.85.0 pin is too old for
