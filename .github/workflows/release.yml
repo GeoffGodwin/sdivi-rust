@@ -249,12 +249,22 @@ jobs:
         run: cargo publish -p sdivi-rust
 
   # ── Publish to npm (manual approval gate) ────────────────────────────────
+  # Uses npm Trusted Publishing (OIDC). Configured at
+  # https://www.npmjs.com/package/@geoffgodwin/sdivi-wasm/access — that page
+  # trusts: repo GeoffGodwin/sdivi-rust, workflow release.yml, environment
+  # npm-publish. With trusted publishing, no NPM_PUBLISH_TOKEN secret is
+  # needed; the npm CLI exchanges the GitHub OIDC token for short-lived
+  # registry credentials and auto-attaches a provenance attestation.
+  # Requirements: id-token: write permission, npm CLI >= 11.5.1.
   publish-npm:
     name: Publish @geoffgodwin/sdivi-wasm to npm
     needs: [create-release]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm-publish
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -301,8 +311,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      # Node 22 ships with npm 10.x, but trusted publishing requires npm
+      # >= 11.5.1 for the OIDC token exchange. Upgrade to latest npm.
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
 
       - name: Dry-run (pre-release tags only)
         if: contains(github.ref_name, '-rc')
@@ -312,6 +327,8 @@ jobs:
       - name: Publish to npm (release tags only)
         if: "!contains(github.ref_name, '-rc')"
         working-directory: bindings/sdivi-wasm/pkg
+        # No NODE_AUTH_TOKEN needed — npm CLI detects the GitHub OIDC env
+        # vars (ACTIONS_ID_TOKEN_REQUEST_TOKEN/_URL) and exchanges them for
+        # registry credentials via the trusted-publisher config. Provenance
+        # attestation is generated automatically.
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}

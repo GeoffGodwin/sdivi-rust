@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-04
+
+### Changed
+
+- npm publish moved from `NPM_PUBLISH_TOKEN` (long-lived secret) to npm
+  Trusted Publishing (OIDC). The `publish-npm` job now requests an OIDC
+  token from GitHub Actions (`permissions: id-token: write`), and the
+  npm CLI exchanges it for short-lived registry credentials based on the
+  trusted-publisher config at npmjs.com/package/@geoffgodwin/sdivi-wasm
+  /access. Provenance attestations are generated automatically. Node
+  upgraded to 22 and npm upgraded to latest in the runner so the OIDC
+  exchange (npm CLI >= 11.5.1) is available. The `NPM_PUBLISH_TOKEN`
+  secret is no longer needed and can be removed.
+
+### Notes
+
+- The package's first publish (`@geoffgodwin/sdivi-wasm@0.2.3`) was
+  done manually from a local machine because npm Trusted Publishing
+  requires the package to exist before its trusted-publisher config
+  page becomes reachable. From v0.2.4 onward, publishes flow through
+  CI via OIDC.
+
 ## [0.2.3] - 2026-05-04
 
 ### Fixed
