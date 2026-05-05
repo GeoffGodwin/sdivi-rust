@@ -4,12 +4,12 @@ use sdivi_config::{load_with_paths, BoundarySpec};
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
 
-/// sdi-py config.toml loads without error and values are preserved.
+/// Python POC config.toml loads without error and values are preserved.
 #[test]
-fn sdi_py_config_toml_loads_cleanly() {
-    let config_path = Path::new(FIXTURES).join("sdi_py_config.toml");
+fn legacy_config_toml_loads_cleanly() {
+    let config_path = Path::new(FIXTURES).join("legacy_config.toml");
     let config = load_with_paths(Some(&config_path), None)
-        .expect("sdi-py style config.toml must load without error");
+        .expect("Python POC style config.toml must load without error");
 
     // Values from the fixture (not defaults) are preserved.
     assert_eq!(config.snapshots.retention, 50);
@@ -22,10 +22,10 @@ fn sdi_py_config_toml_loads_cleanly() {
     assert_eq!(config.change_coupling.history_depth, 200);
 }
 
-/// sdi-py boundaries.yaml loads without error and boundaries are preserved.
+/// Python POC boundaries.yaml loads without error and boundaries are preserved.
 #[test]
-fn sdi_py_boundaries_yaml_loads_cleanly() {
-    let path = Path::new(FIXTURES).join("sdi_py_boundaries.yaml");
+fn legacy_boundaries_yaml_loads_cleanly() {
+    let path = Path::new(FIXTURES).join("legacy_boundaries.yaml");
     let spec = BoundarySpec::load(&path).expect("BoundarySpec::load must not error");
     let spec = spec.expect("fixture boundaries.yaml must be found");
 
@@ -57,12 +57,12 @@ fn missing_boundaries_yaml_returns_none() {
 }
 
 /// sdivi-rust-only config sections ([determinism], [bindings]) are absent from
-/// sdi-py configs — must still load with built-in defaults for those sections.
+/// Python POC configs — must still load with built-in defaults for those sections.
 #[test]
-fn sdi_py_config_without_rust_only_sections_uses_defaults() {
-    let config_path = Path::new(FIXTURES).join("sdi_py_config.toml");
+fn legacy_config_without_rust_only_sections_uses_defaults() {
+    let config_path = Path::new(FIXTURES).join("legacy_config.toml");
     let config = load_with_paths(Some(&config_path), None).unwrap();
-    // [determinism] not in sdi-py config — default applies.
+    // [determinism] not in Python POC config — default applies.
     assert!(config.determinism.enforce_btree_order);
 }
 

@@ -1,5 +1,5 @@
-# sdi-py style config — CLAUDE.md requires read-compat with sdi-py
-# This fixture represents a typical sdi-py project config.
+# Python POC style config — CLAUDE.md requires read-compat with the Python POC.
+# This fixture represents a typical Python-POC-era project config.
 
 [core]
 languages = "auto"

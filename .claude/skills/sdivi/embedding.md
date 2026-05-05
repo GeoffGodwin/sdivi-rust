@@ -107,8 +107,8 @@ footprint — not the total codebase. Do not hold any type containing a
   add. The pipeline contract forbids it (Rule 13).
 - **Don't introduce ML/LLM calls** in the analysis path. SDIVI is a measurement
   instrument; determinism is the contract.
-- **Don't import sdi-py snapshots.** sdivi-rust uses `snapshot_version: "1.0"`
-  and refuses sdi-py JSON (KDD-1 / KD13).
+- **Don't import the Python POC's snapshots.** sdivi-rust uses `snapshot_version: "1.0"`
+  and refuses Python POC JSON (KDD-1 / KD13).
 
 ## Bindings (post-MVP)
 

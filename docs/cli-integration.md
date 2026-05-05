@@ -255,7 +255,7 @@ history_depth = 500
 
 Note: files renamed in git register as separate delete/add events, which
 inflates the change-coupling signal for rename-heavy histories. This is by
-design for v0 (see `docs/migrating-from-sdi-py.md`).
+design for v0 (see `docs/migrating-from-the-python-poc.md`).
 
 ## Absorbing the M19 boundary violation cutover
 

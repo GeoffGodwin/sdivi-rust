@@ -12,8 +12,9 @@ description: |
   `crates/sdivi-*`; sees a non-zero `sdivi` exit code; asks "what does this
   divergence number mean."
 
-  SKIP: unrelated Rust work; questions about sdi-py (the Python predecessor) —
-  this skill only covers sdivi-rust (`snapshot_version: "1.0"`).
+  SKIP: unrelated Rust work; questions about the retired Python POC
+  (`structural-divergence-indexer`) — this skill only covers sdivi-rust
+  (`snapshot_version: "1.0"`).
 ---
 
 # SDIVI — Structural Divergence Indexer
@@ -25,7 +26,7 @@ same repo state + same `Config` ⇒ bit-identical `Snapshot` JSON.
 ## Always-true facts (memorize these)
 
 1. **`snapshot_version` is the literal string `"1.0"`** for all sdivi-rust output.
-   sdivi-rust does not read sdi-py snapshots. An incompatible version is a stderr
+   sdivi-rust does not read the Python POC's snapshots. An incompatible version is a stderr
    warning + baseline treatment, never a crash.
 2. **Exit codes are public API: `0`, `1`, `2`, `3`, `10`.** `10` is exclusively
    `sdivi check` (threshold breach). Every other command's success exits `0`.

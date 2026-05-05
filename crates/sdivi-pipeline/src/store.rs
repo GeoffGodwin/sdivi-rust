@@ -109,7 +109,7 @@ pub fn write_boundary_spec(spec: &sdivi_config::BoundarySpec, path: &Path) -> st
         }) {
             eprintln!(
                 "sdivi: warning: '{}' contains YAML comments — comments will be lost \
-                 after ratify (see docs/migrating-from-sdi-py.md)",
+                 after ratify (see docs/migrating-from-the-python-poc.md)",
                 path.display()
             );
         }

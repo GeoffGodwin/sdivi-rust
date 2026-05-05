@@ -1,14 +1,16 @@
 ---
-title: Migrating from sdi-py
+title: Migrating from the Python POC
 ---
 
-# Migrating from sdi-py to sdivi-rust
+# Migrating from the Python POC to sdivi-rust
 
 ## Overview
 
 sdivi-rust is a full reimplementation of the Structural Divergence Indexer in
-Rust. It is **not** backward-compatible with sdi-py snapshot files. The
-migration involves:
+Rust. It replaces the original Python POC
+([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)).
+sdivi-rust is **not** backward-compatible with the Python POC's snapshot files.
+The migration involves:
 
 1. Installing sdivi-rust and running `sdivi init`
 2. Accepting a trend-continuity reset (see Snapshot Schema)
@@ -31,13 +33,14 @@ migration involves:
 
 ### Snapshot Schema (breaking)
 
-sdivi-rust uses `snapshot_version: "1.0"`. sdi-py used `snapshot_version: "0.1.0"`.
-sdivi-rust **does not read** sdi-py snapshot files.
+sdivi-rust uses `snapshot_version: "1.0"`. The Python POC used
+`snapshot_version: "0.1.0"`. sdivi-rust **does not read** the Python POC's
+snapshot files.
 
 **Effect:** All trend history is lost on migration. `sdivi trend` will show no
 data until two or more sdivi-rust snapshots have accumulated. This is an
-intentional clean break (KDD-1) — sdi-py snapshots are tool-generated and
-trivially regeneratable.
+intentional clean break (KDD-1) — the Python POC's snapshots are tool-generated
+and trivially regeneratable.
 
 **Mitigation:** If you need trend continuity, run `sdivi snapshot --commit <sha>`
 against each historical commit before going live. There is no automated
@@ -47,28 +50,29 @@ backfill command; use a shell loop.
 
 sdivi-rust exits `3` when all detected languages in the repository lack
 tree-sitter grammars (e.g. a repo containing only `.xyz` files with no
-registered adapter). sdi-py had no equivalent.
+registered adapter). The Python POC had no equivalent.
 
 ### Pattern Fingerprints
 
-sdivi-rust uses `blake3` (keyed hash) for pattern fingerprints. sdi-py used a
-different hashing scheme. Fingerprint values from sdi-py snapshots are not
-comparable to sdivi-rust fingerprints.
+sdivi-rust uses `blake3` (keyed hash) for pattern fingerprints. The Python POC
+used a different hashing scheme. Fingerprint values from the Python POC's
+snapshots are not comparable to sdivi-rust fingerprints.
 
 ### Boundary Inference
 
-`sdivi boundaries` is new in sdivi-rust. sdi-py had no equivalent subcommand.
-The `.sdivi/boundaries.yaml` format is compatible, but the inference algorithm
-(native Leiden community detection) is not bit-identical to sdi-py's output.
+`sdivi boundaries` is new in sdivi-rust. The Python POC had no equivalent
+subcommand. The `.sdivi/boundaries.yaml` format is compatible, but the
+inference algorithm (native Leiden community detection) is not bit-identical to
+the Python POC's output.
 
 ### Coupling Topology Metrics
 
-The `graph_metrics` / `coupling_topology` field names differ between sdi-py
-and sdivi-rust snapshots. sdivi-rust uses:
+The `graph_metrics` / `coupling_topology` field names differ between the Python
+POC and sdivi-rust snapshots. sdivi-rust uses:
 - `graph.node_count`, `graph.edge_count`, `graph.density`, `graph.cycle_count`
 - `partition.community_count()`, `partition.modularity`, `partition.seed`
 
-sdi-py used a flat `graph_metrics` object.
+The Python POC used a flat `graph_metrics` object.
 
 ### `sdivi boundaries ratify` Loses YAML Comments
 
@@ -103,10 +107,10 @@ sdivi snapshot --commit "$(git rev-parse HEAD)"
 sdivi check
 ```
 
-## Comparing Results Against sdi-py
+## Comparing Results Against the Python POC
 
-When validating sdivi-rust output against an sdi-py baseline on the same repo at
-the same commit, expect the following metric tolerances:
+When validating sdivi-rust output against a Python POC baseline on the same repo
+at the same commit, expect the following metric tolerances:
 
 | Metric | Acceptable variance |
 |---|---|
@@ -130,7 +134,7 @@ are stricter than the Python POC's heuristic walk.
 
 ```
 sdivi: warning: '.sdivi/boundaries.yaml' contains YAML comments — comments will be
-lost after ratify (see docs/migrating-from-sdi-py.md)
+lost after ratify (see docs/migrating-from-the-python-poc.md)
 ```
 
 The command still succeeds (exit 0). The comment-stripped version is written

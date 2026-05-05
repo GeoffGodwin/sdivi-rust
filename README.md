@@ -25,6 +25,8 @@ sdivi-rust ships as a Cargo workspace with a two-layer library shape:
 
 Languages: **Rust, Python, TypeScript, JavaScript, Go, Java**.
 
+**Documentation site:** <https://geoffgodwin.github.io/sdivi-rust/>
+
 ---
 
 ## Install
@@ -332,7 +334,7 @@ For longer-form embedding guidance, see
 | [`docs/library-embedding.md`](docs/library-embedding.md) | Rust + WASM embedding guide, common pitfalls, change-coupling for foreign extractors |
 | [`docs/snapshot-schema.md`](docs/snapshot-schema.md) | `Snapshot` JSON schema reference |
 | [`docs/determinism.md`](docs/determinism.md) | `BTreeMap` discipline, seed contract, FMA notes, cross-platform guarantees |
-| [`docs/migrating-from-sdi-py.md`](docs/migrating-from-sdi-py.md) | Migrating from the Python POC |
+| [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md) | Migrating from the Python POC |
 | [`CHANGELOG.md`](CHANGELOG.md) | Per-release changes |
 
 API reference (rustdoc) is published to docs.rs on every `cargo publish`.

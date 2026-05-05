@@ -7,7 +7,7 @@ sdivi-rust is the Rust reimplementation of the Structural Divergence Indexer (SD
 **Languages:**
 - Rust
 
-**Frameworks and key dependencies:** `tree-sitter` (AST parsing, per-language grammars gated by Cargo features), `petgraph` (graph representation; KDD-5 — no CSR view), `clap` v4 with derive (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yml` + `toml` (serialization), `rand` with `StdRng` (seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdivi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs), `chrono` with `default-features = false` in sdivi-core to avoid the clock feature. M12 adds `wasm-bindgen` + `tsify` + `serde-wasm-bindgen` for `bindings/sdivi-wasm`. PyO3 (`sdi-py`) and napi-rs (`sdivi-node`) remain post-MVP.
+**Frameworks and key dependencies:** `tree-sitter` (AST parsing, per-language grammars gated by Cargo features), `petgraph` (graph representation; KDD-5 — no CSR view), `clap` v4 with derive (CLI), `ratatui` + `owo-colors` + `anstream` (terminal output), `rayon` (parsing parallelism), `serde` + `serde_json` + `serde_yml` + `toml` (serialization), `rand` with `StdRng` (seeded RNG), `blake3` (pattern fingerprints) and `xxh3` (cache keys), `thiserror` (library errors) plus `anyhow` (sdivi-cli only), `walkdir` + `globset` + `ignore` (file discovery), `tracing` + `tracing-subscriber` (stderr structured logs), `chrono` with `default-features = false` in sdivi-core to avoid the clock feature. M12 adds `wasm-bindgen` + `tsify` + `serde-wasm-bindgen` for `bindings/sdivi-wasm`. PyO3 (`sdivi-py`) and napi-rs (`sdivi-node`) remain post-MVP.
 
 **Target platforms and deployment model:**
 - Tier 1: Linux x86_64 + aarch64 (CI on `ubuntu-latest`); macOS x86_64 + aarch64 (CI on `macos-latest`)
@@ -20,7 +20,7 @@ sdivi-rust is the Rust reimplementation of the Structural Divergence Indexer (SD
 
 ## Architecture Philosophy
 
-sdivi-rust inherits sdi-py's principles unchanged — they are language-agnostic and have already been ratified through the Python POC. Rust upgrades several of them from convention to compiler-enforced invariants.
+sdivi-rust inherits the Python POC's principles unchanged — they are language-agnostic and have already been ratified through that POC. Rust upgrades several of them from convention to compiler-enforced invariants.
 
 ### Concrete Patterns This Project Follows
 
@@ -31,7 +31,7 @@ sdivi-rust inherits sdi-py's principles unchanged — they are language-agnostic
 - **Ownership-enforced memory discipline.** Tree-sitter CSTs are dropped per file inside the parsing API. Memory stays proportional to the largest single source file, not the codebase total.
 - **Determinism by construction.** `BTreeMap` over `HashMap` everywhere output ordering matters. `StdRng` seeded from `Config::random_seed`. Pattern fingerprints via `blake3` keyed hash. `normalize_and_hash` is exposed in `sdivi-core` so foreign extractors produce the same canonical hashes as the Rust pipeline.
 - **Pure functions for derived data.** `compute_delta`, `compute_thresholds_check`, `compute_pattern_metrics`, `detect_boundaries`, `infer_boundaries`, `compute_coupling_topology`, `compute_boundary_violations`, `compute_trend` are all referentially transparent. They live in `sdivi-core` and are callable from CLI, Rust embedders, and WASM.
-- **Snapshot schema clean break (KDD-1).** `snapshot_version: "1.0"`. sdivi-rust does not read sdi-py snapshots.
+- **Snapshot schema clean break (KDD-1).** `snapshot_version: "1.0"`. sdivi-rust does not read the Python POC's snapshots.
 - **Native Leiden, no FFI (KDD-2).** Native Rust port; verified against `leidenalg` on partition quality, not bit identity. Cluster assignments exposed as `BTreeMap<NodeId, ClusterId>`; consecutive-snapshot stability score computed against caller-supplied prior partitions.
 
 ### Anti-Patterns This Project Avoids
@@ -139,19 +139,19 @@ sdivi-rust/
 │   └── sdivi-lang-{rust,python,typescript,javascript,go,java}/
 ├── bindings/
 │   ├── sdivi-wasm/        # @geoffgodwin/sdivi-wasm; depends on sdivi-core only
-│   ├── sdi-py/          # post-MVP / v1: PyO3 wheel
+│   ├── sdivi-py/        # post-MVP / v1: PyO3 wheel
 │   └── sdivi-node/        # post-MVP / v1: napi-rs prebuilt
 ├── examples/            # embed_pipeline.rs · embed_compute.rs · custom_config.rs · binding_node.ts
 ├── tests/               # cross-crate: full_pipeline · snapshot_diff_trend · boundary_lifecycle + fixtures/
 ├── benches/             # criterion, gated behind `bench` feature
-└── docs/                # cli-integration · library-embedding · migrating-from-sdi-py · determinism
+└── docs/                # cli-integration · library-embedding · migrating-from-the-python-poc · determinism
 ```
 
 ## Key Design Decisions
 
-### KDD-1: Snapshot schema is a clean break from sdi-py
+### KDD-1: Snapshot schema is a clean break from the Python POC
 
-**Decision:** sdivi-rust ships `snapshot_version: "1.0"` and refuses to read sdi-py snapshot JSON; `.sdivi/cache/*` is also a clean break. Trend continuity for migrators is explicitly accepted as lost. `.sdivi/config.toml` and `.sdivi/boundaries.yaml` remain read-compatible — those are user-edited and worth migrating; snapshots are tool-generated and trivially regeneratable.
+**Decision:** sdivi-rust ships `snapshot_version: "1.0"` and refuses to read the Python POC's snapshot JSON; `.sdivi/cache/*` is also a clean break. Trend continuity for migrators is explicitly accepted as lost. `.sdivi/config.toml` and `.sdivi/boundaries.yaml` remain read-compatible — those are user-edited and worth migrating; snapshots are tool-generated and trivially regeneratable.
 
 ### KDD-2: Native Leiden port, no FFI to C++
 
@@ -163,7 +163,7 @@ sdivi-rust/
 
 ### KDD-4: Tree-sitter grammars linked at compile time
 
-**Decision:** Each grammar is a build dependency gated by `lang-<name>` Cargo feature. Default feature set matches sdi-py's supported languages. Compile-time over runtime dynamic loading: simpler, matches ecosystem norms, lets binary-size-sensitive consumers strip languages they don't need.
+**Decision:** Each grammar is a build dependency gated by `lang-<name>` Cargo feature. Default feature set matches the Python POC's supported languages. Compile-time over runtime dynamic loading: simpler, matches ecosystem norms, lets binary-size-sensitive consumers strip languages they don't need.
 
 ### KDD-5: `petgraph` is the default — no CSR view
 
@@ -191,7 +191,7 @@ sdivi-rust/
 
 ### KDD-11: Bindings live in-repo until they earn their own repos
 
-**Decision:** `bindings/sdivi-wasm`, `bindings/sdi-py`, and `bindings/sdivi-node` ship in this workspace. `sdivi-wasm` is in v0; the other two remain post-MVP / v1 era. Cross-repo CI complexity outweighs the workspace benefit only after non-trivial consumer-side surface area.
+**Decision:** `bindings/sdivi-wasm`, `bindings/sdivi-py`, and `bindings/sdivi-node` ship in this workspace. `sdivi-wasm` is in v0; the other two remain post-MVP / v1 era. Cross-repo CI complexity outweighs the workspace benefit only after non-trivial consumer-side surface area.
 
 ### KDD-12: Two-layer library shape — `sdivi-core` (pure compute) + `sdivi-pipeline` (orchestration)
 
@@ -212,11 +212,11 @@ sdivi-rust/
 
 ## Config Architecture
 
-Config is loaded via TOML files plus environment variables, resolved through a 5-level precedence chain. The schema is **read-compatible with sdi-py** (KD13) — sdi-py users can drop in their existing `.sdivi/config.toml` unchanged. New `sdivi-rust`-only sections (`[determinism]`, `[bindings]`) are additive.
+Config is loaded via TOML files plus environment variables, resolved through a 5-level precedence chain. The schema is **read-compatible with the Python POC** (KD13) — Python POC users can drop in their existing `.sdivi/config.toml` unchanged. New `sdivi-rust`-only sections (`[determinism]`, `[bindings]`) are additive.
 
 ### Loading Strategy
 
-`Config::load_or_default(repo_root)` walks the precedence order and returns a fully-resolved `Config`. `Config::default()` returns built-in defaults. All keys are optional. Malformed TOML returns `ConfigError::Parse`; out-of-range values return `ConfigError::InvalidValue { key, message }`. Unknown keys produce a deprecation warning to stderr but never error (rule 12 from sdi-py: keys are reserved forever once introduced).
+`Config::load_or_default(repo_root)` walks the precedence order and returns a fully-resolved `Config`. `Config::default()` returns built-in defaults. All keys are optional. Malformed TOML returns `ConfigError::Parse`; out-of-range values return `ConfigError::InvalidValue { key, message }`. Unknown keys produce a deprecation warning to stderr but never error (rule 12 from the Python POC: keys are reserved forever once introduced).
 
 ### Precedence (Highest to Lowest)
 
@@ -276,7 +276,7 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 
 ## Non-Negotiable Rules
 
-1. **`unsafe` is forbidden in `sdivi-core` and language adapter crates.** Bindings crates (`sdi-py`, `sdivi-node`) may use `unsafe` only as required by the binding macro. Any other `unsafe` lives in a dedicated crate behind a feature flag with a per-block `// SAFETY:` comment justifying the invariant.
+1. **`unsafe` is forbidden in `sdivi-core` and language adapter crates.** Bindings crates (`sdivi-py`, `sdivi-node`) may use `unsafe` only as required by the binding macro. Any other `unsafe` lives in a dedicated crate behind a feature flag with a per-block `// SAFETY:` comment justifying the invariant.
 2. **No network calls anywhere in the analysis pipeline.** No telemetry, no update checks, no remote lookups. A snapshot must be producible on an airgapped machine. CI tests must not require network.
 3. **No ML/LLM calls in the pipeline.** Determinism is the contract. A measurement instrument cannot depend on a stochastic model.
 4. **Tree-sitter CSTs are dropped before the parsing function returns.** The `sdivi-parsing` API consumes file content + grammar and returns a `FeatureRecord`. No type containing a `Tree` may escape `parse_file`. Memory usage stays proportional to the largest single file, not the codebase total.
@@ -285,8 +285,8 @@ Section-by-section override, later wins. Within a section, key-by-key override. 
 7. **Pattern fingerprints use `blake3` with a fixed key constant.** The key constant is defined once in `sdivi-patterns::fingerprint` and never changes within a `snapshot_version`.
 8. **Logs, progress bars, and warnings go to stderr. Snapshot JSON, summaries, and table output go to stdout.** `sdivi show --format json | jq '.'` must work without contamination. CI test `tests/stdout_stderr_split.rs` is non-negotiable.
 9. **Exit codes are public API: `0`, `1`, `2`, `3`, `10`.** Code `10` is exclusively `sdivi check`. Adding or repurposing an exit code is a breaking change requiring a major version bump.
-10. **`.sdivi/config.toml` and `.sdivi/boundaries.yaml` are read-compatible with sdi-py.** New config keys are additive. Existing key semantics may not change. Removed keys are reserved forever.
-11. **`snapshot_version` is `"1.0"` for all sdivi-rust output.** sdivi-rust does not read sdi-py snapshots. Reading an incompatible `snapshot_version` produces a warning and baseline treatment (no delta), never a crash.
+10. **`.sdivi/config.toml` and `.sdivi/boundaries.yaml` are read-compatible with the Python POC.** New config keys are additive. Existing key semantics may not change. Removed keys are reserved forever.
+11. **`snapshot_version` is `"1.0"` for all sdivi-rust output.** sdivi-rust does not read the Python POC's snapshots. Reading an incompatible `snapshot_version` produces a warning and baseline treatment (no delta), never a crash.
 12. **Per-category threshold overrides require an `expires` field.** Missing `expires` is a config error (exit 2). After expiry the override is silently ignored — no manual reset, no retention.
 13. **Snapshot writes are atomic.** Write to a tempfile in the target snapshot directory, then rename. A killed process must never leave a half-written `.json` file. Retention is enforced synchronously after each successful write.
 14. **First-snapshot deltas are `null`, not zero.** `null` means "no prior snapshot to compare." `0` means "snapshots compared and no change observed." These are different and observable in the CI gate.
@@ -369,7 +369,7 @@ M01–M11 done. Remaining: **M12** (sdivi-wasm + consumer-app integration) and *
 ## What Not to Build Yet
 
 - **GitHub Actions reusable action** — post-MVP polish. Document manual `cargo install sdivi && sdivi check` for now.
-- **PyO3 / napi-rs bindings (`sdi-py`, `sdivi-node`)** — post-MVP / v1 era. Revisit when a concrete consumer appears.
+- **PyO3 / napi-rs bindings (`sdivi-py`, `sdivi-node`)** — post-MVP / v1 era. Revisit when a concrete consumer appears.
 - **IDE / editor plugin** — requires a stable API and snapshot schema. Post-1.0.
 - **SaaS dashboard or web UI** — sdivi-rust is a measurement instrument. Output is JSON; existing dashboards consume it.
 - **Auto-remediation / gardener agent** — sdivi-rust measures drift; it never fixes it. Separate project.
@@ -381,7 +381,7 @@ M01–M11 done. Remaining: **M12** (sdivi-wasm + consumer-app integration) and *
 - **Stdin input for `sdivi diff`** — deferred.
 - **`sdivi config` subcommand** — edit `.sdivi/config.toml` directly.
 - **Comment-preserving YAML write** — accept comment loss for MVP (KDD-6). Revisit on user complaint.
-- **Importing sdi-py snapshots** — clean break (KDD-1). Trend continuity for migrators is acceptably lost.
+- **Importing the Python POC's snapshots** — clean break (KDD-1). Trend continuity for migrators is acceptably lost.
 - **Bit-identical snapshot output across platforms** — aggregate equality only; revisit via build flag if a real adopter needs it.
 - **Bindings split into separate repos** — in-repo until non-trivial cross-repo CI complexity earns the split (KDD-11).
 
@@ -434,7 +434,7 @@ Under `tests/fixtures/`:
 ### What We Do NOT Test
 
 - Real network access (Rule 13).
-- Cross-version migration of sdi-py snapshot JSON (KDD-1 clean break).
+- Cross-version migration of the Python POC's snapshot JSON (KDD-1 clean break).
 - Bit-identity of snapshot output across platforms (aggregate equality only — see `docs/determinism.md`).
 
 ### Commands
@@ -509,7 +509,7 @@ cargo test --workspace   # runs default test suite
 - **rustdoc on `sdivi-core`** — canonical API reference, published to docs.rs on `cargo publish`. `#![deny(missing_docs)]` enforced. Every public item has a doc comment with an `# Examples` block where meaningful.
 - **`docs/cli-integration.md`** — manual CI integration recipe, GitHub Actions snippet, exit-code reference.
 - **`docs/library-embedding.md`** — embedding `sdivi-core` in a Rust agent runtime; minimal viable consumer; common pitfalls.
-- **`docs/migrating-from-sdi-py.md`** — what carries vs what changes vs explicit non-goals.
+- **`docs/migrating-from-the-python-poc.md`** — what carries vs what changes vs explicit non-goals.
 - **`docs/determinism.md`** — `BTreeMap` discipline, seed contract, FMA notes.
 - **`examples/` directory** — runnable consumer snippets, not a published crate.
 
@@ -523,7 +523,7 @@ cargo test --workspace   # runs default test suite
 ### Update Cadence
 
 - **Per feature** (in the same PR): rustdoc on new public items, `docs/*.md` if behavior changes for embedders, `CHANGELOG.md` entry under the next-release section.
-- **Per milestone** (Tekhton checkpoint): `docs/migrating-from-sdi-py.md` if the milestone changes anything visible to migrators.
+- **Per milestone** (Tekhton checkpoint): `docs/migrating-from-the-python-poc.md` if the milestone changes anything visible to migrators.
 - **Per release** (tag): `CHANGELOG.md` finalized into a versioned section, `MIGRATION_NOTES.md` extended if breaking, binary size noted.
 
 ### Public Surface
@@ -532,7 +532,7 @@ The "public surface" requiring docs:
 
 - Every `pub` item in `sdivi-core` and the language adapter crates (rustdoc, doc test where meaningful).
 - Every `sdivi` CLI command, flag, and exit code.
-- Every `.sdivi/config.toml` key (both `sdi-py`-shared and sdivi-rust-only).
+- Every `.sdivi/config.toml` key (both Python-POC-shared and sdivi-rust-only).
 - The `Snapshot` JSON schema (versioned via `snapshot_version`).
 - The `BoundarySpec` YAML schema.
 - The `ExitCode` enum.

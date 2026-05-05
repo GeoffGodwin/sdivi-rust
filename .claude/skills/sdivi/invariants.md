@@ -26,10 +26,10 @@ CI-enforced. Breaking one is a blocker, not a discussion.
 9. **Exit codes `0/1/2/3/10` are public API.** `10` is exclusively `sdivi check`.
    Adding or repurposing an exit code is a breaking change.
 10. **`.sdivi/config.toml` and `.sdivi/boundaries.yaml` are read-compatible with
-    sdi-py.** New keys are additive. Existing semantics may not change. Removed
-    keys are reserved forever.
+    the Python POC.** New keys are additive. Existing semantics may not change.
+    Removed keys are reserved forever.
 11. **`snapshot_version` is `"1.0"` for all sdivi-rust output.** sdivi-rust does
-    not read sdi-py snapshots. Incompatible versions ⇒ stderr warning +
+    not read the Python POC's snapshots. Incompatible versions ⇒ stderr warning +
     baseline treatment, never a crash.
 12. **Per-category threshold overrides require `expires`.** Missing `expires` ⇒
     config error, exit `2`. After expiry the override is silently ignored.
@@ -115,7 +115,7 @@ must derive from `FeatureRecord` alone, never from graph or partition data.
 - Add a `pub` item to `sdivi-core` without a doc comment + example.
 - Change `snapshot_version` without bumping major + writing
   `MIGRATION_NOTES.md`.
-- Import sdi-py snapshot JSON (clean break, KDD-1).
+- Import the Python POC's snapshot JSON (clean break, KDD-1).
 - FFI to the C++ Leiden (native port only, KDD-2 / KD11).
 - Auto-classify drift as "drift" vs "evolution" (KD1 — humans declare intent).
 - Add a watch mode, daemon, or interactive TUI (CLI invocation only).

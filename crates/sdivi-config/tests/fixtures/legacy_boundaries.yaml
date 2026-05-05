@@ -1,4 +1,4 @@
-# sdi-py style boundaries.yaml — used for read-compat testing.
+# Python POC style boundaries.yaml — used for read-compat testing.
 version: "1"
 boundaries:
   - name: api

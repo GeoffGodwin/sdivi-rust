@@ -36,7 +36,7 @@ impl BoundarySpec {
     ///
     /// Does not touch the filesystem — I/O is the caller's responsibility.
     /// Comments in any prior user-written file are lost on the next write
-    /// (see `docs/migrating-from-sdi-py.md`).
+    /// (see `docs/migrating-from-the-python-poc.md`).
     ///
     /// # Examples
     ///

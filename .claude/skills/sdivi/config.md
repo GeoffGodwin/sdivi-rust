@@ -1,8 +1,8 @@
 # SDIVI Configuration
 
 SDIVI is configured via `.sdivi/config.toml` (TOML), with `.sdivi/boundaries.yaml`
-holding the optional boundary spec. Both files are **read-compatible with
-sdi-py** — drop-in migration of user-edited config is supported.
+holding the optional boundary spec. Both files are **read-compatible with the
+Python POC** — drop-in migration of user-edited config is supported.
 
 ## Precedence (highest to lowest)
 
@@ -96,7 +96,7 @@ reason = "Migrating to ? operator from `match Err(_)` chains"
 
 ## Boundary spec — `.sdivi/boundaries.yaml`
 
-Read with `serde_yaml`. Schema is identical to sdi-py's. **Missing file is
+Read with `serde_yaml`. Schema is identical to the Python POC's. **Missing file is
 normal operation** — no warning is emitted; intent divergence is simply absent.
 
 Programmatic writes via `sdivi boundaries ratify` may regress comment

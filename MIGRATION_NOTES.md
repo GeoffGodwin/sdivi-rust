@@ -4,8 +4,9 @@ Breaking-change migration guidance for sdivi-rust adopters. Each `0.x → 0.(x+1
 bump that touches stable surface gets an entry. Post-1.0, the same applies to
 major-version bumps.
 
-For the broader migration story from the Python POC (`sdi-py`), see
-[`docs/migrating-from-sdi-py.md`](docs/migrating-from-sdi-py.md).
+For the broader migration story from the Python POC
+([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
+see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
 ## 0.2.x → 0.3.0 (M25 + M26 resolver fixes — no schema break)
 
