@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Non-Rust language adapters now emit bare module specifiers from import
+  statements rather than whole-statement text. Previously, adapters for Python,
+  TypeScript, JavaScript, Go, and Java pushed the full statement text (e.g.
+  `import { foo } from '../lib/x';`) into `FeatureRecord::imports`, which
+  `dependency_graph::resolve_import` silently dropped because the string did
+  not match any recognized prefix. Cross-file edge counts on Python, TS, JS,
+  Go, and Java projects now increase substantially; `modularity`, `community_count`,
+  and `boundary_violation_rate` metrics are meaningful on these projects for
+  the first time.
+
+  **Impact on existing baselines:** The first snapshot taken after upgrading
+  will show a large `coupling_delta` and `community_count_delta` compared to
+  any pre-M25 baseline. This is a correctness fix, not a schema change —
+  `snapshot_version` remains `"1.0"`. Re-baseline at the M25 boundary or use
+  one-time threshold overrides (with `expires` set 1–2 weeks out) to absorb
+  the cutover. See `MIGRATION_NOTES.md` for guidance.
+
 ## [0.2.13] - 2026-05-04
 
 ### Changed
@@ -45,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   license-compliance and metadata-consistency scanners. They do
   not change the WASM bundle's runtime behavior or its public API.
 
+- Rewrote `extract_imports` in Python, TypeScript, JavaScript, Go, and Java adapters to emit (M25)
 ## [0.2.12] - 2026-05-04
 
 ### Fixed

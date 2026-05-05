@@ -7,6 +7,49 @@ major-version bumps.
 For the broader migration story from the Python POC (`sdi-py`), see
 [`docs/migrating-from-sdi-py.md`](docs/migrating-from-sdi-py.md).
 
+## 0.2.x → 0.3.0 (M25 adapter fix — no schema break)
+
+### Import specifier extraction: substantial edge-count increase on non-Rust projects
+
+**What changed.** Language adapters for Python, TypeScript, JavaScript, Go, and
+Java previously emitted whole import-statement text into `FeatureRecord::imports`
+(e.g. `"import { foo } from '../lib/x'"`). The graph resolver silently dropped
+every such string, producing zero cross-file edges for all five languages.
+Adapters now emit only the module specifier (e.g. `"../lib/x"`). Edges that
+were previously invisible now resolve, and all coupling-based metrics become
+meaningful.
+
+**Schema impact.** None. `snapshot_version` stays `"1.0"`. Pre-M25 snapshots
+are still readable; the change affects only the content of future snapshots.
+
+**Baseline impact.** The first `sdivi snapshot` after upgrading will produce
+a large `coupling_delta` and `community_count_delta` against any pre-M25
+baseline on a Python/TS/JS/Go/Java project. `boundary_violation_rate` will
+likely increase if you have a `.sdivi/boundaries.yaml` declared, because
+violations that were previously undetectable now appear.
+
+**Recommended migration:**
+
+Option A — re-baseline (cleanest):
+```bash
+rm .sdivi/snapshots/*.json   # clear old baselines
+sdivi snapshot               # first snapshot under new adapter
+```
+
+Option B — one-time override (preserves trend history):
+```toml
+# .sdivi/config.toml — expires after the spike settles
+[thresholds.overrides.coupling]
+coupling_delta_rate = 50.0
+expires = "2026-06-01"
+reason = "M25 import-specifier fix; first post-upgrade snapshot has large coupling_delta"
+
+[thresholds.overrides.boundaries]
+boundary_violation_rate = 20.0
+expires = "2026-06-01"
+reason = "M25 import-specifier fix; first post-upgrade snapshot may spike violations"
+```
+
 ## 0.1.x
 
 No breaking changes between 0.1.0 and 0.1.14. Every release in the 0.1 line is

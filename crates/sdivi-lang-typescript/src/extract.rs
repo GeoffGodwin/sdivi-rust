@@ -27,17 +27,21 @@ const DECLARATION_KINDS: &[&str] = &[
     "variable_declaration",
 ];
 
-/// Extracts `import` statement text from the AST.
+/// Extracts the module specifier from each `import_statement` in the AST.
+///
+/// - `import { foo } from "../lib/x"` → `["../lib/x"]`
+/// - `import * as ns from "./util"` → `["./util"]`
+/// - `import "./side-effect"` → `["./side-effect"]`
+/// - `import type { T } from "./types"` → `["./types"]`
+///
+/// `export { … } from "…"` re-exports are not captured here (Seeds Forward, M26).
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if node.kind() == "import_statement" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
-                }
+            if let Some(spec) = import_string_specifier(node, source) {
+                imports.push(spec);
             }
             continue; // don't recurse into import children
         }
@@ -48,6 +52,51 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Finds the `string` child of an `import_statement` and returns its content.
+fn import_string_specifier(import_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..import_node.child_count() {
+        let Some(child) = import_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string" {
+            return string_content(child, source);
+        }
+    }
+    None
+}
+
+/// Extracts the unquoted content of a `string` node.
+///
+/// Tries the `string_fragment` child first; falls back to stripping the
+/// surrounding quote characters from the raw node text.
+fn string_content(string_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..string_node.child_count() {
+        let Some(child) = string_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string_fragment" {
+            return child
+                .utf8_text(source)
+                .ok()
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty());
+        }
+    }
+    // Fallback: strip surrounding quote character.
+    let text = string_node.utf8_text(source).ok()?;
+    let t = text.trim();
+    if t.len() >= 2 {
+        let q = &t[..1];
+        if (q == "\"" || q == "'") && t.ends_with(q) {
+            let inner = &t[1..t.len() - 1];
+            if !inner.is_empty() {
+                return Some(inner.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Extracts names of top-level exported items.

@@ -23,19 +23,31 @@ const DECLARATION_KINDS: &[&str] = &[
     "variable_declaration",
 ];
 
-/// Extracts `import` statement text from the AST.
+/// Extracts module specifiers from `import` statements, `require()` calls, and
+/// dynamic `import()` expressions in the AST.
+///
+/// - `import { foo } from "./utils"` → `["./utils"]`
+/// - `const x = require("./utils")` → `["./utils"]`
+/// - `import("./utils")` → `["./utils"]` (dynamic import with string literal arg)
+/// - `require(varName)` / `import(expr)` with non-string arg → skipped
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
-        if node.kind() == "import_statement" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
+        match node.kind() {
+            "import_statement" => {
+                if let Some(spec) = import_string_specifier(node, source) {
+                    imports.push(spec);
                 }
+                continue; // don't recurse into import children
             }
-            continue;
+            "call_expression" => {
+                if let Some(spec) = require_or_dynamic_import_specifier(node, source) {
+                    imports.push(spec);
+                }
+                // Still recurse — nested require() calls inside other expressions.
+            }
+            _ => {}
         }
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i) {
@@ -44,6 +56,70 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Returns the string specifier from a `require("…")` or dynamic `import("…")`.
+///
+/// Returns `None` if:
+/// - the call is not `require` or `import`
+/// - the argument is not a string literal (variable, template, etc.)
+fn require_or_dynamic_import_specifier(call: Node<'_>, source: &[u8]) -> Option<String> {
+    let func = call.child_by_field_name("function")?;
+    let func_kind = func.kind();
+    let is_require = func_kind == "identifier" && func.utf8_text(source).ok()? == "require";
+    let is_dynamic_import = func_kind == "import";
+    if !is_require && !is_dynamic_import {
+        return None;
+    }
+    let args = call.child_by_field_name("arguments")?;
+    for i in 0..args.child_count() {
+        let Some(child) = args.child(i) else { continue };
+        if child.kind() == "string" {
+            return string_content(child, source);
+        }
+    }
+    None
+}
+
+/// Finds the `string` child of an `import_statement` and returns its content.
+fn import_string_specifier(import_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..import_node.child_count() {
+        let Some(child) = import_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string" {
+            return string_content(child, source);
+        }
+    }
+    None
+}
+
+/// Extracts the unquoted content of a `string` node.
+fn string_content(string_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..string_node.child_count() {
+        let Some(child) = string_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string_fragment" {
+            return child
+                .utf8_text(source)
+                .ok()
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty());
+        }
+    }
+    let text = string_node.utf8_text(source).ok()?;
+    let t = text.trim();
+    if t.len() >= 2 {
+        let q = &t[..1];
+        if (q == "\"" || q == "'") && t.ends_with(q) {
+            let inner = &t[1..t.len() - 1];
+            if !inner.is_empty() {
+                return Some(inner.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Extracts names of top-level exported items.

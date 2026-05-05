@@ -19,23 +19,58 @@ fn adapter_handles_go_extension() {
     assert!(GoAdapter.file_extensions().contains(&".go"));
 }
 
+// ── single imports ───────────────────────────────────────────────────────────
+
 #[test]
-fn import_declaration_is_extracted() {
+fn single_import_yields_unquoted_specifier() {
     let record = parse("package main\nimport \"fmt\"\n");
-    assert_eq!(record.imports.len(), 1);
-    assert!(record.imports[0].contains("import"));
+    assert_eq!(record.imports, &["fmt"]);
 }
 
 #[test]
-fn grouped_import_is_extracted_as_single_entry() {
+fn aliased_import_drops_alias() {
+    let record = parse("package main\nimport f \"fmt\"\n");
+    assert_eq!(record.imports, &["fmt"]);
+}
+
+#[test]
+fn dot_import_yields_specifier() {
+    let record = parse("package main\nimport . \"fmt\"\n");
+    assert_eq!(record.imports, &["fmt"]);
+}
+
+#[test]
+fn blank_import_yields_specifier() {
+    let record = parse("package main\nimport _ \"github.com/lib/pq\"\n");
+    assert_eq!(record.imports, &["github.com/lib/pq"]);
+}
+
+// ── grouped imports ───────────────────────────────────────────────────────────
+
+#[test]
+fn grouped_import_yields_one_specifier_per_spec() {
     let record = parse("package main\nimport (\n    \"fmt\"\n    \"os\"\n)\n");
     assert_eq!(
-        record.imports.len(),
-        1,
-        "grouped import is one import_declaration, got: {:?}",
+        record.imports,
+        &["fmt", "os"],
+        "each import_spec must produce one specifier, got: {:?}",
         record.imports
     );
 }
+
+#[test]
+fn grouped_import_with_alias_drops_alias() {
+    let record = parse("package main\nimport (\n    f \"fmt\"\n    \"os\"\n)\n");
+    assert_eq!(record.imports, &["fmt", "os"]);
+}
+
+#[test]
+fn grouped_import_with_blank_yields_specifier() {
+    let record = parse("package main\nimport (\n    _ \"github.com/lib/pq\"\n    \"fmt\"\n)\n");
+    assert_eq!(record.imports, &["github.com/lib/pq", "fmt"]);
+}
+
+// ── exports ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn exported_function_capitalized_name_is_captured() {
@@ -56,6 +91,8 @@ fn unexported_function_lowercase_name_is_not_exported() {
         record.exports
     );
 }
+
+// ── pattern hints ─────────────────────────────────────────────────────────────
 
 #[test]
 fn go_statement_captured_as_pattern_hint() {

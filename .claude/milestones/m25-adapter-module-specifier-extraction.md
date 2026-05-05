@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "25"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Change every non-Rust language adapter (`sdivi-lang-python`, `sdivi-lang-typescript`, `sdivi-lang-javascript`, `sdivi-lang-go`, `sdivi-lang-java`) to emit just the module specifier(s) of each import statement into `FeatureRecord::imports`, not the full statement text. The current implementation pushes whole-statement text such as `"import { foo } from '../lib/x';"` into the records, which `dependency_graph::resolve_import` immediately rejects (the string starts with `import`, not `./` / `../` / `crate::` / `self::` / `super::`), producing zero cross-file edges in the dependency graph for every non-Rust language. The Rust adapter already extracts specifiers correctly via its `use ` keyword strip and is unchanged here.

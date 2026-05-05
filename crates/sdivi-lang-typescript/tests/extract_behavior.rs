@@ -25,18 +25,53 @@ fn adapter_handles_ts_and_tsx_extensions() {
     assert!(exts.contains(&".tsx"));
 }
 
+// ── import_statement specifier extraction ────────────────────────────────────
+
 #[test]
-fn import_statement_is_extracted() {
+fn named_import_yields_string_fragment() {
     let record = parse_ts("import { foo } from './foo';\n");
-    assert_eq!(record.imports.len(), 1);
-    assert!(record.imports[0].contains("import"));
+    assert_eq!(record.imports, &["./foo"]);
 }
+
+#[test]
+fn default_import_yields_specifier() {
+    let record = parse_ts("import React from 'react';\n");
+    assert_eq!(record.imports, &["react"]);
+}
+
+#[test]
+fn namespace_import_yields_specifier() {
+    let record = parse_ts("import * as ns from './util';\n");
+    assert_eq!(record.imports, &["./util"]);
+}
+
+#[test]
+fn side_effect_import_yields_specifier() {
+    let record = parse_ts("import './side-effect';\n");
+    assert_eq!(record.imports, &["./side-effect"]);
+}
+
+#[test]
+fn type_only_import_yields_specifier() {
+    let record = parse_ts("import type { T } from './types';\n");
+    assert_eq!(record.imports, &["./types"]);
+}
+
+#[test]
+fn parent_relative_import_yields_specifier() {
+    let record = parse_ts("import { x } from '../lib/x';\n");
+    assert_eq!(record.imports, &["../lib/x"]);
+}
+
+// ── count tests ──────────────────────────────────────────────────────────────
 
 #[test]
 fn multiple_imports_are_extracted() {
     let record = parse_ts("import { a } from './a';\nimport { b } from './b';\n");
     assert_eq!(record.imports.len(), 2);
 }
+
+// ── exports ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn exported_function_name_is_captured() {
@@ -77,6 +112,8 @@ fn tsx_file_parses_correctly() {
         record.exports
     );
 }
+
+// ── pattern hints ─────────────────────────────────────────────────────────────
 
 #[test]
 fn try_statement_captured_as_pattern_hint() {

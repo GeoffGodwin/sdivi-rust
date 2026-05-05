@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-04
-- Runs since audit: 0
+- Runs since audit: 1
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -47,6 +47,9 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-04 | "M25"] `truncate_to_256_bytes` is defined identically (`pub(crate)`) in all five adapter `extract.rs` files (Python, TypeScript, JavaScript, Go, Java) and has inline unit tests only in the Python file. Factoring it into `sdivi-parsing` as a shared utility would eliminate the duplication; lower priority than M26 work but worth a cleanup ticket.
+- [2026-05-04 | "M25"] `string_content` (unquote a `string` AST node) is byte-for-byte identical in `crates/sdivi-lang-typescript/src/extract.rs:74-100` and `crates/sdivi-lang-javascript/src/extract.rs:98-123`. Same consolidation opportunity as above.
+- [2026-05-04 | "M25"] `crates/sdivi-parsing/tests/import_extraction.rs` is a cross-crate integration test (uses sdivi-graph + six language adapters) placed inside `sdivi-parsing/tests/`. CLAUDE.md calls for workspace-level cross-crate tests to live under the top-level `tests/` directory. Pragmatically fine here (`CARGO_MANIFEST_DIR` path resolution is the reason), but the pattern drifts from the stated convention.
 - [2026-05-03 | "Address all 19 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `bindings/sdivi-wasm/src/weight_keys.rs:97` — `rejects_nan_weight` test asserts `e.contains("NaN")`, which passes because `format!("{}", f64::NAN)` == `"NaN"`. Works today but is an implementation-detail assertion. Low-risk, no action required.
 - [2026-05-03 | "Address all 19 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/DRIFT_LOG.md:36` (carried from M23) — `CATEGORIES` and `CATEGORY_DESCRIPTIONS` parallel arrays in `sdivi-core/src/categories.rs` have no compile-time sync enforcement; runtime tests are the only guard. Not new; already noted in the drift log.
 - [2026-05-03 | "Implement Milestone 24: Node.js WASM Distribution Target"] `tests/node_smoke/package.json` `"test"` script uses `node --input-type=module < index.mjs` (stdin redirect) while the CI step uses `node index.mjs` directly. Both work, but running `npm test` locally exercises a different invocation path than CI. Align to `node index.mjs` for consistency.
@@ -57,9 +60,3 @@
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
-- [2026-05-02 | "M20 run"] `crates/sdivi-detection/src/leiden/compute/mod.rs:9` — stale `use` of a removed helper. Fix applied in M20 cycle; imports corrected.
-- [2026-05-02 | "M21 run"] `crates/sdivi-detection/src/leiden/compute/mod.rs:9` — duplicate observation carried from M20; same fix confirmed present. No further action needed.
-- [2026-05-02 | "M19 run"] `crates/sdivi-detection/src/leiden/helpers.rs:55-70` — `build_leiden_graph` accepted a mutable reference where a shared reference sufficed. Fix applied; signature corrected in M19 cycle.
-- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/quality.rs:compute_stability` — plan review confirmed function is inert (called only in tests, no pipeline impact). No code change required; observation closed.
-- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/refine.rs:150` `#[doc(hidden)]` — attribute is intentional; `RefinementStep` is a public-but-not-API enum variant used by the verify-leiden test suite. No change required; observation closed.
-- [2026-05-02 | "architect audit"] `crates/sdivi-detection/src/leiden/refine.rs:26` `RefinementState` pub — `pub` visibility on `RefinementState` is intentional for the same verify-leiden test access pattern. No change required; observation closed.
