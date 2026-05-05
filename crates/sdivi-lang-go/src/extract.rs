@@ -1,6 +1,7 @@
 //! AST extraction helpers for the Go language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::truncate_to_256_bytes;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -13,18 +14,20 @@ const PATTERN_KINDS: &[&str] = &[
 ];
 
 /// Extracts import path strings from `import_declaration` nodes.
+///
+/// One specifier is emitted per `import_spec`, regardless of import form:
+/// - `import "fmt"` → `["fmt"]`
+/// - `import ( "fmt"; "os" )` → `["fmt", "os"]` (one per spec)
+/// - `import f "fmt"` → `["fmt"]` (alias dropped)
+/// - `import . "fmt"` → `["fmt"]` (dot import, namespace marker dropped)
+/// - `import _ "github.com/lib/pq"` → `["github.com/lib/pq"]` (blank import)
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if node.kind() == "import_declaration" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
-                }
-            }
-            continue; // don't recurse inside import_declaration
+            collect_import_declaration(node, source, &mut imports);
+            continue;
         }
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i) {
@@ -33,6 +36,59 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Collects specifiers from a single `import_declaration`.
+fn collect_import_declaration(node: Node<'_>, source: &[u8], imports: &mut Vec<String>) {
+    for i in 0..node.child_count() {
+        let Some(child) = node.child(i) else { continue };
+        match child.kind() {
+            "import_spec" => {
+                if let Some(s) = import_spec_path(child, source) {
+                    imports.push(s);
+                }
+            }
+            "import_spec_list" => {
+                for j in 0..child.child_count() {
+                    let Some(spec) = child.child(j) else { continue };
+                    if spec.kind() == "import_spec" {
+                        if let Some(s) = import_spec_path(spec, source) {
+                            imports.push(s);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Returns the unquoted path string from an `import_spec` node.
+///
+/// Uses the `path` field if available; falls back to scanning for an
+/// `interpreted_string_literal` child. Strips the surrounding `"` characters.
+fn import_spec_path(spec: Node<'_>, source: &[u8]) -> Option<String> {
+    if let Some(path_node) = spec.child_by_field_name("path") {
+        return strip_go_string(path_node, source);
+    }
+    for i in 0..spec.child_count() {
+        let Some(child) = spec.child(i) else { continue };
+        if child.kind() == "interpreted_string_literal" {
+            return strip_go_string(child, source);
+        }
+    }
+    None
+}
+
+/// Strips the surrounding `"` quotes from a Go interpreted string literal.
+fn strip_go_string(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let text = node.utf8_text(source).ok()?;
+    let t = text.trim();
+    if t.starts_with('"') && t.ends_with('"') && t.len() >= 2 {
+        Some(t[1..t.len() - 1].to_string())
+    } else {
+        None
+    }
 }
 
 /// Extracts names of exported (capitalized) top-level functions and types.
@@ -155,18 +211,4 @@ fn go_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

@@ -19,25 +19,91 @@ fn adapter_handles_py_extension() {
     assert!(PythonAdapter.file_extensions().contains(&".py"));
 }
 
+// ── import_statement ─────────────────────────────────────────────────────────
+
 #[test]
-fn import_statement_is_extracted() {
+fn import_statement_emits_specifier() {
     let record = parse("import os\n");
-    assert_eq!(record.imports.len(), 1);
-    assert!(record.imports[0].starts_with("import os"));
+    assert_eq!(record.imports, &["os"]);
 }
 
 #[test]
-fn from_import_statement_is_extracted() {
-    let record = parse("from os.path import join\n");
-    assert_eq!(record.imports.len(), 1);
-    assert!(record.imports[0].contains("from os.path"));
+fn import_with_alias_drops_alias() {
+    let record = parse("import os.path as p\n");
+    assert_eq!(record.imports, &["os.path"]);
 }
+
+#[test]
+fn multi_name_import_yields_multiple_specifiers() {
+    let record = parse("import os, sys, re\n");
+    assert_eq!(record.imports, &["os", "sys", "re"]);
+}
+
+#[test]
+fn import_dotted_name() {
+    let record = parse("import os.path\n");
+    assert_eq!(record.imports, &["os.path"]);
+}
+
+// ── import_from_statement ────────────────────────────────────────────────────
+
+#[test]
+fn from_import_emits_module_specifier() {
+    let record = parse("from os.path import join\n");
+    assert_eq!(record.imports, &["os.path"]);
+}
+
+#[test]
+fn from_import_multi_names_still_one_specifier() {
+    let record = parse("from os.path import join, exists\n");
+    assert_eq!(record.imports, &["os.path"]);
+}
+
+#[test]
+fn relative_single_dot_import() {
+    let record = parse("from . import utils\n");
+    assert_eq!(record.imports, &["."]);
+}
+
+#[test]
+fn relative_double_dot_import() {
+    let record = parse("from .. import shared\n");
+    assert_eq!(record.imports, &[".."]);
+}
+
+#[test]
+fn relative_dot_with_name_import() {
+    let record = parse("from .models import User\n");
+    assert_eq!(record.imports, &[".models"]);
+}
+
+#[test]
+fn relative_double_dot_with_name_import() {
+    let record = parse("from ..pkg import helper\n");
+    assert_eq!(record.imports, &["..pkg"]);
+}
+
+// ── future_import_statement ──────────────────────────────────────────────────
+
+#[test]
+fn future_import_yields_nothing() {
+    let record = parse("from __future__ import annotations\n");
+    assert!(
+        record.imports.is_empty(),
+        "from __future__ import must produce no specifier, got: {:?}",
+        record.imports
+    );
+}
+
+// ── count tests ──────────────────────────────────────────────────────────────
 
 #[test]
 fn multiple_imports_are_all_extracted() {
     let record = parse("import os\nimport sys\n");
     assert_eq!(record.imports.len(), 2);
 }
+
+// ── exports ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn top_level_public_function_is_exported() {
@@ -82,6 +148,8 @@ fn nested_function_is_not_in_exports() {
     );
 }
 
+// ── pattern hints ─────────────────────────────────────────────────────────────
+
 #[test]
 fn try_statement_captured_as_pattern_hint() {
     let record = parse("try:\n    pass\nexcept Exception:\n    pass\n");
@@ -101,7 +169,6 @@ fn lambda_captured_as_pattern_hint() {
 
 #[test]
 fn pattern_hints_text_does_not_exceed_256_bytes() {
-    // 'á' is 2 bytes; 200 repetitions = 400 bytes > 256 limit.
     let fill = "á".repeat(200);
     let source = format!("try:\n    x = \"{fill}\"\nexcept Exception:\n    pass\n");
     let record = parse(&source);

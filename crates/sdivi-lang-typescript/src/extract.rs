@@ -1,6 +1,7 @@
 //! AST extraction helpers for the TypeScript language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::{js_string_content, truncate_to_256_bytes};
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -27,17 +28,21 @@ const DECLARATION_KINDS: &[&str] = &[
     "variable_declaration",
 ];
 
-/// Extracts `import` statement text from the AST.
+/// Extracts the module specifier from each `import_statement` in the AST.
+///
+/// - `import { foo } from "../lib/x"` → `["../lib/x"]`
+/// - `import * as ns from "./util"` → `["./util"]`
+/// - `import "./side-effect"` → `["./side-effect"]`
+/// - `import type { T } from "./types"` → `["./types"]`
+///
+/// `export { … } from "…"` re-exports are not captured here (Seeds Forward, M26).
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if node.kind() == "import_statement" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
-                }
+            if let Some(spec) = import_string_specifier(node, source) {
+                imports.push(spec);
             }
             continue; // don't recurse into import children
         }
@@ -48,6 +53,19 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Finds the `string` child of an `import_statement` and returns its content.
+fn import_string_specifier(import_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..import_node.child_count() {
+        let Some(child) = import_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string" {
+            return js_string_content(child, source);
+        }
+    }
+    None
 }
 
 /// Extracts names of top-level exported items.
@@ -166,18 +184,4 @@ fn ts_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

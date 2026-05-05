@@ -1,0 +1,26 @@
+{
+  "name": "sdivi-wasm",
+  "type": "module",
+  "collaborators": [
+    "Geoff Godwin <geoff.godwin@gmail.com>"
+  ],
+  "description": "WASM bindings for the Structural Divergence Indexer — wraps sdivi-core via wasm-bindgen + tsify",
+  "version": "0.2.12",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GeoffGodwin/sdivi-rust"
+  },
+  "files": [
+    "sdivi_wasm_bg.wasm",
+    "sdivi_wasm.js",
+    "sdivi_wasm_bg.js",
+    "sdivi_wasm.d.ts"
+  ],
+  "main": "sdivi_wasm.js",
+  "types": "sdivi_wasm.d.ts",
+  "sideEffects": [
+    "./sdivi_wasm.js",
+    "./snippets/*"
+  ]
+}

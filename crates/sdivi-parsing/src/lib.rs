@@ -10,6 +10,7 @@
 pub mod adapter;
 pub mod feature_record;
 pub mod parse;
+pub mod text;
 pub mod walker;
 
 #[cfg(feature = "test-tree-counter")]

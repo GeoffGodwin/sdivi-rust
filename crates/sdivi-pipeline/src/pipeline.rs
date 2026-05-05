@@ -13,13 +13,14 @@ use crate::error::PipelineError;
 use crate::helpers::{
     build_edge_weight_map, compute_path_partition, graph_to_boundary_input, spec_to_boundary_input,
 };
+use crate::readers::{read_go_mod_prefix, read_tsconfig_paths};
 use crate::store::{enforce_retention, write_snapshot};
 pub use crate::time::current_timestamp;
 use sdivi_config::{BoundarySpec, Config};
 use sdivi_core::input::ChangeCouplingConfigInput;
 use sdivi_detection::warm_start::CACHE_FILENAME;
 use sdivi_detection::{run_leiden, run_leiden_with_weights, LeidenConfig};
-use sdivi_graph::dependency_graph::build_dependency_graph;
+use sdivi_graph::dependency_graph::build_dependency_graph_with_tsconfig;
 use sdivi_graph::metrics::compute_metrics;
 use sdivi_parsing::adapter::LanguageAdapter;
 use sdivi_parsing::parse::parse_repository;
@@ -159,7 +160,6 @@ impl Pipeline {
 
         // ending_at drives the change-coupling window: None = HEAD, Some = REF.
         let ending_at = effective_sha.as_deref();
-
         // ── Stage 1: Parsing ─────────────────────────────────────────────
         let records = parse_repository(&self.config, parse_root, &self.adapters);
         tracing::info!(count = records.len(), "parsed {} files", records.len());
@@ -175,11 +175,15 @@ impl Pipeline {
                 return Err(PipelineError::NoGrammarsAvailable);
             }
         }
-
         // ── Stage 2: Graph ───────────────────────────────────────────────
-        let dg = build_dependency_graph(&records);
+        let go_mod_prefix = read_go_mod_prefix(parse_root);
+        let tsconfig = read_tsconfig_paths(parse_root);
+        let dg = build_dependency_graph_with_tsconfig(
+            &records,
+            go_mod_prefix.as_deref(),
+            tsconfig.as_ref(),
+        );
         let metrics = compute_metrics(&dg);
-
         // ── Change-coupling analysis ─────────────────────────────────────
         let cc_cfg = ChangeCouplingConfigInput {
             min_frequency: self.config.change_coupling.min_frequency,

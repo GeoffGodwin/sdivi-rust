@@ -22,6 +22,7 @@ pub mod commit_extract;
 pub mod error;
 mod helpers;
 pub mod pipeline;
+mod readers;
 pub mod store;
 pub mod time;
 

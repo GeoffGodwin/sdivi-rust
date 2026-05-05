@@ -1,6 +1,6 @@
 /// Tests verifying M13 metadata requirements:
 /// - Workspace `[workspace.package].version` is set to a 0.1.x semver
-/// - bindings/sdivi-wasm/package.json version matches the workspace version
+/// - bindings/sdivi-wasm/pkg-template/package.json version matches the workspace version
 /// - All published crates have `readme`, `keywords`, and `categories` fields
 /// - Coverage Gap 2 (REVIEWER_REPORT.md): sdivi-wasm package.json declares
 ///   the expected artifact files (.wasm, .d.ts) so the npm dry-run is
@@ -51,6 +51,7 @@ fn wasm_package_json_version() -> String {
     let path = workspace_root()
         .join("bindings")
         .join("sdivi-wasm")
+        .join("pkg-template")
         .join("package.json");
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("could not read {}", path.display()));
@@ -125,12 +126,16 @@ fn wasm_package_json_declares_wasm_artifact() {
     let path = workspace_root()
         .join("bindings")
         .join("sdivi-wasm")
+        .join("pkg-template")
         .join("package.json");
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("could not read {}", path.display()));
+    // Post-M26 the manifest ships per-target directories (`bundler/`, `node/`)
+    // rather than naming the wasm binary explicitly; the .wasm file is
+    // included transitively via the `bundler/` entry.
     assert!(
-        content.contains("sdivi_wasm_bg.wasm"),
-        "package.json must declare sdivi_wasm_bg.wasm in the files array"
+        content.contains("\"bundler/\""),
+        "pkg-template/package.json must list \"bundler/\" in the files array so the wasm binary ships"
     );
 }
 
@@ -139,6 +144,7 @@ fn wasm_package_json_declares_dts_artifact() {
     let path = workspace_root()
         .join("bindings")
         .join("sdivi-wasm")
+        .join("pkg-template")
         .join("package.json");
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("could not read {}", path.display()));
@@ -153,6 +159,7 @@ fn wasm_package_json_has_types_field() {
     let path = workspace_root()
         .join("bindings")
         .join("sdivi-wasm")
+        .join("pkg-template")
         .join("package.json");
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("could not read {}", path.display()));

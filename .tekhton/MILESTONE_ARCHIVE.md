@@ -1956,3 +1956,415 @@ status: "done"
 - If the smoke-test surface grows, factor it into its own minimal npm package under `bindings/sdivi-wasm/tests/` rather than inlining; for v0 the inline `index.cjs` + `index.mjs` is sufficient.
 
 ---
+
+---
+
+## Archived: 2026-05-04 — Unknown Initiative
+
+#### Milestone 25: Adapter Module-Specifier Extraction
+
+<!-- milestone-meta
+id: "25"
+status: "done"
+-->
+
+**Scope:** Change every non-Rust language adapter (`sdivi-lang-python`, `sdivi-lang-typescript`, `sdivi-lang-javascript`, `sdivi-lang-go`, `sdivi-lang-java`) to emit just the module specifier(s) of each import statement into `FeatureRecord::imports`, not the full statement text. The current implementation pushes whole-statement text such as `"import { foo } from '../lib/x';"` into the records, which `dependency_graph::resolve_import` immediately rejects (the string starts with `import`, not `./` / `../` / `crate::` / `self::` / `super::`), producing zero cross-file edges in the dependency graph for every non-Rust language. The Rust adapter already extracts specifiers correctly via its `use ` keyword strip and is unchanged here.
+
+**Why this milestone exists:** Validating sdivi on a real Next.js TypeScript application (bifl-tracker) produced `nodes=38 edges=0 communities=38 modularity=0.000` — every file alone, every coupling-based metric meaningless. Investigation traced the cause to `extract_imports` in each non-Rust adapter calling `node.utf8_text(source)` on the whole `import_statement` / `import_declaration` / `import_from_statement` node and pushing the result. The graph stage's `resolve_import` then drops every such string at `DEBUG` level because it doesn't match any known prefix. This silently breaks every coupling-based metric — `coupling_delta`, `community_count_delta`, `modularity`, and Factor 4 (`boundary_violation_rate` from M19) all become near-zero or trivial because they require a non-trivial graph. The same symptom has shown up on a large internal TS project at work where boundary violations stayed at `0` despite obvious layering breaks. The existing test `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` in `crates/sdivi-graph/tests/dependency_graph.rs` even pins a downstream symptom of this with a comment ("See BUG note in TESTER_REPORT.md re: parent navigation not implemented") — confirming the issue was observed during initial development but never resolved. This milestone is the precondition for any non-Rust project to get a usable structural graph; M26 (parent navigation) and M27 (tsconfig aliases) build on it.
+
+**Deliverables:**
+
+- **Python (`sdivi-lang-python`):** Walk into `import_statement` and `import_from_statement` to extract specifiers rather than pushing the whole node text.
+  - `import a, b.c, d as e` → emit `["a", "b.c", "d"]` (one entry per `dotted_name`; the `as` alias is a local name, drop it).
+  - `from foo.bar import x, y as z` → emit `["foo.bar"]` (the module is the `dotted_name` after `from`; the imported names are not modules).
+  - `from . import foo` → emit `["."]` (relative-package import; the resolver will treat this as "current package").
+  - `from .. import foo` / `from ..pkg import foo` → emit `[".."]` / `["..pkg"]` (relative-package navigation, count of leading dots preserved).
+  - `from __future__ import …` (a `future_import_statement`) → emit nothing; `__future__` is a synthetic module the graph should never resolve to a file.
+
+- **TypeScript (`sdivi-lang-typescript`):** Walk into `import_statement` to find the `string_fragment` child of the `string` node that holds the module specifier.
+  - `import { foo } from "../lib/x"` → emit `["../lib/x"]`.
+  - `import * as ns from "./util"` → emit `["./util"]`.
+  - `import "./side-effect"` → emit `["./side-effect"]` (side-effect import; specifier is the only child).
+  - `import type { T } from "./types"` → emit `["./types"]` (type-only imports still create a structural dependency for our purposes).
+  - `export { foo } from "./util"` (an `export_statement` with `from` clause; **TSX/JSX too**) — out of scope for this milestone. Note in `Watch For`; it's a real edge type but `extract_imports` only walks `import_statement` today. Track in **Seeds Forward**.
+  - Tree-sitter-typescript node kinds to assert: `import_statement` → child `import_clause` (optional) + child `string` → child `string_fragment` (the unquoted specifier). Verify against `tree-sitter-typescript` v0.20+ which is what the grammar pin in `Cargo.toml` ships.
+
+- **JavaScript (`sdivi-lang-javascript`):** Same pattern as TypeScript — extract `string_fragment` from `import_statement`'s `string` child. Additionally, capture CommonJS `require("…")` calls:
+  - Walk for `call_expression` whose `function` child is an `identifier` named `require` and whose `arguments` first child is a `string` → emit the `string_fragment`. This catches the `const fs = require("fs")` and `const utils = require("./utils")` patterns ubiquitous in older Node code and in mixed-module projects.
+  - Bare `import("…")` dynamic imports (a `call_expression` whose `function` is the `import` keyword node) → emit the specifier. Note: dynamic imports may take expressions, not just literals — only emit when the argument is a string literal, skip otherwise.
+
+- **Go (`sdivi-lang-go`):** Walk into `import_declaration` to find `import_spec` children, each with a `path` field (an `interpreted_string_literal`).
+  - `import "fmt"` → emit `["fmt"]`.
+  - Grouped `import ( "fmt"; "os" )` → emit `["fmt", "os"]` (one per `import_spec`).
+  - Aliased `import f "fmt"` → emit `["fmt"]` (alias is a local name).
+  - Dot import `import . "fmt"` → emit `["fmt"]` (the dot is a syntactic marker for namespace flattening).
+  - Blank import `import _ "github.com/lib/pq"` → emit `["github.com/lib/pq"]` (side-effect import; structurally still a dependency).
+
+- **Java (`sdivi-lang-java`):** Walk into `import_declaration` and extract the `scoped_identifier` child as a dotted string.
+  - `import java.util.List;` → emit `["java.util.List"]`.
+  - `import java.util.*;` → emit `["java.util.*"]` (preserve the wildcard; the resolver will need to decide how to handle wildcard imports — see M26).
+  - `import static org.junit.Assert.assertEquals;` → emit `["org.junit.Assert"]` (drop the trailing static-imported member name; the module is the class).
+
+- **Update existing per-adapter unit tests:** Each adapter has a `tests/` file (or `#[cfg(test)] mod tests`) asserting `extract_imports` on small fixtures. Update those assertions to expect specifier-only strings, not whole-statement text. Add new test cases covering the bullet variants above (relative dots in Python, `string_fragment` extraction in TS/JS, `require()` and dynamic `import()` in JS, grouped/aliased/blank in Go, wildcards and statics in Java).
+
+- **Update `crates/sdivi-graph/tests/dependency_graph.rs`:** The existing test `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` (line 152) explicitly pins broken downstream behavior with a "See BUG note" comment. Leave its assertions untouched in this milestone (M26 handles the resolver fix that flips it). But add a new test `python_from_import_yields_dotted_specifier` and `typescript_default_import_yields_string_fragment` that build a `FeatureRecord` directly and assert the resolver receives the right shape — confirming end-to-end shape regardless of language.
+
+**Migration Impact:** Snapshots produced after M25 will have substantially **larger** edge counts on Python / TS / JS / Go / Java projects than prior baselines, because edges that were silently dropped now resolve. This is a correctness fix, not a schema change — `snapshot_version` stays `"1.0"`. Existing baselines remain readable; the first post-M25 snapshot will simply produce a large `coupling_delta` and `community_count_delta` against the prior (artificially-sparse) baseline. Document in `CHANGELOG.md` under **Fixed** and recommend either re-baselining at the M25 boundary or using one-time `coupling_delta_rate` and `boundary_violation_rate` overrides with `expires` set 1–2 weeks out to absorb the cutover. Boundary-violation deltas will increase on projects with `.sdivi/boundaries.yaml` declared — a *good* sign that M19's gate is finally meaningful.
+
+**Files to create or modify:**
+
+- **Modify:** `crates/sdivi-lang-python/src/extract.rs` — rewrite `extract_imports` to walk into `import_statement` / `import_from_statement` children rather than emitting the whole node text. Add a private helper `dotted_name_text(node, source) -> Option<String>` for the dotted-identifier extraction.
+- **Modify:** `crates/sdivi-lang-python/tests/extract.rs` (if it exists; otherwise the inline `#[cfg(test)]` block) — update fixtures.
+- **Modify:** `crates/sdivi-lang-typescript/src/extract.rs` — rewrite `extract_imports` to extract `string_fragment`. Update the docstring on the function.
+- **Modify:** `crates/sdivi-lang-typescript/tests/...` — update.
+- **Modify:** `crates/sdivi-lang-javascript/src/extract.rs` — rewrite `extract_imports` to extract `string_fragment`; add `require()` and dynamic `import()` walk.
+- **Modify:** `crates/sdivi-lang-javascript/tests/...` — update; new tests for `require` and dynamic `import`.
+- **Modify:** `crates/sdivi-lang-go/src/extract.rs` — walk `import_spec` children rather than the whole `import_declaration`.
+- **Modify:** `crates/sdivi-lang-go/tests/...` — update; new tests for grouped, aliased, blank imports.
+- **Modify:** `crates/sdivi-lang-java/src/extract.rs` — walk `scoped_identifier` rather than the whole `import_declaration`; strip the trailing member name on static imports.
+- **Modify:** `crates/sdivi-lang-java/tests/...` — update; new tests for wildcard and static imports.
+- **Modify:** `crates/sdivi-graph/tests/dependency_graph.rs` — add the two new shape-assertion tests; do not touch the broken-by-design parent-navigation test (M26 owns that flip).
+- **Modify:** `tests/full_pipeline.rs` (or whichever workspace-level integration test exists) — assert non-zero edges on the existing per-language fixtures (`tests/fixtures/simple-{python,typescript,javascript,go,java}/`). This becomes the regression net that catches future adapter regressions across all 5 languages at once.
+- **Modify:** `CHANGELOG.md` — under **Fixed**: "Non-Rust language adapters now emit module specifiers from imports rather than whole-statement text; cross-file edge counts on Python/TS/JS/Go/Java projects increase substantially. May produce a one-time large `coupling_delta` against pre-M25 baselines."
+- **Modify:** `MIGRATION_NOTES.md` — add an entry under "0.x → 0.y" describing the re-baseline guidance.
+
+**Acceptance criteria:**
+
+- For each of the 5 fixture repos under `tests/fixtures/simple-{python,typescript,javascript,go,java}/`, the integration test asserts `dg.edge_count() > 0` after `Pipeline::snapshot`. Exact counts pinned per fixture so regressions are caught precisely.
+- `cargo test --workspace` passes. The verify-leiden, change-coupling, and snapshot-roundtrip suites continue to pass (they use synthetic graphs and are unaffected by adapter changes).
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- `cargo build --target wasm32-unknown-unknown -p sdivi-core --no-default-features` continues to succeed (this milestone touches only adapter crates, which are not in `sdivi-core`'s WASM dep tree — Rule 21 is preserved).
+- Snapshot determinism: running `Pipeline::snapshot` twice on the same fixture yields a bit-identical `Snapshot` JSON (Rule 1 + Critical System Rule 1).
+- Per-language baseline of edge counts (regression sentinels): pinned in the integration test as `assert_eq!`, not `>=`. If grammar updates change the count, it's a deliberate decision that requires updating the pinned value.
+- The `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` test continues to pass — M25 doesn't fix it; M26 does. Its presence confirms M25 didn't accidentally also flip parent-navigation behavior.
+
+**Tests:**
+
+- **Per-adapter unit tests** in each `sdivi-lang-*/src/extract.rs` (or `tests/extract.rs`):
+  - **Python:** plain `import`, `import a as b`, `from foo import x`, `from foo.bar import x`, `from . import x`, `from .. import x`, `from ..pkg import x`, `from __future__ import annotations` (yields nothing), multi-name `import a, b, c`.
+  - **TypeScript:** named `import { a }`, default `import a`, namespace `import * as a`, side-effect `import "./x"`, type-only `import type { T }`, mixed `import a, { b } from "./x"`.
+  - **JavaScript:** all TS shapes, plus `require("./x")`, `require(\`./tpl\`)` (template literal — skip), `require(name)` (variable arg — skip), dynamic `import("./x")`.
+  - **Go:** single, grouped, aliased, dot, blank, multi-line grouped with comments interleaved.
+  - **Java:** single, wildcard, static-method, static-wildcard, package-relative.
+- **Workspace integration test** `tests/import_extraction.rs` (new): for each fixture under `tests/fixtures/simple-*`, run `Pipeline::snapshot` and assert `dg.edge_count() == EXPECTED` where `EXPECTED` is a pinned number per fixture.
+- **Property test (proptest)** in `crates/sdivi-graph/tests/proptest.rs`: generate `FeatureRecord` lists with `imports = [random specifier]` and assert that resolution either succeeds or fails deterministically — no panics, no non-deterministic outcomes.
+
+**Multi-Language Regression Guarantees:**
+
+This milestone touches 5 of 6 adapter crates but leaves the Rust adapter (`sdivi-lang-rust`) **completely untouched** — its existing `extract_imports` already returns proper specifiers via the `use ` keyword strip. Concretely:
+
+- **Rust:** zero source-file changes in `sdivi-lang-rust`. The crate's existing tests must pass byte-identically.
+- **Cross-crate isolation:** each non-Rust adapter is its own Cargo crate. A change in `sdivi-lang-python::extract` cannot affect `sdivi-lang-typescript` (no shared mutable state, no shared types beyond `FeatureRecord` and `PatternHint` which are already-stable).
+- **`FeatureRecord` shape unchanged:** `imports: Vec<String>` is unchanged in field name and type. Only the *content* of those strings changes for non-Rust languages. `sdivi-graph::resolve_import`'s current behavior on Rust-style strings (`crate::foo::bar`) is preserved verbatim — M25 changes inputs the resolver sees, not the resolver itself.
+- **Per-language regression sentinel test required:** `tests/import_extraction.rs` must include all 6 fixtures (including `simple-rust/`) with pinned edge counts. The Rust fixture's edge count is **identical pre- and post-M25**; this catches accidental cross-language refactor leakage during review.
+
+**Watch For:**
+
+- **Tree-sitter grammar version drift.** The exact node kinds (e.g. `string_fragment` vs `string`, `dotted_name` vs `identifier`) depend on the pinned grammar version. Each adapter's `Cargo.toml` pins a specific `tree-sitter-*` crate version; check the actual node names against the pinned version's grammar.json before assuming the structure. If the grammar exposes different node kinds, the test fixtures catch it but the extractor logic must match.
+- **Python relative-package dot count.** `from ... import foo` (three dots) is "two parents up." The graph resolver in M26 will need the count of leading dots — preserve it in the specifier string verbatim (`"..."` literally) rather than collapsing. Document this contract in the rustdoc on `extract_imports` so M26 knows what to consume.
+- **TypeScript export-from (`export { foo } from "./x"`)** is not handled by this milestone — `extract_imports` only walks `import_statement`. Track the gap in the `Watch For` of M26 (which is the natural place to expand resolver behavior). Skipping it now keeps M25 scoped to a literal one-statement-class change.
+- **JavaScript dynamic `import()` with non-string args.** `import(somePathVar)` cannot be resolved statically. Skip silently — emitting an unresolvable specifier costs nothing but adds noise to `DEBUG` logs. The `if argument is a string literal` gate is essential.
+- **Go grouped imports with build-tag-conditional blocks.** `import (\n//go:build foo\n"foo"\n)` — the build tag is a comment node and should be ignored. The walk is structural (`import_spec` children only); build tags don't appear inside `import_spec`. Verify nonetheless.
+- **Java `import static foo.Bar.*`** — wildcard static import. Strip the trailing `*` as well as the member; specifier is `foo.Bar`. Document.
+- **CST-drop discipline (Rule 4).** `extract_imports` must not return any `Node` reference; it returns `Vec<String>`. The current pattern (allocate `String` from `utf8_text`) is already compliant — preserve it.
+- **Determinism of multi-import order.** When a single statement yields multiple specifiers (`import a, b, c` in Python; grouped Go imports), preserve syntactic order. `BTreeMap` ordering does *not* apply here — these are inputs to graph construction, and the graph builder takes them in `Vec` order. Stability across runs requires syntactic-order preservation, which tree-sitter's child-iteration provides naturally. Don't sort.
+
+**Seeds Forward:**
+
+- M26 picks up the resolver work: parent-path navigation for `../`, language-specific module resolution (Python dots → paths, Go module paths via `go.mod`, Java dotted packages → paths).
+- M27 picks up tsconfig `compilerOptions.paths` and `baseUrl` for TS path aliases (`@/lib/...` style) — a separate concern from the adapter extraction handled here.
+- TS `export { … } from "…"` re-export edges. Real structural dependency, not currently captured. Probably add to `extract_imports` (or rename to `extract_imports_and_reexports`) once a consumer needs it. Defer until requested.
+- Dynamic and computed imports (template literals, `require(varName)`). Static analysis can never resolve these; consumers who care will need a runtime-tracing extractor — outside SDIVI's scope.
+- Per-language `extract_imports` could share a common return shape (`Vec<ModuleSpecifier>` with kind: `Relative { dots: u8, path: String } | Absolute { name: String } | PackageRelative { dots: u8, path: String }`) instead of bare `Vec<String>`. That would let the resolver branch on kind rather than re-parse the string. Worth doing eventually; deferred to keep this milestone scoped.
+
+---
+
+---
+
+## Archived: 2026-05-04 — Unknown Initiative
+
+#### Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions
+
+<!-- milestone-meta
+id: "26"
+status: "done"
+-->
+
+**Scope:** Rewrite `crates/sdivi-graph/src/dependency_graph.rs::resolve_relative` and `resolve_import` to (a) actually navigate parent directories for `../` and `super::` prefixes, (b) handle Python-style dotted module specifiers as path lookups, (c) handle Go module-path imports against the repository's `go.mod` (when present), and (d) handle Java dotted package specifiers as path lookups. The current resolver strips `../` characters with `trim_start_matches` but never walks up a directory, joins the remainder onto the importer's own directory, and looks for a flat file there — producing zero matches for the vast majority of real-world relative imports. This milestone fixes the resolver itself; M25 fixes what the adapters feed into it; M27 layers tsconfig path aliases on top.
+
+**Why this milestone exists:** The function `resolve_relative` (sdivi-graph/src/dependency_graph.rs:220) reads:
+
+```rust
+let from_dir = from_path.parent()?;
+let rel = import.trim_start_matches("./").trim_start_matches("../");
+for ext in &["rs", "py", "ts", "tsx", "js", "go", "java"] {
+    let candidate = from_dir.join(format!("{rel}.{ext}"));
+    ...
+```
+
+`trim_start_matches` strips the *characters* `./` or `../` from the start, greedily and without bound. For `../lib/foo` from `components/Bar.tsx`, after stripping it becomes `lib/foo`, then the resolver looks for `components/lib/foo.tsx` — wrong; should be `lib/foo.tsx`. For `../../shared/x` from `app/items/Edit.tsx` it strips both `../` and looks for `app/items/shared/x.tsx` — also wrong; should be `shared/x.tsx`. The existing test `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` (sdivi-graph/tests/dependency_graph.rs:152) explicitly pins this broken behavior with the comment `"See BUG note in TESTER_REPORT.md re: parent navigation not implemented"`, confirming the bug was observed during M05/M06 development but never fixed. Compounding this, the resolver only handles two import shapes:
+
+1. Relative paths starting with `./` or `../` (broken as above)
+2. Rust `crate::`/`self::`/`super::` prefixes (where `super::` has the same parent-navigation gap as `../`)
+
+It has no handling for Python dotted imports (`foo.bar.baz`), Go module-path imports (`github.com/foo/bar/pkg`), or Java dotted packages (`com.acme.lib.Util`). Even with M25 making the adapters emit clean specifiers, these languages would still produce zero or near-zero edges because the resolver doesn't know how to look up their conventions. This milestone fixes the resolver to handle all four conventions correctly.
+
+**Theoretical basis:** Path resolution is a per-language convention. The fixes here implement the *language-agnostic* core of each language's module resolution algorithm — enough to find the file given the specifier, not enough to fully replicate `tsc`'s or `node`'s resolver (which need full node_modules walking, package.json `exports` maps, etc., far beyond static structural analysis). The contract is: "for any specifier that names a file in the repository, return its `NodeIndex`; for specifiers that name external packages or unresolvable paths, return `None` and let the resolver drop them silently at `DEBUG`." External imports (e.g. `import React from "react"`, `import "fmt"`) deliberately produce no edges — they're not part of the structural graph.
+
+**Deliverables:**
+
+- **`resolve_relative` parent navigation rewrite:**
+  - Count leading `../` segments (and `./` which contributes 0 levels up). Walk `from_path.parent()` that many times. Treat overshoot (more `../` than path components) as an unresolvable import and return `None` — do not panic, do not silently bottom-out at the repo root.
+  - The remainder after the dot-prefixes is the path-relative-to-base. Join it onto the walked-up base and try **language-specific** extension lists, not a global list — see "Multi-Language Regression Guarantees" below for why. Per-language extension priority:
+    - `rust`: `["rs"]` then directory-index `["mod.rs"]`.
+    - `python`: `["py"]` then directory-index `["__init__.py"]`.
+    - `typescript`: `["ts", "tsx", "d.ts"]` then directory-index `["index.ts", "index.tsx"]`.
+    - `javascript`: `["js", "jsx", "mjs", "cjs"]` then directory-index `["index.js", "index.jsx", "index.mjs", "index.cjs"]`.
+    - `go`: `["go"]` (no directory-index — Go packages are directories, handled by `resolve_go_module`).
+    - `java`: `["java"]` (no directory-index).
+    - **Cross-language fallback** (when language doesn't match any of the above — should never happen in practice but defensive): try the union `["rs", "py", "ts", "tsx", "js", "jsx", "mjs", "cjs", "go", "java", "d.ts"]` in the order listed, then the union of directory-index names. This preserves the pre-M26 behavior for any unknown `language` value.
+  - Order matters for tie-breaking when both a file and a directory exist (e.g. `./util` matching both `util.ts` and `util/index.ts`). Pick the **file** over the directory, matching node and tsc resolution behavior. Document the rule in rustdoc.
+
+- **`resolve_super` for Rust `super::` prefix:**
+  - Currently `super::` is bundled with `crate::`/`self::` and treated as a stem search, ignoring the parent-navigation semantics. Split it out: count consecutive leading `super::` segments, walk up that many directories from `from_path.parent()`, then resolve the remainder via the existing stem-map logic against the repo-relative subtree rooted at the walked-up directory.
+
+- **`resolve_python_dotted` for Python:**
+  - Specifier shape from M25: bare dotted (`foo.bar.baz`), package-relative (`.`, `..`, `..pkg`, `...sibling.module`).
+  - Bare dotted: replace `.` with `/`, look up `path_to_node` for `<repo-rel>/foo/bar/baz.py` and `<repo-rel>/foo/bar/baz/__init__.py`. If neither exists, treat as external (e.g. `os`, `pytest`) and return `None`.
+  - Package-relative: count leading dots (1 dot = current package, 2 dots = parent package, etc.). Walk up from `from_path.parent()` that many levels, then apply the post-dots remainder as a path. Same file-vs-`__init__.py` lookup as bare dotted.
+  - Python's resolution is package-aware: `from . import foo` from `pkg/sub/mod.py` looks up `pkg/sub/foo.py` or `pkg/sub/foo/__init__.py`. Honor that.
+
+- **`resolve_go_module` for Go:**
+  - On graph construction, look for a `go.mod` at the repo root; if present, parse the `module <path>` line (regex `^\s*module\s+(\S+)$` is sufficient — full `go.mod` parsing is overkill). Cache the module path on the graph builder.
+  - Specifier `github.com/foo/bar` where `<module-path> = "github.com/foo/bar"` → an internal import. Strip the module prefix, look up `path_to_node` for the remaining sub-path with `.go` extension. Multi-file packages: a Go package is a directory; an internal import `github.com/foo/bar/pkg/util` resolves to **all** `.go` files in `pkg/util/`. Emit one edge per `.go` file in the directory (matches the structural convention that each `.go` file is a node).
+  - Specifier without the module prefix: external; return `None`.
+  - Standard library imports (`fmt`, `os`, `net/http`): external; return `None`.
+  - When `go.mod` is absent: treat all Go imports as external (no edges from Go files). Log to stderr at `INFO` once per snapshot run (deduplicated) so users discover why their Go graph is empty.
+
+- **`resolve_java_dotted` for Java:**
+  - Specifier shape: dotted (`com.acme.lib.Util`) or wildcard (`com.acme.lib.*`).
+  - Dotted: replace `.` with `/` and append `.java`, look up against `path_to_node`. Java places source under `src/main/java/<package-path>/Class.java` conventionally — accept both repo-relative (`com/acme/lib/Util.java`) and `src/main/java`-prefixed locations. Walk a small list of common roots: `["", "src/main/java", "src/test/java", "src", "java"]` — try each as a base.
+  - Wildcard `com.acme.lib.*`: emit one edge per `.java` file in the resolved `com/acme/lib/` directory. Document the wildcard expansion behavior; this is the only language where one specifier can produce multiple edges.
+
+- **Update the resolver dispatch:** `resolve_import` currently dispatches by string-prefix. Extend to dispatch by the **language** of the importing record (use `FeatureRecord.language`). Pass through to the language-specific resolver:
+  - `language == "rust"` → existing `crate::`/`self::`/`super::` paths plus the new `resolve_super` parent-walk.
+  - `language == "python"` → `resolve_python_dotted` (handles relative dots and bare dotted).
+  - `language == "go"` → `resolve_go_module`.
+  - `language == "java"` → `resolve_java_dotted`.
+  - `language in ("typescript", "javascript")` → `resolve_relative` (the `./`/`../` case) for relative specifiers; absolute specifiers are external until M27 adds tsconfig alias support.
+  - **Multi-language fallback:** if the specifier starts with `./` or `../`, always go through `resolve_relative` regardless of language. This handles the rare cross-language relative import (e.g. a TS file importing a generated `.json` — won't resolve to a node anyway, but the dispatch shouldn't panic).
+
+- **Pass `language` through to the resolver:** `resolve_import`'s signature gains a `language: &str` parameter. Update the caller in `build_dependency_graph` (line 161-176) to thread `record.language.as_str()` through.
+
+- **Update the broken-by-design test:** `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` (sdivi-graph/tests/dependency_graph.rs:152) is the test that pins the current bug. Rewrite it as `relative_import_parent_slash_resolves_to_parent_dir` and update both the import path and the expected file:
+  ```rust
+  make_record("src/sub/module.py", &["../shared"]),
+  make_record("src/shared.py", &[]),  // parent dir, was: src/sub/shared.py (same dir)
+  ```
+  Assert `edge_count == 1` resolving to `src/shared.py`. This flip is the canary that the fix landed.
+
+- **Add new resolver tests** (in `crates/sdivi-graph/tests/dependency_graph.rs`):
+  - Multi-level parent: `../../shared/x` from `app/items/Edit.tsx` resolves to `shared/x.tsx`.
+  - Overshoot: `../../../../foo` from `src/util.ts` returns `None` (more `../` than path depth).
+  - File-over-directory tie-break: `./util` with both `./util.ts` and `./util/index.ts` present resolves to `./util.ts`.
+  - Python bare dotted: `foo.bar` with `foo/bar.py` present resolves correctly; with `foo/bar/__init__.py` present resolves correctly; with neither present returns `None` (external).
+  - Python package-relative: `from .. import x` from `a/b/c.py` resolves to `a/x.py` or `a/__init__.py`.
+  - Go: with `go.mod` declaring `module example.com/myapp`, importing `example.com/myapp/internal/util` from `cmd/main.go` resolves to one or more nodes under `internal/util/`.
+  - Java: dotted `com.acme.lib.Util` with `src/main/java/com/acme/lib/Util.java` present resolves correctly.
+  - Java wildcard: `com.acme.lib.*` with three `.java` files in `src/main/java/com/acme/lib/` produces three edges.
+
+- **Add an integration test** `crates/sdivi-graph/tests/integration_real_world.rs` that builds a small synthetic multi-language repo (TS app importing relative siblings + parents; Python package with `__init__.py`; Go module with internal imports) and asserts edge counts match a hand-computed expected value. This is the "does it actually work end-to-end" test.
+
+**Migration Impact:** Edge counts on existing repos will jump again post-M26 — anywhere parent-relative imports were used (most TS/JS code, package-relative Python, internal Go imports). Combined with M25, snapshot deltas will be substantial on the first run after upgrade. This is purely additive correctness — `snapshot_version` stays `"1.0"`. Update `MIGRATION_NOTES.md` with M25-and-M26 combined re-baselining guidance. The existing `relative_import_parent_slash_strips_prefix_resolves_in_same_dir` test's comment about "BUG" goes away — the test is replaced by one that asserts the correct behavior, and the broken-as-documented behavior is no longer present anywhere in the test suite.
+
+**Files to create or modify:**
+
+- **Modify:** `crates/sdivi-graph/src/dependency_graph.rs` — split `resolve_import` to dispatch by language; rewrite `resolve_relative` for proper parent navigation; add `resolve_super`, `resolve_python_dotted`, `resolve_go_module`, `resolve_java_dotted`. Add a `GoModInfo` struct for the parsed module path; load it once per `build_dependency_graph` call.
+- **Modify:** `crates/sdivi-graph/Cargo.toml` — no new deps expected. `regex` is already in the workspace tree for the M16 historical-commit work; verify it's available transitively. If not, prefer hand-rolling the `module ` line scan over adding a dep.
+- **Modify:** `crates/sdivi-graph/tests/dependency_graph.rs` — rewrite the parent-navigation test (was pinning the bug); add the multi-level, overshoot, tie-break, and per-language tests listed in Deliverables.
+- **Create:** `crates/sdivi-graph/tests/integration_real_world.rs` — multi-language synthetic repo with hand-computed expected edge counts.
+- **Modify:** `crates/sdivi-snapshot/tests/...` (workspace integration tests) — update fixture expectations now that edges resolve.
+- **Modify:** `tests/full_pipeline.rs` — likewise.
+- **Modify:** `CHANGELOG.md` — under **Fixed**: "Dependency graph resolver now navigates parent directories for `../` and `super::` imports; supports Python dotted, Go module-path, and Java dotted resolution. Combined with M25 adapter fixes, edge counts on real codebases increase substantially."
+- **Modify:** `MIGRATION_NOTES.md` — combined M25+M26 re-baseline note.
+
+**Acceptance criteria:**
+
+- The rewritten parent-navigation test passes with the **corrected** expected target (`src/shared.py`, not `src/sub/shared.py`).
+- All new unit tests pass.
+- Multi-language integration test asserts pinned non-zero edge counts per language.
+- `cargo test --workspace` continues to pass.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- `cargo build --target wasm32-unknown-unknown -p sdivi-core --no-default-features` continues to succeed (this milestone is scoped to `sdivi-graph` with the `pipeline-records` feature on; the WASM build path is unaffected because `compute_*` functions take pre-resolved `*Input` structs from the caller).
+- Snapshotting `bifl-tracker` (the M11 validation fixture, also the user's bifl-tracker) produces `edge_count > 50` (rough lower bound — exact count pinned in CHANGELOG).
+- Snapshotting `sdivi-rust` itself produces a substantially higher edge count than the current ~20 (rough target: ≥100, reflecting actual cross-crate use statements via the improved `resolve_super` and stem fallback).
+- Determinism: two runs against the same repo produce a bit-identical `Snapshot.graph` field.
+
+**Tests:**
+
+- All Deliverables-section tests are required.
+- Property test: generate random `(from_path, import_specifier)` pairs and assert resolution either succeeds with a path that exists in `path_to_node` or returns `None`. No panics.
+- Regression test on `verify-leiden` quality fixtures: confirm modularity values stay within KDD-2's 1% / ±10% tolerance (the resolver fix does not change the Leiden algorithm; it changes the input graph density. Modularity may shift but the algorithm's output quality on a given graph is unchanged).
+- Snapshot-roundtrip test: serialize and deserialize the snapshot, confirm the edge list survives.
+
+**Multi-Language Regression Guarantees:**
+
+M26 introduces language-based dispatch in the resolver where there was previously string-prefix dispatch. This is the highest cross-language risk surface in the M25–M27 sequence; the following invariants are non-negotiable:
+
+- **Rust resolution must not regress.** The `crate::foo::bar` and `self::foo::bar` paths continue to dispatch to the existing `resolve_stem` logic (strip prefix → first segment → stem search across the whole repo). Behavior is byte-identical to pre-M26 for these cases. The `super::` path is the *only* Rust-specific change: parent-walk + stem-search-in-subtree, with **stem-search-across-whole-repo as a final fallback** if the parent-walk path doesn't resolve. This guarantees no Rust import that resolved before M26 fails to resolve after.
+- **Per-language extension lists prevent extension-collision regressions.** Pre-M26 the resolver tried Rust extensions on Python files (and vice versa). With per-language extension lists, a Python file with `./util` import only tries `util.py` and `util/__init__.py` — not `util.rs` or `util.ts`. This eliminates a class of subtle false-positive resolutions but could in principle drop edges that depended on the old cross-extension behavior. Audit: search the existing fixtures and per-crate tests for any case where a Python/Go/Java specifier resolved to a non-`.py`/`.go`/`.java` file. None should exist; if any do, that's a latent bug in the fixture, not a regression.
+- **Test fixtures using `language: "rust"` for non-Rust paths continue to work.** The `make_record` helper in `crates/sdivi-graph/tests/dependency_graph.rs` defaults to `language: "rust"` even for tests with `.py`/`.ts` paths. M26's dispatch logic for relative specifiers (`./` or `../`) overrides language and always routes to `resolve_relative` regardless of `record.language`. This preserves every existing relative-import test. (The cross-language fallback extension list is the safety net that makes this work even for fixtures that mix languages.)
+- **Pluralized resolver API does not break callers outside `sdivi-graph`.** The `resolve_import` → `resolve_imports` rename and `Option<NodeIndex>` → `Vec<NodeIndex>` return-type change are confined to `sdivi-graph/src/dependency_graph.rs`. The public surface of `sdivi-graph` (the `DependencyGraph` type, `build_dependency_graph` constructor, `compute_*` consumers in `sdivi-core`) is unchanged. Verify no external callers use `resolve_import` directly — `grep -r resolve_import crates/ examples/ benches/` should turn up only the file being modified.
+- **Pre-M26 test suite must pass green except for the one explicitly-flipped test.** Before merging, run `cargo test -p sdivi-graph` and confirm exactly one test fails (`relative_import_parent_slash_strips_prefix_resolves_in_same_dir`, which the milestone replaces with `relative_import_parent_slash_resolves_to_parent_dir`). Any other test failure is a regression that must be diagnosed before merge.
+- **Snapshot determinism must hold per-language.** Add a determinism test that snapshots each of the 6 simple-language fixtures twice and asserts byte-identical `Snapshot.graph` output. Pre-M26 this guarantee held trivially because most graphs were near-empty; post-M26 the graphs are populated and a non-deterministic resolver path (e.g. iterating over a `HashMap` instead of a `BTreeMap`) would surface as a flaky snapshot.
+- **`sdivi-lang-rust` is unchanged.** This milestone touches `sdivi-graph` only. The Rust adapter, its tests, and its fixtures are not modified. Rust resolution improvements live in M26's resolver work, not the adapter.
+- **CI gates the cross-language regression net.** Add `tests/per_language_baselines.rs` with one pinned edge count per language fixture. Any future PR that changes the resolver causing a per-language baseline to shift gets a visible diff in the test output, forcing a deliberate update rather than a silent regression.
+
+**Watch For:**
+
+- **Path normalization on Windows.** `from_path.parent()` returns `\\`-separated paths on Windows; specifiers in import statements use `/`. `Path::join` handles the mismatch but `path_to_node`'s keys are constructed during graph build — verify the lookup uses the same separator convention. The `tests/stdout_stderr_split.rs` and existing fixtures pass on Windows CI; M26's fixtures should too.
+- **Symlinks inside the repo.** `from_path.parent()` walked up `n` levels could cross a symlink boundary. Don't follow symlinks during resolution — `Path::join` doesn't, which is the safe default. Document.
+- **Case sensitivity.** macOS HFS+ is case-insensitive; Linux ext4 is case-sensitive. The `path_to_node` map uses exact-byte path matching. Imports of `./Util` against a file named `util.ts` resolve on macOS but fail on Linux. Don't paper over this — match the underlying filesystem behavior. Document in `docs/determinism.md` as a caveat.
+- **Go module path parsing edge cases.** `go.mod` may have `module path/with/slashes // a comment`, multi-line `module (\n path \n)` (rare), or be absent. The simple regex handles the common case; on parse failure, log and treat all Go imports as external rather than crashing.
+- **Python's implicit namespace packages (PEP 420).** A directory without `__init__.py` can still be a package in Python 3.3+. The resolver should treat both as resolvable: if `foo.bar.baz` matches `foo/bar/baz.py` OR `foo/bar/baz/` (a directory containing any `.py` files), produce an edge. Test this case explicitly.
+- **Java conventional source roots.** The list `["", "src/main/java", "src/test/java", "src", "java"]` covers Maven, Gradle, and ad-hoc layouts. It does not cover multi-module Maven (each module having its own `src/main/java`). For multi-module repos, every module's `src/main/java` is a separate root — the resolver should try them all. Implementation: at graph-build time, scan for any directory ending in `/src/main/java` or `/src/test/java` and add each to the list of roots. Document in rustdoc.
+- **The `resolve_super` interaction with Rust's module tree.** Rust modules are not 1:1 with files; `mod foo; mod bar;` declarations in a `lib.rs` create a virtual tree. `super::foo::Bar` from inside `mod bar` could refer to a sibling module at any nesting. The resolver here is a heuristic: walk up `n` directories per `super::`, then stem-search the remainder. False negatives are acceptable (the import doesn't resolve, no edge added); false positives (resolving to the wrong file) are not. Tie-break: if `resolve_stem` finds multiple candidates, return `None` (current behavior — preserve it).
+- **`resolve_relative` for bare specifiers in TS/JS.** `import "./util"` (no extension) is the common case; `import "./util.js"` (explicit `.js`) is also valid in ESM and refers to a `.ts` file at compile time. Try the specifier verbatim first (with both extension stripped and as-given), then with each extension. Document.
+- **Multi-edge emissions (Java wildcard, Go package-import).** These are the only resolver paths that produce >1 edge per import. Make sure the caller (`build_dependency_graph`) handles a `Vec<NodeIndex>` return rather than `Option<NodeIndex>`. Plumb the API change cleanly: rename `resolve_import` to `resolve_imports` (plural), return `Vec<NodeIndex>`, with empty Vec for unresolvable. The single-target case becomes `vec![ni]`. Update all call sites.
+- **Don't add tsconfig path-alias support here.** That's M27. Specifiers that *would* match a tsconfig alias (e.g. `@/lib/foo`) should fail to resolve in this milestone (return empty Vec) and log at `DEBUG`. M27 layers the alias step in front of the existing resolver chain.
+- **Don't change the cache key in `.sdivi/cache/partition.json`.** The warm-start cache is keyed by graph topology hash; the topology will change due to new edges, so the cache will invalidate naturally on the first post-M26 run. That's correct — don't try to preserve cache continuity across the bug-fix boundary.
+
+**Seeds Forward:**
+
+- **M27** picks up tsconfig `compilerOptions.paths` and `baseUrl` for TS path aliases.
+- **`package.json` `imports` field** (Node subpath imports, `#alias/foo` style). Fewer projects use this than tsconfig aliases. Defer until requested.
+- **Python `setup.py` / `pyproject.toml` package roots.** The current resolver assumes the repo root is the import root. Real Python projects often have `src/<package>/...` layouts where `src/` is the import root. A future milestone could detect this from `pyproject.toml`'s `[tool.setuptools.packages.find]` or similar. Defer.
+- **Multi-edge Java wildcards introduce a precision/recall trade-off.** A wildcard import that resolves to 50 classes in the package emits 50 edges, all with equal weight. This may inflate `coupling_delta` artificially. If this becomes noisy in practice, consider weighting wildcard-derived edges at `1/n` rather than `1` per file. Defer until observed.
+- **Cross-language imports** (TS importing a generated Python file's stub, or Java FFI). Out of scope; SDIVI doesn't track these structurally.
+
+---
+
+---
+
+## Archived: 2026-05-05 — Unknown Initiative
+
+#### Milestone 27: tsconfig Path Alias Support
+
+<!-- milestone-meta
+id: "27"
+status: "done"
+-->
+
+**Scope:** Add support for TypeScript / JavaScript path aliases declared in `tsconfig.json` (or `jsconfig.json`) so specifiers like `@/lib/foo` and `~components/Button` resolve to the correct files. The resolver added in M26 handles relative paths and external packages but treats any unrecognized prefix as external. Modern Next.js, Vite, Nx, and bare-tsc projects commonly use `compilerOptions.paths` (with optional `baseUrl`) to define short aliases — and bifl-tracker is one such project (`paths: { "@/*": ["./*"] }`). Without alias support, every `@/foo` import in such codebases is dropped, leaving a noticeable hole in the dependency graph even after M25 + M26 land.
+
+**Why this milestone exists:** After M25 (adapters emit specifiers) and M26 (resolver navigates parents), bifl-tracker's edge count will jump from 0 to "most of the way there" — but `import { foo } from "@/lib/util"` still fails to resolve because the resolver has no understanding of `@/`. tsconfig path aliases are a structural property of the project (declared in checked-in config), not a runtime concern, so they belong in static analysis. The `tsc`, `node --experimental-...`, `webpack`, `vite`, `next`, and `tsx` resolvers all honor them; SDIVI should too. Skipping aliases means SDIVI's graph for any post-2020 TS project is incomplete by design — and "incomplete by design" is the same failure mode as the M25/M26 bugs, just less obvious because aliases are a smaller fraction of imports than relatives.
+
+**Theoretical basis:** `tsconfig.json` is a strict subset of JSON (with comments — JSON-with-comments / JSONC). The relevant fields are:
+
+- `compilerOptions.baseUrl` (optional, string): all module resolution starts from this directory, resolved relative to the `tsconfig.json` location.
+- `compilerOptions.paths` (optional, object: pattern → array of target patterns): each key is a pattern with at most one `*`; each value is a list of substitution patterns also with at most one `*`. The first matching alias wins; within an alias, the first existing target wins.
+
+Examples:
+- `"@/*": ["./*"]` (bifl-tracker): `@/lib/foo` → `./lib/foo` relative to the tsconfig.
+- `"@components/*": ["src/components/*", "vendor/components/*"]`: `@components/Button` tries `src/components/Button` first, falls back to `vendor/components/Button`.
+- `"~lib": ["./src/lib/index.ts"]` (no `*`): exact-match alias.
+
+`tsconfig` `extends` chains are out of scope for this milestone — projects that use them are rare in the bifl-tracker validation set, and full chain resolution is its own can of worms (multiple files, transitive merges, Node-resolve semantics for the extended path). If extends becomes blocking, file a follow-up milestone.
+
+**Deliverables:**
+
+- **Locate and parse `tsconfig.json` / `jsconfig.json`:**
+  - At graph-build time (`build_dependency_graph` in `sdivi-graph/src/dependency_graph.rs`), look for `tsconfig.json` at the repo root. If absent, look for `jsconfig.json`. If both absent, no aliases are configured — the resolver behaves exactly as M26.
+  - Parse with a JSONC-tolerant parser. The workspace already pulls `serde_json`; line and block comments are not legal JSON. Two options:
+    - (A) Strip comments with a small regex/state-machine pre-pass before `serde_json::from_str`. Lightweight, no new dep.
+    - (B) Add `jsonc-parser` or `serde_jsonc` as a dep. Slightly heavier; better corner-case handling.
+  - Prefer option (A) — the comment grammar is small and a 30-line state-machine handles it. Document the chosen approach in rustdoc.
+  - Define a typed view: `struct TsConfigPaths { base_url: Option<PathBuf>, mappings: BTreeMap<String, Vec<String>> }`. Populate from `compilerOptions.baseUrl` and `compilerOptions.paths`. Resolve `base_url` relative to the tsconfig file's directory.
+  - On parse failure (malformed JSON even after comment-strip, or non-JSON), log a `WARN` to stderr ("tsconfig.json present but unparseable; alias resolution disabled") and proceed without aliases. Do not fail the snapshot — Rule 15 (warning, not crash) extends naturally to this case.
+
+- **Add `resolve_tsconfig_alias` to `sdivi-graph/src/dependency_graph.rs`:**
+  - Signature: `fn resolve_tsconfig_alias(specifier: &str, paths: &TsConfigPaths, path_to_node: &BTreeMap<PathBuf, NodeIndex>) -> Vec<NodeIndex>`.
+  - Iterate `paths.mappings` in **insertion order from the config** (not BTree order — tsc honors longest-prefix-match, but the dominant convention is "first match wins" and the spec's most-specific rules can come later if needed). Update the `TsConfigPaths` struct to use an ordered map (`Vec<(String, Vec<String>)>`) to preserve insertion order from the JSON parse.
+  - For each pattern key, attempt match: split key on `*` (at most one `*` allowed by spec). If exact (no `*`) and `specifier == key`, match with empty capture. If pattern `prefix*` and `specifier.starts_with(prefix)`, capture is `&specifier[prefix.len()..]`. If pattern `prefix*suffix`, capture is the middle. (One `*` total — TypeScript's spec.)
+  - On match, iterate the target list. For each target, substitute the capture for the target's `*` (if any) and join with `base_url` (if present) or with the tsconfig directory (if `base_url` absent). Pass the resulting path through the same file-vs-directory-index lookup logic as `resolve_relative`. First target that resolves to a node wins.
+  - Return `Vec<NodeIndex>` (matching M26's pluralized resolver API). Empty Vec means no alias matched or no alias target resolved.
+
+- **Wire into the resolver dispatch:** In `resolve_imports` (M26's renamed function), for `language in ("typescript", "javascript")` and a specifier that does **not** start with `./`, `../`, or `/` (an absolute path), try `resolve_tsconfig_alias` *before* declaring the import external. Order:
+  1. Relative (`./`, `../`) → `resolve_relative`.
+  2. tsconfig alias match (specifier matches a `paths` key pattern) → `resolve_tsconfig_alias`.
+  3. Otherwise → external (return empty `Vec`).
+
+- **Tests:**
+  - Unit test in `sdivi-graph/tests/tsconfig_alias.rs` (new): build a synthetic `path_to_node` and `TsConfigPaths`, exercise:
+    - Exact alias (`"~lib": ["./src/lib/index.ts"]`).
+    - Wildcard alias (`"@/*": ["./*"]`) with several specifiers.
+    - Multi-target fallback (`"@x/*": ["a/*", "b/*"]`) where only `b/foo.ts` exists.
+    - Pattern with prefix and suffix (`"#int/*.types": ["src/types/*.types.ts"]`).
+    - No match (specifier doesn't match any pattern) → empty Vec.
+    - Match but target doesn't exist → empty Vec, falls through to external.
+  - Integration test: drop a fixture under `tests/fixtures/tsconfig-alias/` with `tsconfig.json`, a few `.ts` files using `@/`, and assert pinned edge counts via `Pipeline::snapshot`.
+  - Bifl-tracker validation: run `Pipeline::snapshot` on the user's bifl-tracker (or a copy) and confirm `@/...` imports now resolve. This is a manual verification step in the M27 PR description, not an automated test.
+
+**Migration Impact:** Edge counts increase on TS/JS projects that use path aliases — typically by 10–40% on top of the M25+M26 baseline, depending on how alias-heavy the codebase is. `snapshot_version` stays `"1.0"`. For projects without `tsconfig.json` / `jsconfig.json`, behavior is unchanged. Update `CHANGELOG.md` and combine the M25-M26-M27 re-baseline guidance into a single `MIGRATION_NOTES.md` entry — telling adopters who upgrade across all three milestones to expect a ~5-50× edge count increase on TS/JS projects, and to use a 1-2 week threshold override during the cutover.
+
+**Files to create or modify:**
+
+- **Modify:** `crates/sdivi-graph/src/dependency_graph.rs` — add tsconfig discovery, JSONC-tolerant parse, `TsConfigPaths` struct, `resolve_tsconfig_alias`, dispatch wiring. Cache the parsed config on the graph builder so it's read once per snapshot, not once per import.
+- **Modify:** `crates/sdivi-graph/Cargo.toml` — no new deps if option (A) is chosen; otherwise add `jsonc-parser` or equivalent. Verify any new dep compiles for `wasm32-unknown-unknown` (this code is feature-gated behind `pipeline-records` and not in `sdivi-core`'s WASM build, so a WASM-incompatible JSONC dep is acceptable — but flag it explicitly in the PR description).
+- **Create:** `crates/sdivi-graph/tests/tsconfig_alias.rs` — unit tests for alias resolution.
+- **Create:** `tests/fixtures/tsconfig-alias/tsconfig.json` plus a few `.ts` files — integration fixture.
+- **Modify:** `tests/full_pipeline.rs` (or wherever the workspace integration tests live) — add a case using the new fixture.
+- **Modify:** `CHANGELOG.md` — under **Added**: "tsconfig.json / jsconfig.json `compilerOptions.paths` alias resolution."
+- **Modify:** `docs/cli-integration.md` and/or `docs/library-embedding.md` — note alias support and the (deferred) `extends` limitation.
+- **Modify:** `MIGRATION_NOTES.md` — combined M25+M26+M27 re-baseline note.
+
+**Acceptance criteria:**
+
+- New unit and integration tests pass.
+- `cargo test --workspace` continues green.
+- `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- `cargo build --target wasm32-unknown-unknown -p sdivi-core --no-default-features` continues to succeed (this milestone is in `sdivi-graph` behind `pipeline-records`, not in `sdivi-core`'s WASM build).
+- Snapshotting the bifl-tracker fixture (or a copy of the user's bifl-tracker) shows `@/`-aliased edges resolved — verifiable by inspecting the snapshot JSON for edges crossing alias-resolved boundaries.
+- Determinism preserved: two runs against the same repo produce a bit-identical snapshot, including the parsed alias map's contribution to edges.
+- A repo with malformed `tsconfig.json` produces a stderr `WARN` and a successful snapshot (alias resolution disabled, other resolution unaffected).
+- A repo with no `tsconfig.json` produces no warnings and a successful snapshot (M27 silently does nothing).
+
+**Tests:**
+
+- All unit tests in `tsconfig_alias.rs`.
+- Integration via `tests/fixtures/tsconfig-alias/`.
+- Property test: random alias patterns + random specifiers; resolver either resolves to a path in `path_to_node` or returns empty Vec — no panics, no non-deterministic outcomes.
+- Negative test: `tsconfig.json` declared with a pattern that has two `*`s (illegal per spec) — log `WARN`, skip that pattern, continue.
+- Determinism test: same alias map, same specifiers, two runs produce identical edge lists in identical order.
+
+**Multi-Language Regression Guarantees:**
+
+M27 is the most surgically scoped of the M25–M27 trio:
+
+- **Only the `language in ("typescript", "javascript")` dispatch arm is modified.** Rust, Python, Go, Java resolution code paths are not touched. A Rust file with a `crate::foo::bar` import goes through the same M26 resolver logic before and after M27.
+- **No effect when tsconfig is absent.** The `TsConfigPaths` struct is only built if a `tsconfig.json` or `jsconfig.json` exists at the repo root. When absent, `resolve_tsconfig_alias` is never invoked, and the resolver behaves identically to M26 for all 6 languages — including TS/JS.
+- **Layered before "external" determination, not before relative resolution.** The dispatch order for TS/JS in M26 is: relative (`./`/`../`) → external. M27 inserts alias resolution between the two: relative → alias → external. Specifiers that match `./` or `../` never reach the alias step; specifiers that don't match any alias still fall through to "external" as in M26. Pure-additive on the resolution path.
+- **JSONC parser is feature-gated to `pipeline-records`.** Tsconfig parsing happens only inside `build_dependency_graph` which is `#[cfg(feature = "pipeline-records")]`. The `sdivi-core` WASM build path doesn't see it — Rule 21 is preserved by construction.
+- **Existing TS/JS fixtures (`tests/fixtures/simple-typescript`, `simple-javascript`) must produce identical edge counts pre- and post-M27** (assuming they don't have a `tsconfig.json`). Add this as a test sentinel.
+- **Per-language baselines pinned in M26 are extended for M27.** The `per_language_baselines.rs` file gains a 7th entry (`tsconfig-alias` fixture). The other 6 baselines are byte-identical between M26 and M27 as a regression guard.
+
+**Watch For:**
+
+- **JSONC corner cases.** `// line comments`, `/* block comments */`, trailing commas in objects/arrays. The state-machine pre-pass must handle: comments inside strings (don't strip), strings inside comments (don't terminate the comment early), escape sequences (`\"` inside strings). A small property test that strips comments and then re-parses the unstripped JSON's string literals is a good guard.
+- **`baseUrl` interaction with path aliases.** When `baseUrl` is set and `paths` is also set, alias resolution starts from `baseUrl`. When only `baseUrl` is set, *every* non-relative import is resolved against `baseUrl` first — this is technically separate from `paths` but commonly used together. Decision for M27: only resolve specifiers that match a `paths` key. Pure `baseUrl`-only resolution (without an alias) is rare enough to defer; document the limitation in `Watch For` and `Seeds Forward`.
+- **`extends` chains.** `tsconfig.json` can extend another tsconfig (e.g. `"extends": "@tsconfig/next/tsconfig.json"` from a node_modules package). Resolving the chain requires walking package.json's, which is a different scope. M27 reads only the literal `compilerOptions.paths` from the root `tsconfig.json`; if the project's actual paths are inherited from a base, those won't be picked up. Document. If a real adopter hits this, file a follow-up milestone.
+- **Multiple tsconfig.json files (monorepos).** Per-package `tsconfig.json` under `packages/*/tsconfig.json` is common in pnpm/yarn workspaces. M27 reads only the root `tsconfig.json`. For monorepo support, the resolver would need to find the nearest tsconfig walking up from each importing file. Defer to a follow-up. Document the limitation explicitly: "tsconfig path aliases are read from the repo root tsconfig.json only; per-package tsconfigs in monorepos are not currently supported."
+- **The `*` substitution exact semantics.** When `"@/*": ["./*"]` and the specifier is `@/foo/bar.css`, the capture is `foo/bar.css`. Substitution gives `./foo/bar.css`. The `.css` is not in the resolver's extension list. Decision: alias resolution honors any extension if the file exists at exactly that path (no extension append). If the substituted path doesn't exist as-is, then try the standard extension/index list. This matches `tsc`'s behavior closely enough for structural analysis.
+- **Determinism (Rule 5 / KDD-10).** The alias map is a `BTreeMap` for serde output ordering — but the resolver matching order is the **insertion order from the JSON file**, not BTreeMap's lexicographic order. Use `Vec<(String, Vec<String>)>` for the matching loop while preserving `BTreeMap` for any serialized representation.
+- **Don't add a CLI flag to disable aliases.** If a user wants to skip alias resolution, they can move the tsconfig out of the way. Keeping the surface area small avoids a config-key proliferation.
+- **Don't try to honor `.npmrc` / pnpm workspace files / yarn workspaces.** These are package-resolution concerns, not module-resolution. Out of scope.
+
+**Seeds Forward:**
+
+- **`extends` chain support.** When a project's `compilerOptions.paths` is defined in a base tsconfig (common in Next.js / Vite starter kits), M27 won't see it. A follow-up milestone could chase the chain.
+- **`baseUrl`-only resolution** (no `paths` block) — the current decision is to skip. If observed in real adopter projects, add as a follow-up.
+- **Per-package monorepo tsconfig discovery.** Walk up from each importing file to find the nearest tsconfig. Adds complexity (per-file alias map) but unlocks pnpm/yarn workspace projects. Defer until requested.
+- **`package.json` `imports` field** (Node subpath imports, `#alias/foo` style). Parallel to tsconfig aliases but in a different config file. Defer.
+- **`vite.config.ts` / `webpack.config.js` resolver aliases.** These are JavaScript files, not JSON; reading them statically is a non-starter. Document as out of scope.
+
+---

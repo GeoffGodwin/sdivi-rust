@@ -1,0 +1,10 @@
+{
+  // tsconfig-alias fixture: tests M27 path alias resolution
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "~lib": ["./src/lib/index.ts"]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 //! AST extraction helpers for the JavaScript language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::{js_string_content, truncate_to_256_bytes};
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -23,19 +24,32 @@ const DECLARATION_KINDS: &[&str] = &[
     "variable_declaration",
 ];
 
-/// Extracts `import` statement text from the AST.
+/// Extracts module specifiers from `import` statements, `require()` calls, and
+/// dynamic `import()` expressions in the AST.
+///
+/// - `import { foo } from "./utils"` → `["./utils"]`
+/// - `const x = require("./utils")` → `["./utils"]`
+/// - `import("./utils")` → `["./utils"]` when the grammar represents the callee
+///   as an `import` node; best-effort and grammar-version-dependent
+/// - `require(varName)` / `import(expr)` with non-string arg → skipped
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
-        if node.kind() == "import_statement" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
+        match node.kind() {
+            "import_statement" => {
+                if let Some(spec) = import_string_specifier(node, source) {
+                    imports.push(spec);
                 }
+                continue; // don't recurse into import children
             }
-            continue;
+            "call_expression" => {
+                if let Some(spec) = require_or_dynamic_import_specifier(node, source) {
+                    imports.push(spec);
+                }
+                // Still recurse — nested require() calls inside other expressions.
+            }
+            _ => {}
         }
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i) {
@@ -44,6 +58,42 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Returns the string specifier from a `require("…")` or dynamic `import("…")`.
+///
+/// Returns `None` if:
+/// - the call is not `require` or `import`
+/// - the argument is not a string literal (variable, template, etc.)
+fn require_or_dynamic_import_specifier(call: Node<'_>, source: &[u8]) -> Option<String> {
+    let func = call.child_by_field_name("function")?;
+    let func_kind = func.kind();
+    let is_require = func_kind == "identifier" && func.utf8_text(source).ok()? == "require";
+    let is_dynamic_import = func_kind == "import";
+    if !is_require && !is_dynamic_import {
+        return None;
+    }
+    let args = call.child_by_field_name("arguments")?;
+    for i in 0..args.child_count() {
+        let Some(child) = args.child(i) else { continue };
+        if child.kind() == "string" {
+            return js_string_content(child, source);
+        }
+    }
+    None
+}
+
+/// Finds the `string` child of an `import_statement` and returns its content.
+fn import_string_specifier(import_node: Node<'_>, source: &[u8]) -> Option<String> {
+    for i in 0..import_node.child_count() {
+        let Some(child) = import_node.child(i) else {
+            continue;
+        };
+        if child.kind() == "string" {
+            return js_string_content(child, source);
+        }
+    }
+    None
 }
 
 /// Extracts names of top-level exported items.
@@ -152,18 +202,4 @@ fn js_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

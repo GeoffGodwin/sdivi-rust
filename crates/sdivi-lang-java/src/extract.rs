@@ -1,6 +1,7 @@
 //! AST extraction helpers for the Java language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::truncate_to_256_bytes;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -22,17 +23,21 @@ const EXPORTABLE_KINDS: &[&str] = &[
     "record_declaration",
 ];
 
-/// Extracts `import_declaration` text from the AST.
+/// Extracts the module specifier from each `import_declaration` in the AST.
+///
+/// - `import java.util.List;` → `["java.util.List"]`
+/// - `import java.util.*;` → `["java.util.*"]` (wildcard preserved)
+/// - `import static org.junit.Assert.assertEquals;` → `["org.junit.Assert"]`
+///   (trailing member name stripped — the class is the module)
+/// - `import static org.junit.Assert.*;` → `["org.junit.Assert"]`
+///   (wildcard static import; `*` stripped, scoped_identifier is the class)
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if node.kind() == "import_declaration" {
-            if let Ok(text) = node.utf8_text(source) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    imports.push(text);
-                }
+            if let Some(spec) = java_import_specifier(node, source) {
+                imports.push(spec);
             }
             continue;
         }
@@ -43,6 +48,54 @@ pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
         }
     }
     imports
+}
+
+/// Derives the module specifier from a single `import_declaration` node.
+///
+/// Wildcard detection uses the node's source text (`".*"` substring) rather
+/// than child node kind matching, because tree-sitter-java 0.21.x represents
+/// the anonymous `*` terminal with a kind that varies across grammar versions.
+fn java_import_specifier(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let mut is_static = false;
+    let mut qualified: Option<String> = None;
+
+    for i in 0..node.child_count() {
+        let Some(child) = node.child(i) else { continue };
+        match child.kind() {
+            "static" => {
+                is_static = true;
+            }
+            "scoped_identifier" | "identifier" => {
+                qualified = child
+                    .utf8_text(source)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty());
+            }
+            _ => {}
+        }
+    }
+
+    let qualified = qualified?;
+    // ".*" in the declaration source text always means wildcard in Java imports.
+    let has_wildcard = node.utf8_text(source).unwrap_or("").contains(".*");
+
+    if is_static {
+        if has_wildcard {
+            // `import static a.b.C.*` → "a.b.C" (qualified stops at the class)
+            Some(qualified)
+        } else {
+            // `import static a.b.C.method` → "a.b.C" (strip trailing member)
+            let pos = qualified.rfind('.')?;
+            Some(qualified[..pos].to_string())
+        }
+    } else if has_wildcard {
+        // `import a.b.*` → "a.b.*"
+        Some(format!("{qualified}.*"))
+    } else {
+        // `import a.b.C` → "a.b.C"
+        Some(qualified)
+    }
 }
 
 /// Extracts names of `public` top-level declarations.
@@ -145,18 +198,4 @@ fn java_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

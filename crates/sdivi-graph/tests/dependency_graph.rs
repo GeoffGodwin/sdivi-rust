@@ -1,7 +1,5 @@
-//! Tests for DependencyGraph accessor methods and import resolution strategies.
-//!
-//! Exercises: node_path, node_for_path, edges_as_pairs, neighbors, relative
-//! path resolution, directory-module resolution, and ambiguous-stem handling.
+//! Tests for DependencyGraph accessor methods, import resolution strategies,
+//! and M25 specifier shape assertions.
 
 use sdivi_graph::dependency_graph::build_dependency_graph;
 use sdivi_parsing::feature_record::FeatureRecord;
@@ -150,21 +148,18 @@ fn relative_import_dot_slash_resolves_to_sibling() {
 }
 
 #[test]
-fn relative_import_parent_slash_strips_prefix_resolves_in_same_dir() {
-    // The implementation strips the `../` prefix but then resolves in the
-    // importer's own directory, not the parent.  `../shared` from
-    // `src/sub/module.py` looks for `src/sub/shared.py` (same directory),
-    // NOT `src/shared.py` (parent directory).
-    // See BUG note in TESTER_REPORT.md re: parent navigation not implemented.
+fn relative_import_parent_slash_resolves_to_parent_dir() {
+    // M26 fix: `../shared` from `src/sub/module.py` walks up one directory
+    // and resolves to `src/shared.py`, not the same-dir file.
     let records = vec![
         make_record("src/sub/module.py", &["../shared"]),
-        make_record("src/sub/shared.py", &[]), // same dir, not parent
+        make_record("src/shared.py", &[]), // parent dir — correct target
     ];
     let dg = build_dependency_graph(&records);
     assert_eq!(
         dg.edge_count(),
         1,
-        "../shared strips prefix and resolves in same directory"
+        "../shared must resolve to src/shared.py via parent navigation"
     );
 }
 
@@ -249,8 +244,7 @@ fn super_prefix_resolves_to_stem() {
 
 #[test]
 fn ambiguous_stem_does_not_add_edge() {
-    // Both `src/models.rs` and `lib/models.rs` share stem "models".
-    // Resolution is ambiguous — no edge should be added.
+    // Two files share stem "models" — resolution is ambiguous; no edge added.
     let records = vec![
         make_record("src/main.rs", &["crate::models"]),
         make_record("src/models.rs", &[]),
@@ -264,8 +258,6 @@ fn ambiguous_stem_does_not_add_edge() {
     );
 }
 
-// ── external imports are dropped ─────────────────────────────────────────────
-
 #[test]
 fn external_crate_import_produces_no_edge() {
     let records = vec![
@@ -274,4 +266,34 @@ fn external_crate_import_produces_no_edge() {
     ];
     let dg = build_dependency_graph(&records);
     assert_eq!(dg.edge_count(), 0, "external imports must produce no edges");
+}
+
+#[test]
+fn python_from_import_dotted_specifier_requires_python_language() {
+    // With language:"rust" (make_record default), "foo.bar" dispatches to the Rust
+    // resolver (no crate::/self::/super:: prefix); Python dotted requires language:"python".
+    let records = vec![
+        make_record("src/main.py", &["foo.bar"]),
+        make_record("src/foo/bar.py", &[]),
+    ];
+    let dg = build_dependency_graph(&records);
+    assert_eq!(
+        dg.edge_count(),
+        0,
+        "language:\"rust\" record dispatches to Rust resolver; dotted specifier dropped"
+    );
+}
+#[test]
+fn typescript_import_string_fragment_resolves() {
+    // TypeScriptAdapter produces "./utils" from `import { x } from "./utils"`.
+    let records = vec![
+        make_record("src/app.ts", &["./utils"]),
+        make_record("src/utils.ts", &[]),
+    ];
+    let dg = build_dependency_graph(&records);
+    assert_eq!(
+        dg.edge_count(),
+        1,
+        "./utils specifier from TS adapter must resolve"
+    );
 }

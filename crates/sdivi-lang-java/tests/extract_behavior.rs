@@ -19,18 +19,45 @@ fn adapter_handles_java_extension() {
     assert!(JavaAdapter.file_extensions().contains(&".java"));
 }
 
+// ── regular imports ───────────────────────────────────────────────────────────
+
 #[test]
-fn import_declaration_is_extracted() {
+fn plain_import_yields_qualified_name() {
     let record = parse("import java.util.List;\npublic class A {}\n");
-    assert_eq!(record.imports.len(), 1);
-    assert!(record.imports[0].contains("import"));
+    assert_eq!(record.imports, &["java.util.List"]);
 }
 
 #[test]
 fn multiple_imports_are_extracted() {
     let record = parse("import java.util.List;\nimport java.util.Map;\npublic class A {}\n");
     assert_eq!(record.imports.len(), 2);
+    assert!(record.imports.contains(&"java.util.List".to_string()));
+    assert!(record.imports.contains(&"java.util.Map".to_string()));
 }
+
+// ── wildcard imports ──────────────────────────────────────────────────────────
+
+#[test]
+fn wildcard_import_appends_star() {
+    let record = parse("import java.util.*;\npublic class A {}\n");
+    assert_eq!(record.imports, &["java.util.*"]);
+}
+
+// ── static imports ────────────────────────────────────────────────────────────
+
+#[test]
+fn static_import_strips_member_name() {
+    let record = parse("import static org.junit.Assert.assertEquals;\npublic class A {}\n");
+    assert_eq!(record.imports, &["org.junit.Assert"]);
+}
+
+#[test]
+fn static_wildcard_import_yields_class_specifier() {
+    let record = parse("import static org.junit.Assert.*;\npublic class A {}\n");
+    assert_eq!(record.imports, &["org.junit.Assert"]);
+}
+
+// ── exports ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn public_class_is_exported() {
@@ -51,6 +78,8 @@ fn package_private_class_is_not_exported() {
         record.exports
     );
 }
+
+// ── pattern hints ─────────────────────────────────────────────────────────────
 
 #[test]
 fn try_statement_captured_as_pattern_hint() {

@@ -7,6 +7,77 @@ major-version bumps.
 For the broader migration story from the Python POC (`sdi-py`), see
 [`docs/migrating-from-sdi-py.md`](docs/migrating-from-sdi-py.md).
 
+## 0.2.x → 0.3.0 (M25 + M26 resolver fixes — no schema break)
+
+### Graph resolver: parent navigation and per-language dispatch (M26)
+
+**What changed.** The graph resolver previously stripped `../` and `super::`
+characters but never walked up the directory tree, so all parent-relative
+imports resolved to nothing. It also had no per-language dispatch — Python
+dotted specifiers, Go module-path imports, and Java dotted class names were all
+dropped silently.
+
+M26 fixes this:
+- `../` and `../../` imports now walk up the correct number of directory levels
+  before resolving file extensions (TypeScript, JavaScript, Python, etc.).
+- `super::` Rust imports navigate to the parent directory and search for the
+  stem there before falling back to the global stem map.
+- Python: `foo.bar` resolves to `foo/bar.py` or `foo/bar/__init__.py`; relative
+  imports with leading dots (`.sibling`, `..pkg`) resolve per PEP 328.
+- Go: module-path imports strip the `module` prefix from `go.mod` and resolve
+  to all `.go` files in the resulting directory. The pipeline reads `go.mod`
+  automatically; non-pipeline callers use `build_dependency_graph_with_go_module`.
+- Java: `com.acme.lib.Util` resolves via standard Maven source roots
+  (`src/main/java`, `src/test/java`) plus dynamically discovered module roots.
+  Wildcard imports (`com.acme.lib.*`) emit one edge per class file in the package.
+
+**Schema impact.** None. `snapshot_version` stays `"1.0"`.
+
+**Baseline impact.** Edge counts increase substantially — especially on
+Python, Go, and Java projects. The same re-baseline or threshold-override
+strategy from M25 applies; see below.
+
+### Import specifier extraction: substantial edge-count increase on non-Rust projects (M25)
+
+**What changed.** Language adapters for Python, TypeScript, JavaScript, Go, and
+Java previously emitted whole import-statement text into `FeatureRecord::imports`
+(e.g. `"import { foo } from '../lib/x'"`). The graph resolver silently dropped
+every such string, producing zero cross-file edges for all five languages.
+Adapters now emit only the module specifier (e.g. `"../lib/x"`). Edges that
+were previously invisible now resolve, and all coupling-based metrics become
+meaningful.
+
+**Schema impact.** None. `snapshot_version` stays `"1.0"`. Pre-M25 snapshots
+are still readable; the change affects only the content of future snapshots.
+
+**Baseline impact.** The first `sdivi snapshot` after upgrading will produce
+a large `coupling_delta` and `community_count_delta` against any pre-M25
+baseline on a Python/TS/JS/Go/Java project. `boundary_violation_rate` will
+likely increase if you have a `.sdivi/boundaries.yaml` declared, because
+violations that were previously undetectable now appear.
+
+**Recommended migration:**
+
+Option A — re-baseline (cleanest):
+```bash
+rm .sdivi/snapshots/*.json   # clear old baselines
+sdivi snapshot               # first snapshot under new adapter
+```
+
+Option B — one-time override (preserves trend history):
+```toml
+# .sdivi/config.toml — expires after the spike settles
+[thresholds.overrides.coupling]
+coupling_delta_rate = 50.0
+expires = "2026-06-01"
+reason = "M25+M26 fixes; first post-upgrade snapshot has large coupling_delta"
+
+[thresholds.overrides.boundaries]
+boundary_violation_rate = 20.0
+expires = "2026-06-01"
+reason = "M25+M26 fixes; first post-upgrade snapshot may spike violations"
+```
+
 ## 0.1.x
 
 No breaking changes between 0.1.0 and 0.1.14. Every release in the 0.1 line is
