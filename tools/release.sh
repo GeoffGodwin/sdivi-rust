@@ -5,7 +5,7 @@
 # Modes:
 #   prepare              Validate version coherence and print a release
 #                        checklist. Verifies the workspace version, the
-#                        WASM package.json, and the release notes file.
+#                        WASM pkg-template/package.json, and the release notes file.
 #   post-merge           Create/push tag + create GitHub Release.
 #
 # Source of truth:
@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NOTES_DIR="$REPO_ROOT/tools/release_notes"
 CARGO_TOML="$REPO_ROOT/Cargo.toml"
-WASM_PKG_JSON="$REPO_ROOT/bindings/sdivi-wasm/package.json"
+WASM_PKG_JSON="$REPO_ROOT/bindings/sdivi-wasm/pkg-template/package.json"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
 
 err()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
@@ -46,7 +46,7 @@ Notes:
   - Optional vX.Y.Z argument must match the workspace version exactly if
     provided.
   - Release notes must exist at tools/release_notes/vX.Y.Z.md.
-  - The workspace version must match bindings/sdivi-wasm/package.json.
+  - The workspace version must match bindings/sdivi-wasm/pkg-template/package.json.
 EOF
     exit 1
 }

@@ -1004,7 +1004,12 @@ version = "0.2.13"
 dependencies = [
  "petgraph",
  "sdivi-config",
+ "sdivi-lang-go",
+ "sdivi-lang-java",
+ "sdivi-lang-javascript",
+ "sdivi-lang-python",
  "sdivi-lang-rust",
+ "sdivi-lang-typescript",
  "sdivi-parsing",
  "serde",
  "serde_json",
@@ -1090,6 +1095,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "tree-sitter",
  "walkdir",
 ]
 

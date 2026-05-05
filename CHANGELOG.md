@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.2.14] - 2026-05-04
+
+### Added
+- **Milestone 26 — Resolver: Parent Navigation and Per-Language Module Conventions** (M26)
 
 ### Fixed
 
@@ -22,9 +26,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Impact on existing baselines:** The first snapshot taken after upgrading
   will show a large `coupling_delta` and `community_count_delta` compared to
   any pre-M25 baseline. This is a correctness fix, not a schema change —
-  `snapshot_version` remains `"1.0"`. Re-baseline at the M25 boundary or use
+  `snapshot_version` remains `"1.0"`. Re-baseline at the M25+M26 boundary or use
   one-time threshold overrides (with `expires` set 1–2 weeks out) to absorb
   the cutover. See `MIGRATION_NOTES.md` for guidance.
+
+- Dependency graph resolver now navigates parent directories for `../` and
+  `super::` imports instead of only stripping the prefix characters. The
+  resolver also gained per-language dispatch: Python bare dotted specifiers
+  (`foo.bar`) resolve as path lookups; Go module-path imports resolve via the
+  `go.mod` module prefix (auto-detected by the pipeline); Java dotted imports
+  resolve via standard Maven source roots plus auto-discovered module roots;
+  wildcard Java imports (`com.acme.lib.*`) emit one edge per class file.
+  Combined with the M25 adapter fixes, cross-file edge counts on Python, TS,
+  JS, Go, and Java projects now reflect the actual import graph.
+
+  **New API:** `build_dependency_graph_with_go_module(records, go_module)` —
+  accepts an optional Go module prefix so WASM / non-pipeline callers can
+  supply the value without touching the filesystem.
 
 ## [0.2.13] - 2026-05-04
 

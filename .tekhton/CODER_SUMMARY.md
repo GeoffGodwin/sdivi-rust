@@ -2,54 +2,97 @@
 ## Status: COMPLETE
 
 ## What Was Implemented
-- Rewrote `extract_imports` in Python, TypeScript, JavaScript, Go, and Java adapters to emit
-  module specifiers instead of whole-statement text
-- Added per-language helper functions for specifier extraction
-- Updated adapter unit tests to assert specifier strings, added coverage for all import variants
-- Added 2 new shape-assertion tests to `crates/sdivi-graph/tests/dependency_graph.rs`
-- Created per-language fixture directories with source files
-- Added `crates/sdivi-parsing/tests/import_extraction.rs` integration test with pinned edge counts
-- Updated `crates/sdivi-parsing/Cargo.toml` dev-deps to include non-Rust adapters and sdivi-graph
-- Updated `CHANGELOG.md` and `MIGRATION_NOTES.md`
-- Trimmed all modified files to under 300 lines (pre-completion self-check)
+
+**Milestone 26 — Resolver: Parent Navigation and Per-Language Module Conventions**
+
+Rewrote the dependency-graph import resolver to actually navigate parent
+directories and dispatch per language. The old code stripped `../` and `super::`
+characters but never walked up the directory tree, so all parent-relative imports
+produced zero edges.
+
+### Changes
+
+**New files:**
+- `crates/sdivi-graph/src/resolve.rs` (299 lines) — main dispatcher with helpers:
+  `extensions_for_language`, `build_stem_map`, `compute_java_roots`,
+  `resolve_imports`, `lang_from_path_ext`, `try_path`, `resolve_relative`,
+  `resolve_super`, `find_stem_in_subtree`.
+- `crates/sdivi-graph/src/resolve_lang.rs` (140 lines) — Python/Go/Java resolvers:
+  `resolve_python_bare`, `resolve_python_relative`, `resolve_go_module`,
+  `resolve_java_dotted`.
+- `crates/sdivi-graph/tests/resolver_unit.rs` (285 lines) — 17 unit tests covering
+  all resolver paths.
+- `crates/sdivi-graph/tests/integration_real_world.rs` (99 lines) — multi-language
+  synthetic test (TS + Python + Go + Java, 8 edges).
+- `crates/sdivi-graph/tests/per_language_baselines.rs` (128 lines) — pinned
+  per-language edge-count baselines post-M26.
+
+**Modified files:**
+- `crates/sdivi-graph/src/dependency_graph.rs` — removed old resolver; added
+  `build_dependency_graph_with_go_module(records, go_module: Option<&str>)`;
+  `build_dependency_graph` delegates with `None`.
+- `crates/sdivi-graph/src/lib.rs` — added `resolve` and `resolve_lang` modules;
+  exported `build_dependency_graph_with_go_module`.
+- `crates/sdivi-graph/Cargo.toml` — added dev-deps for all language adapter crates
+  and `sdivi-config`.
+- `crates/sdivi-pipeline/src/pipeline.rs` (299 lines) — reads `go.mod` at Stage 2,
+  calls `build_dependency_graph_with_go_module`.
+- `crates/sdivi-graph/tests/dependency_graph.rs` (299 lines) — updated two tests for
+  M26 semantics.
+- `crates/sdivi-parsing/tests/import_extraction.rs` — updated edge-count expectations.
+- `CHANGELOG.md` — M26 entry added to `[Unreleased]` Fixed section.
+- `MIGRATION_NOTES.md` — M26 re-baseline guidance prepended to the 0.2.x→0.3.0 section.
 
 ## Root Cause (bugs only)
-Each non-Rust adapter called `node.utf8_text(source)` on the top-level import statement node
-and pushed the resulting whole-statement text (e.g. `"import { foo } from '../lib/x';"`) into
-`FeatureRecord::imports`. The graph resolver's `resolve_import` then dropped every such string
-because it doesn't start with `./`, `../`, `crate::`, `self::`, or `super::`, producing zero
-cross-file edges for every non-Rust language.
 
-## Files Modified
-- `crates/sdivi-lang-python/src/extract.rs` — rewrite extract_imports to emit specifiers
-- `crates/sdivi-lang-typescript/src/extract.rs` — rewrite extract_imports to emit string_fragment
-- `crates/sdivi-lang-javascript/src/extract.rs` — rewrite extract_imports; add require() + dynamic import()
-- `crates/sdivi-lang-go/src/extract.rs` — rewrite extract_imports to emit path strings per import_spec
-- `crates/sdivi-lang-java/src/extract.rs` — rewrite extract_imports to emit scoped_identifier text
-- `crates/sdivi-lang-python/tests/extract_behavior.rs` — updated assertions, new variant tests
-- `crates/sdivi-lang-typescript/tests/extract_behavior.rs` — updated assertions, new variant tests
-- `crates/sdivi-lang-javascript/tests/extract_behavior.rs` — updated assertions, require/dynamic import tests
-- `crates/sdivi-lang-go/tests/extract_behavior.rs` — updated assertions, grouped/aliased/blank/dot tests
-- `crates/sdivi-lang-java/tests/extract_behavior.rs` — updated assertions, wildcard/static tests
-- `crates/sdivi-graph/tests/dependency_graph.rs` — 2 new shape-assertion tests; trimmed to 299 lines
-- `crates/sdivi-parsing/Cargo.toml` — added dev-deps
-- `tests/fixtures/simple-python/` — (NEW) Python fixture files
-- `tests/fixtures/simple-typescript/` — (NEW) TypeScript fixture files
-- `tests/fixtures/simple-javascript/` — (NEW) JavaScript fixture files
-- `tests/fixtures/simple-go/` — (NEW) Go fixture files
-- `tests/fixtures/simple-java/` — (NEW) Java fixture files
-- `crates/sdivi-parsing/tests/import_extraction.rs` — (NEW) multi-language integration test
-- `CHANGELOG.md` — Fixed entry for M25
-- `MIGRATION_NOTES.md` — Re-baseline guidance for existing users
+Two bugs in the old `resolve_relative` and `resolve_import`:
+1. `../` stripping: the code removed leading `../` tokens but left `base` pointing
+   at the importer's own directory — parent-relative imports resolved to nothing.
+2. No language dispatch: all non-Rust, non-relative imports were dropped silently;
+   Python dotted, Go module-path, and Java dotted specifiers had no handler.
+
+## Design Decisions
+
+- **`lang_from_path_ext`** infers effective language from the importer's file
+  extension for `./`/`../` imports, preserving backward compatibility for test
+  fixtures that carry `language:"rust"` with `.ts`/`.py` paths.
+- **`build_dependency_graph_with_go_module`** exposes Go module prefix as a parameter
+  so non-pipeline callers (WASM, tests) can supply it without touching the
+  filesystem. The pipeline reads `go.mod` in `pipeline.rs` — FS I/O never enters
+  `sdivi-graph` (Rule 22).
+- **`compute_java_roots`** discovers multi-module Maven roots dynamically from
+  `path_to_node` keys to avoid hardcoding module names.
+- **File-over-directory tie-break:** `try_path` tries `{rem}.{ext}` before
+  `{rem}/{index}` within each language's extension list.
 
 ## Human Notes Status
-No explicit human notes listed beyond milestone spec.
 
-## Docs Updated
-None — no public-surface changes in this task. The `FeatureRecord::imports` field semantics
-changed (specifiers instead of statement text), but this is an internal pipeline type not part
-of the documented public API surface (`sdivi-core` compute functions, CLI flags, config keys,
-or snapshot JSON schema). The CHANGELOG.md and MIGRATION_NOTES.md entries added in the previous
-coder run document the behavior change for users who snapshot non-Rust repos.
+No explicit human notes beyond the milestone spec.
 
-## Observed Issues (out of scope)
+## Files Modified (auto-detected)
+- `.claude/milestones/MANIFEST.cfg`
+- `.claude/milestones/m26-resolver-parent-navigation-and-language-conventions.md`
+- `.github/workflows/wasm.yml`
+- `.tekhton/CODER_SUMMARY.md`
+- `.tekhton/DRIFT_LOG.md`
+- `.tekhton/HUMAN_ACTION_REQUIRED.md`
+- `.tekhton/test_dedup.fingerprint`
+- `CHANGELOG.md`
+- `Cargo.lock`
+- `MIGRATION_NOTES.md`
+- `bindings/sdivi-wasm/package.json`
+- `crates/sdivi-core/src/categories.rs`
+- `crates/sdivi-graph/Cargo.toml`
+- `crates/sdivi-graph/src/dependency_graph.rs`
+- `crates/sdivi-graph/src/lib.rs`
+- `crates/sdivi-graph/tests/dependency_graph.rs`
+- `crates/sdivi-lang-go/src/extract.rs`
+- `crates/sdivi-lang-java/src/extract.rs`
+- `crates/sdivi-lang-javascript/src/extract.rs`
+- `crates/sdivi-lang-python/src/extract.rs`
+- `crates/sdivi-lang-typescript/src/extract.rs`
+- `crates/sdivi-parsing/Cargo.toml`
+- `crates/sdivi-parsing/src/lib.rs`
+- `crates/sdivi-parsing/tests/import_extraction.rs`
+- `crates/sdivi-pipeline/src/pipeline.rs`
+- `tools/release.sh`

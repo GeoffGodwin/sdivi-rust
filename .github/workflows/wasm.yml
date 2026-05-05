@@ -156,15 +156,10 @@ jobs:
           mkdir -p node_modules/@geoffgodwin
           ln -s "${GITHUB_WORKSPACE}/bindings/sdivi-wasm/pkg" node_modules/@geoffgodwin/sdivi-wasm
 
-      - name: Run Node.js CJS smoke test
+      - name: Run Node.js smoke tests (CJS and ESM)
         if: matrix.os == 'ubuntu-latest'
         working-directory: bindings/sdivi-wasm/tests/node_smoke
-        run: node index.cjs
-
-      - name: Run Node.js ESM smoke test
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: bindings/sdivi-wasm/tests/node_smoke
-        run: node index.mjs
+        run: npm test
 
       - name: Compare CJS and ESM category lists
         if: matrix.os == 'ubuntu-latest'

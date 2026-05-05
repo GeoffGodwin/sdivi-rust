@@ -1,6 +1,7 @@
 //! AST extraction helpers for the Java language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::truncate_to_256_bytes;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -197,18 +198,4 @@ fn java_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

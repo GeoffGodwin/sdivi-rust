@@ -1,6 +1,7 @@
 //! AST extraction helpers for the JavaScript language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::{js_string_content, truncate_to_256_bytes};
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -75,7 +76,7 @@ fn require_or_dynamic_import_specifier(call: Node<'_>, source: &[u8]) -> Option<
     for i in 0..args.child_count() {
         let Some(child) = args.child(i) else { continue };
         if child.kind() == "string" {
-            return string_content(child, source);
+            return js_string_content(child, source);
         }
     }
     None
@@ -88,35 +89,7 @@ fn import_string_specifier(import_node: Node<'_>, source: &[u8]) -> Option<Strin
             continue;
         };
         if child.kind() == "string" {
-            return string_content(child, source);
-        }
-    }
-    None
-}
-
-/// Extracts the unquoted content of a `string` node.
-fn string_content(string_node: Node<'_>, source: &[u8]) -> Option<String> {
-    for i in 0..string_node.child_count() {
-        let Some(child) = string_node.child(i) else {
-            continue;
-        };
-        if child.kind() == "string_fragment" {
-            return child
-                .utf8_text(source)
-                .ok()
-                .map(|s| s.to_string())
-                .filter(|s| !s.is_empty());
-        }
-    }
-    let text = string_node.utf8_text(source).ok()?;
-    let t = text.trim();
-    if t.len() >= 2 {
-        let q = &t[..1];
-        if (q == "\"" || q == "'") && t.ends_with(q) {
-            let inner = &t[1..t.len() - 1];
-            if !inner.is_empty() {
-                return Some(inner.to_string());
-            }
+            return js_string_content(child, source);
         }
     }
     None
@@ -228,18 +201,4 @@ fn js_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
 }

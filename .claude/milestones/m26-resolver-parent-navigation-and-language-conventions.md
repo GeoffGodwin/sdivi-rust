@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "26"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Rewrite `crates/sdivi-graph/src/dependency_graph.rs::resolve_relative` and `resolve_import` to (a) actually navigate parent directories for `../` and `super::` prefixes, (b) handle Python-style dotted module specifiers as path lookups, (c) handle Go module-path imports against the repository's `go.mod` (when present), and (d) handle Java dotted package specifiers as path lookups. The current resolver strips `../` characters with `trim_start_matches` but never walks up a directory, joins the remainder onto the importer's own directory, and looks for a flat file there — producing zero matches for the vast majority of real-world relative imports. This milestone fixes the resolver itself; M25 fixes what the adapters feed into it; M27 layers tsconfig path aliases on top.

@@ -130,8 +130,11 @@ pub fn build_dependency_graph_from_edges(
 
 /// Builds a [`DependencyGraph`] from a slice of `FeatureRecord`s.
 ///
-/// Each record becomes one node. Import strings are resolved against the set
-/// of known file paths; unresolvable imports are dropped at `DEBUG` level.
+/// Import strings are resolved against the set of known file paths; unresolvable
+/// imports (external packages, missing files) are dropped at `DEBUG` level.
+/// Go module-path imports are not resolved because the module prefix requires
+/// explicit supply — use [`build_dependency_graph_with_go_module`] from the
+/// pipeline layer when `go.mod` is available.
 ///
 /// # Examples
 ///
@@ -148,6 +151,35 @@ pub fn build_dependency_graph_from_edges(
 pub fn build_dependency_graph(
     records: &[sdivi_parsing::feature_record::FeatureRecord],
 ) -> DependencyGraph {
+    build_dependency_graph_with_go_module(records, None)
+}
+
+/// Builds a [`DependencyGraph`] with an explicit Go module prefix for resolution.
+///
+/// `go_module` should be the module path from `go.mod` (e.g.
+/// `"github.com/myorg/myapp"`). Pass `None` to treat all Go imports as
+/// external (same as [`build_dependency_graph`]).
+///
+/// The pipeline layer reads `go.mod` from the repository root and calls this
+/// function to enable internal Go package edges.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_graph::dependency_graph::build_dependency_graph_with_go_module;
+/// use sdivi_parsing::feature_record::FeatureRecord;
+///
+/// let records: Vec<FeatureRecord> = vec![];
+/// let dg = build_dependency_graph_with_go_module(&records, Some("example.com/myapp"));
+/// assert_eq!(dg.node_count(), 0);
+/// ```
+#[cfg(feature = "pipeline-records")]
+pub fn build_dependency_graph_with_go_module(
+    records: &[sdivi_parsing::feature_record::FeatureRecord],
+    go_module: Option<&str>,
+) -> DependencyGraph {
+    use crate::resolve::{build_stem_map, compute_java_roots, resolve_imports};
+
     let mut graph: Graph<PathBuf, ()> = Graph::new();
     let mut path_to_node: BTreeMap<PathBuf, NodeIndex> = BTreeMap::new();
 
@@ -157,19 +189,26 @@ pub fn build_dependency_graph(
     }
 
     let stem_map = build_stem_map(&path_to_node);
+    let java_roots = compute_java_roots(&path_to_node);
 
     for record in records {
         let from_ni = path_to_node[&record.path];
         for import in &record.imports {
-            match resolve_import(import, &record.path, &stem_map, &path_to_node) {
-                Some(to_ni) if to_ni != from_ni => {
-                    if !graph.contains_edge(from_ni, to_ni) {
-                        graph.add_edge(from_ni, to_ni, ());
-                    }
-                }
-                Some(_) => {}
-                None => {
-                    debug!(%import, path = ?record.path, "unresolved import dropped");
+            let targets = resolve_imports(
+                import,
+                &record.path,
+                &record.language,
+                &stem_map,
+                &path_to_node,
+                go_module,
+                &java_roots,
+            );
+            if targets.is_empty() {
+                debug!(%import, path = ?record.path, "unresolved import dropped");
+            }
+            for to_ni in targets {
+                if to_ni != from_ni && !graph.contains_edge(from_ni, to_ni) {
+                    graph.add_edge(from_ni, to_ni, ());
                 }
             }
         }
@@ -178,73 +217,5 @@ pub fn build_dependency_graph(
     DependencyGraph {
         graph,
         path_to_node,
-    }
-}
-
-#[cfg(feature = "pipeline-records")]
-fn build_stem_map(path_to_node: &BTreeMap<PathBuf, NodeIndex>) -> BTreeMap<String, Vec<NodeIndex>> {
-    let mut map: BTreeMap<String, Vec<NodeIndex>> = BTreeMap::new();
-    for (path, &ni) in path_to_node {
-        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-            map.entry(stem.to_ascii_lowercase()).or_default().push(ni);
-        }
-    }
-    map
-}
-
-#[cfg(feature = "pipeline-records")]
-fn resolve_import(
-    import: &str,
-    from_path: &Path,
-    stem_map: &BTreeMap<String, Vec<NodeIndex>>,
-    path_to_node: &BTreeMap<PathBuf, NodeIndex>,
-) -> Option<NodeIndex> {
-    if import.starts_with("./") || import.starts_with("../") {
-        return resolve_relative(import, from_path, path_to_node);
-    }
-
-    let local = import
-        .strip_prefix("crate::")
-        .or_else(|| import.strip_prefix("self::"))
-        .or_else(|| import.strip_prefix("super::"));
-
-    if let Some(local) = local {
-        let first = local.split("::").next()?;
-        return resolve_stem(first, stem_map);
-    }
-
-    None
-}
-
-#[cfg(feature = "pipeline-records")]
-fn resolve_relative(
-    import: &str,
-    from_path: &Path,
-    path_to_node: &BTreeMap<PathBuf, NodeIndex>,
-) -> Option<NodeIndex> {
-    let from_dir = from_path.parent()?;
-    let rel = import.trim_start_matches("./").trim_start_matches("../");
-    for ext in &["rs", "py", "ts", "tsx", "js", "go", "java"] {
-        let candidate = from_dir.join(format!("{rel}.{ext}"));
-        if let Some(&ni) = path_to_node.get(&candidate) {
-            return Some(ni);
-        }
-    }
-    for index in &["mod.rs", "index.ts", "index.js", "__init__.py"] {
-        let candidate = from_dir.join(rel).join(index);
-        if let Some(&ni) = path_to_node.get(&candidate) {
-            return Some(ni);
-        }
-    }
-    None
-}
-
-#[cfg(feature = "pipeline-records")]
-fn resolve_stem(stem: &str, stem_map: &BTreeMap<String, Vec<NodeIndex>>) -> Option<NodeIndex> {
-    let candidates = stem_map.get(&stem.to_ascii_lowercase())?;
-    if candidates.len() == 1 {
-        Some(candidates[0])
-    } else {
-        None
     }
 }

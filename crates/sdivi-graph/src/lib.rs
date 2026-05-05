@@ -19,9 +19,11 @@
 
 pub mod dependency_graph;
 pub mod metrics;
+pub(crate) mod resolve;
+pub(crate) mod resolve_lang;
 
 pub use dependency_graph::{build_dependency_graph_from_edges, DependencyGraph, GraphError};
 pub use metrics::{compute_metrics, GraphMetrics};
 
 #[cfg(feature = "pipeline-records")]
-pub use dependency_graph::build_dependency_graph;
+pub use dependency_graph::{build_dependency_graph, build_dependency_graph_with_go_module};

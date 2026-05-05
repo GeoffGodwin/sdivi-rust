@@ -1,6 +1,7 @@
 //! AST extraction helpers for the Python language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::truncate_to_256_bytes;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -248,7 +249,9 @@ fn python_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
     for i in 0..node.child_count() {
         if let Some(child) = node.child(i) {
             if child.kind() == "block" {
-                let sig_bytes = source.get(node.start_byte()..child.start_byte()).unwrap_or(&[]);
+                let sig_bytes = source
+                    .get(node.start_byte()..child.start_byte())
+                    .unwrap_or(&[]);
                 return std::str::from_utf8(sig_bytes)
                     .ok()
                     .map(|s| s.trim_end_matches(':').trim().to_string());
@@ -256,42 +259,4 @@ fn python_signature(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
     }
     node.utf8_text(source).ok().map(|s| s.trim().to_string())
-}
-
-/// Truncates a string to at most 256 UTF-8 bytes without splitting a char.
-pub(crate) fn truncate_to_256_bytes(raw: String) -> String {
-    if raw.len() <= 256 {
-        return raw;
-    }
-    let end = raw
-        .char_indices()
-        .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    raw[..end].to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn truncate_ascii_over_256() {
-        let s = "a".repeat(300);
-        let result = truncate_to_256_bytes(s);
-        assert_eq!(result.len(), 256);
-    }
-
-    #[test]
-    fn truncate_respects_char_boundaries() {
-        let s: String = "é".repeat(128); // 256 bytes exactly — no truncation
-        assert_eq!(s.len(), 256);
-        let result = truncate_to_256_bytes(s.clone());
-        assert_eq!(result, s);
-        let s: String = "é".repeat(129); // 258 bytes — must truncate cleanly
-        let result = truncate_to_256_bytes(s);
-        assert_eq!(result.len(), 256);
-        assert!(result.is_char_boundary(result.len()));
-    }
 }

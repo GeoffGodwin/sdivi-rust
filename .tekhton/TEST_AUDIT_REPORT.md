@@ -1,80 +1,111 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 6 files (3 modified this run + 3 freshness samples), 13 Rust test functions + 1 Node validation script
+Tests audited: 2 files, 24 test functions (12 in resolver_edge_cases.rs, 12 in resolver_no_panic.rs)
 Verdict: PASS
+
+---
+
+### Methodology
+
+Read both test files in full; read `crates/sdivi-graph/src/resolve.rs`,
+`crates/sdivi-graph/src/resolve_lang.rs`, and
+`crates/sdivi-graph/src/dependency_graph.rs` to trace every asserted value
+back to implementation logic. Verified `node_for_path`, `node_path`, and
+`edges_as_pairs` signatures against their implementations to confirm test
+comparisons are type-safe and semantically correct.
 
 ---
 
 ### Findings
 
-#### COVERAGE: `accepts_valid_weights` asserts count only
-- File: `bindings/sdivi-wasm/src/weight_keys.rs:60-66`
-- Issue: The test inserts two entries and asserts `result.len() == 2`. It does not verify that the NUL-separated key format was actually applied. If `parse_wasm_edge_weights` were changed to pass keys through unchanged, this test would still pass; `converted_key_uses_nul_separator` would catch the regression, but `accepts_valid_weights` would provide no signal. The assertion is not false — count-of-inputs = count-of-outputs is real behaviour — but the test is redundant as a happy-path gate since the key-content tests already cover it.
+#### COVERAGE: assert_no_panic doc comment promises edge_count assertion that is never made
+- File: `crates/sdivi-graph/tests/resolver_no_panic.rs:30`
+- Issue: The helper's doc comment states "assert the edge_count is 0
+  (specifier unresolvable) and no panic occurred." The body is
+  `let _ = build_dependency_graph(&records);` — the return value is
+  discarded. No edge_count assertion exists. A regression that causes the
+  resolver to fabricate edges for adversarial inputs (e.g. `"../../../foo"`)
+  would pass all 12 tests silently. The no-panic contract is correctly
+  tested, but the promised secondary contract is absent.
+- Severity: MEDIUM
+- Action: Either (a) delete the "assert the edge_count is 0 (specifier
+  unresolvable)" clause from the doc comment so it accurately describes what
+  is tested, or (b) add `assert_eq!(dg.edge_count(), 0, "adversarial input
+  must not fabricate edges")` to the helper body. Option (b) is preferred
+  as it strengthens coverage of adversarial-input regressions.
+
+#### NAMING: double_super_finds_intermediate_level_stem comment mis-states the walked-up base directory
+- File: `crates/sdivi-graph/tests/resolver_edge_cases.rs:104`
+- Issue: The test comment says "subtree search in the walked-up base `a/`
+  returns a unique match there." `resolve_super` with `super::super::` from
+  `a/b/c.rs` computes from_dir=`a/b`, then walks up twice: 1st → `a`,
+  2nd → `""` (empty / repo root). The call is therefore
+  `find_stem_in_subtree("models", "", ...)`, which searches the entire
+  repository, not just the `a/` subtree. The assertion is correct (only one
+  file has stem "models") but the comment describing the mechanism is wrong
+  and would mislead future readers diagnosing a subtree-search failure.
 - Severity: LOW
-- Action: Either add an assertion that the expected NUL-separated key is present (matching the pattern in `converted_key_uses_nul_separator`), or remove this test and rely on `converted_key_uses_nul_separator` as the canonical happy-path test. No implementation change required.
+- Action: Change the comment to reference the actual walked-up base (`""`
+  repo root), e.g. "walked-up base is repo root `\"\"` because two super::
+  levels exhaust `a/b` → `a` → `\"\"`; find_stem_in_subtree searches the
+  entire repo."
 
-#### COVERAGE: `exports["./node"]` and `exports["./bundler"]` subpath routing not validated
-- File: `bindings/sdivi-wasm/tests/validate_pkg_template.cjs:58-69`
-- Issue: The validator checks that `exports["./node"]` and `exports["./bundler"]` are present and non-null objects, but does not verify their internal routing keys. An empty object `{}` at either path would pass all current checks. The M24 constraints — that `./node` must expose a `"require"` key pointing into `node/` and `./bundler` must expose an `"import"` key pointing into `bundler/` — are unverified for the named subpaths (though they ARE verified for the root `"."` entry at lines 45-83).
+#### COVERAGE: triple_super_overshoot_falls_back_to_global_stem comment imprecise about overshoot point
+- File: `crates/sdivi-graph/tests/resolver_edge_cases.rs:123`
+- Issue: The comment says "three levels up overshoots the root (only two
+  path components above)." The actual mechanism is: from_dir=`a/b`, level 1
+  → `a`, level 2 → `""`, level 3 → `"".parent()` returns `None`, triggering
+  the fallback. The overshoot is not about path component count; it is about
+  `Path::parent()` returning `None` on an empty path at the third iteration.
+  The assertion (`edge_count() == 1`) is correct.
 - Severity: LOW
-- Action: After the subpath presence checks, add assertions mirroring the root-entry pattern: verify `typeof pkg.exports['./node']['require'] === 'string'` and that it includes `'node/'`; similarly verify `pkg.exports['./bundler']['import']` includes `'bundler/'`. No implementation change required.
+- Action: Replace the parenthetical with: "three super:: levels: `a/b` →
+  `a` → `""` → `None` on the third `.parent()`, which triggers the
+  global stem-map fallback."
 
 ---
 
-### Detailed Per-File Assessment
+### Positive Findings
 
-#### `bindings/sdivi-wasm/src/weight_keys.rs` — 13 test functions
+**Assertion honesty.** Every `edge_count()` value in `resolver_edge_cases.rs`
+was independently traced through `resolve.rs` / `resolve_lang.rs` and
+confirmed to match implementation logic. No hard-coded values that are
+disconnected from what the code actually produces.
 
-**Assertion Honesty:** All assertions derive from calling the real function. Error-message checks use `contains()` on substrings that appear literally in the implementation's `format!` strings (verified by reading lines 25-48):
-- `rejects_nan_weight`: asserts `e.contains("NaN")` — implementation: `"not finite (NaN)"`. ✓
-- `rejects_positive_infinity_weight`: asserts `e.contains("finite")` — implementation: `"not finite (inf)"`. ✓
-- `rejects_negative_infinity_weight` (NEW): asserts `e.contains("finite") || e.contains("infinite") || e.contains("inf")` — implementation: `"not finite (-inf)"`, satisfying both the first and third conditions. ✓
-- `rejects_negative_weight`: asserts `e.contains("negative") || e.contains(">= 0.0")` — implementation: `"is negative (-0.5)"`. ✓
-- `converted_key_uses_nul_separator` and `colon_in_node_id_produces_correct_nul_key`: assert `result.contains_key(&sdivi_core::input::edge_weight_key(...))` — tests actual output key, not a hardcoded guess. ✓
+**Implementation exercise.** All tests call the real
+`build_dependency_graph` / `build_dependency_graph_with_go_module`
+functions through the public crate API with no mocking.
+`resolve.rs`, `resolve_lang.rs`, and `dependency_graph.rs` are all
+exercised on every run.
 
-**Edge Case Coverage:** Comprehensive. Covers: empty map, valid 0.0 weight, NaN, +∞, −∞, negative float, missing colon, empty source, empty target, colon-in-node-id (two variants), weight value preservation, and NUL-key format. Healthy ratio of 9 error/edge-case tests to 4 happy-path tests.
+**Edge-case coverage alignment.** The twelve edge-case scenarios map
+precisely to the two M26 bugs fixed by the coder (missing `../` parent
+navigation, missing per-language dispatch): Python PEP 420 namespace
+packages, Python triple-dot relative imports, Rust double/triple `super::`,
+Rust `super::` overshoot fallback, Java multi-module Maven root discovery,
+Java wildcard imports, Go module multi-file package edges, graph
+determinism, and self-loop prevention are all covered.
 
-**Implementation Exercise:** Every test calls `parse_wasm_edge_weights` directly with real `BTreeMap` inputs. No mocking.
+**Structural invariant test.** `all_resolved_edges_point_to_nodes_from_input_records`
+verifies that no resolver path fabricates a node that was not in the
+original input records. This test would catch any future path-fabrication
+regression regardless of language or specifier type.
 
-**Test Weakening:** The tester added one new test (`rejects_negative_infinity_weight`, line 184) and did not modify any pre-existing test. No weakening.
+**Determinism tests.** Both `build_dependency_graph_is_deterministic` and
+`build_dependency_graph_go_module_is_deterministic` sort both edge lists
+before comparison (correctly handling unstable `raw_edges()` ordering)
+and the Go variant additionally pins an absolute edge count (`== 3`) that
+is derivable from the three `.go` files in the fixture.
 
-**Naming:** All 13 names encode scenario and expected outcome (`rejects_empty_source`, `weight_value_preserved_after_key_conversion`, etc.). ✓
+**No test weakening.** The tester added only new files; no existing test
+was modified.
 
-**Isolation:** All tests use inline `BTreeMap` literals. No filesystem or external state. ✓
+**No orphaned tests.** All imports reference symbols present in the
+current codebase. The deleted `.tekhton/test_dedup.fingerprint` and the
+removed `bindings/sdivi-wasm/package.json` are not referenced by either
+audited file.
 
----
-
-#### `bindings/sdivi-wasm/tests/validate_pkg_template.cjs` — structural validation script
-
-**Assertion Honesty:** All checks derive from `JSON.parse()` of the actual committed files. No hardcoded expected values that are independent of implementation logic; every `fail()` branch corresponds to a structural constraint that M24 imposes. ✓
-
-**Edge Case Coverage:** Covers malformed JSON (with `process.exit(1)` fast-fail), missing `exports` field, missing root `"."` entry, missing `"import"`/`"require"` keys, wrong target directory references for those keys, missing `engines.node`, a sub-18 engine floor, and the stdin-redirect anti-pattern in the smoke package's test script. See COVERAGE finding above for the one gap.
-
-**Implementation Exercise:** Reads and parses `pkg-template/package.json` — the implementation file for M24's conditional-exports shape. Every assertion reflects a real M24 requirement. ✓
-
-**Weakening:** New test file; no pre-existing tests modified. ✓
-
-**Isolation:** The script reads two committed source-controlled files (`pkg-template/package.json` and `tests/node_smoke/package.json`). These are static, version-controlled artifacts, not mutable pipeline state, CI run outputs, or `.tekhton/` reports. The rubric's ISOLATION flag targets live build reports and pipeline logs; it does not apply to source files that change only through commits. ✓
-
----
-
-#### `bindings/sdivi-wasm/tests/node_smoke/package.json` — test project descriptor
-
-No test assertions are present in this file. The tester fixed the `scripts.test` value from a stdin-redirect form to the direct invocation `"node index.cjs && node index.mjs"`, aligning it with the separate `node index.cjs` / `node index.mjs` steps in `wasm.yml:140-145`. The `validate_pkg_template.cjs` script enforces this alignment at line 128-136. No issues.
-
----
-
-#### Freshness Samples
-
-- `tests/boundary_lifecycle.rs` — layout placeholder (comment only, no executable test code). No tests to evaluate. The placeholder references `crates/sdivi-cli/tests/boundary_lifecycle.rs` as the real location; no scope drift from M24.
-- `tests/full_pipeline.rs` — layout placeholder (comment only). Same pattern. No scope drift.
-- `tests/fixtures/simple-rust/src/utils.rs` — fixture source file, not a test file. M24 does not touch parsing fixtures. No issues.
-
-None of the freshness sample files reference any symbol or file deleted in this milestone. The deleted `.tekhton/test_dedup.fingerprint` is not referenced by any test under audit.
-
----
-
-### Verdict Rationale
-
-Zero HIGH findings. Two LOW-severity coverage gaps, both in areas where the failing conditions would manifest as CI regressions rather than silent false positives. The tester's addition (`rejects_negative_infinity_weight`) is correct: `f64::NEG_INFINITY` satisfies `is_infinite()` at line 25, the implementation produces `"not finite (-inf)"`, and the assertion `e.contains("finite")` is satisfied. The `validate_pkg_template.cjs` script faithfully exercises the actual committed `pkg-template/package.json` against the structural constraints M24 requires. No weakening, no orphaned tests, no mocked-out real code, no isolation violations.
+**Fixture isolation.** All test data is constructed inline via the `rec()`
+factory function. No test reads `.tekhton/` reports, pipeline logs, or
+other mutable project state.

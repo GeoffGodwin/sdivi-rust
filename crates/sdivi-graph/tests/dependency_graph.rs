@@ -148,18 +148,18 @@ fn relative_import_dot_slash_resolves_to_sibling() {
 }
 
 #[test]
-fn relative_import_parent_slash_strips_prefix_resolves_in_same_dir() {
-    // M26 will add real parent navigation; for now `../` is stripped and the
-    // stem is resolved in the importer's own directory.
+fn relative_import_parent_slash_resolves_to_parent_dir() {
+    // M26 fix: `../shared` from `src/sub/module.py` walks up one directory
+    // and resolves to `src/shared.py`, not the same-dir file.
     let records = vec![
         make_record("src/sub/module.py", &["../shared"]),
-        make_record("src/sub/shared.py", &[]), // same dir, not parent
+        make_record("src/shared.py", &[]), // parent dir — correct target
     ];
     let dg = build_dependency_graph(&records);
     assert_eq!(
         dg.edge_count(),
         1,
-        "../shared strips prefix and resolves in same directory"
+        "../shared must resolve to src/shared.py via parent navigation"
     );
 }
 
@@ -269,8 +269,9 @@ fn external_crate_import_produces_no_edge() {
 }
 
 #[test]
-fn python_from_import_yields_dotted_specifier() {
-    // Bare dotted names (e.g. "foo.bar") are dropped until M26 adds resolution.
+fn python_from_import_dotted_specifier_requires_python_language() {
+    // With language:"rust" (make_record default), "foo.bar" dispatches to the Rust
+    // resolver (no crate::/self::/super:: prefix); Python dotted requires language:"python".
     let records = vec![
         make_record("src/main.py", &["foo.bar"]),
         make_record("src/foo/bar.py", &[]),
@@ -279,10 +280,9 @@ fn python_from_import_yields_dotted_specifier() {
     assert_eq!(
         dg.edge_count(),
         0,
-        "bare dotted specifier dropped until M26"
+        "language:\"rust\" record dispatches to Rust resolver; dotted specifier dropped"
     );
 }
-
 #[test]
 fn typescript_import_string_fragment_resolves() {
     // TypeScriptAdapter produces "./utils" from `import { x } from "./utils"`.

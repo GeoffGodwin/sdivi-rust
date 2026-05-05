@@ -8,31 +8,13 @@
 use sdivi_snapshot::snapshot::SNAPSHOT_VERSION;
 use serde::{Deserialize, Serialize};
 
-/// Canonical category names in stable alphabetical order.
+/// Single source of truth: (name, description) for every canonical category.
 ///
-/// Every name here is a permanent contract entry for `snapshot_version "1.0"`.
+/// Every entry here is a permanent contract entry for `snapshot_version "1.0"`.
 /// Once a name is in this list it cannot be removed — only deprecated.
-///
-/// # Examples
-///
-/// ```rust
-/// use sdivi_core::CATEGORIES;
-///
-/// assert!(CATEGORIES.contains(&"error_handling"));
-/// assert_eq!(CATEGORIES.len(), 5);
-/// ```
-pub const CATEGORIES: &[&str] = &[
-    "async_patterns",
-    "error_handling",
-    "resource_management",
-    "state_management",
-    "type_assertions",
-];
-
-/// (name, description) pairs matching [`CATEGORIES`] exactly.
-///
-/// The order matches [`CATEGORIES`] so that `zip` produces aligned pairs.
-const CATEGORY_DESCRIPTIONS: &[(&str, &str)] = &[
+/// [`CATEGORIES`] and [`list_categories`] are both derived from this array,
+/// so the two cannot silently diverge.
+const CATALOG_ENTRIES: &[(&str, &str)] = &[
     (
         "async_patterns",
         "Code constructs that implement or leverage asynchronous execution — \
@@ -59,6 +41,28 @@ const CATEGORY_DESCRIPTIONS: &[(&str, &str)] = &[
         "Code constructs that assert or coerce between types at compile or runtime — \
         e.g., `as` casts (`as_expression`) and language-specific type-cast expressions.",
     ),
+];
+
+/// Canonical category names in stable alphabetical order.
+///
+/// Derived from [`CATALOG_ENTRIES`] — the two cannot diverge.
+/// Every name here is a permanent contract entry for `snapshot_version "1.0"`.
+/// Once a name is in this list it cannot be removed — only deprecated.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_core::CATEGORIES;
+///
+/// assert!(CATEGORIES.contains(&"error_handling"));
+/// assert_eq!(CATEGORIES.len(), 5);
+/// ```
+pub const CATEGORIES: &[&str] = &[
+    CATALOG_ENTRIES[0].0,
+    CATALOG_ENTRIES[1].0,
+    CATALOG_ENTRIES[2].0,
+    CATALOG_ENTRIES[3].0,
+    CATALOG_ENTRIES[4].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -122,7 +126,7 @@ pub struct CategoryCatalog {
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {
         schema_version: SNAPSHOT_VERSION.to_string(),
-        categories: CATEGORY_DESCRIPTIONS
+        categories: CATALOG_ENTRIES
             .iter()
             .map(|(name, desc)| CategoryInfo {
                 name: name.to_string(),

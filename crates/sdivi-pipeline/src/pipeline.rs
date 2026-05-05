@@ -19,7 +19,7 @@ use sdivi_config::{BoundarySpec, Config};
 use sdivi_core::input::ChangeCouplingConfigInput;
 use sdivi_detection::warm_start::CACHE_FILENAME;
 use sdivi_detection::{run_leiden, run_leiden_with_weights, LeidenConfig};
-use sdivi_graph::dependency_graph::build_dependency_graph;
+use sdivi_graph::dependency_graph::build_dependency_graph_with_go_module;
 use sdivi_graph::metrics::compute_metrics;
 use sdivi_parsing::adapter::LanguageAdapter;
 use sdivi_parsing::parse::parse_repository;
@@ -159,7 +159,6 @@ impl Pipeline {
 
         // ending_at drives the change-coupling window: None = HEAD, Some = REF.
         let ending_at = effective_sha.as_deref();
-
         // ── Stage 1: Parsing ─────────────────────────────────────────────
         let records = parse_repository(&self.config, parse_root, &self.adapters);
         tracing::info!(count = records.len(), "parsed {} files", records.len());
@@ -175,11 +174,10 @@ impl Pipeline {
                 return Err(PipelineError::NoGrammarsAvailable);
             }
         }
-
         // ── Stage 2: Graph ───────────────────────────────────────────────
-        let dg = build_dependency_graph(&records);
+        let go_mod_prefix = read_go_mod_prefix(parse_root);
+        let dg = build_dependency_graph_with_go_module(&records, go_mod_prefix.as_deref());
         let metrics = compute_metrics(&dg);
-
         // ── Change-coupling analysis ─────────────────────────────────────
         let cc_cfg = ChangeCouplingConfigInput {
             min_frequency: self.config.change_coupling.min_frequency,
@@ -283,4 +281,19 @@ impl Pipeline {
             Some(p) => compute_delta(p, curr),
         }
     }
+}
+
+/// Reads `go.mod` from `root` and returns the module path, or `None` if
+/// absent or unparseable (Go imports treated as external on failure).
+fn read_go_mod_prefix(root: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(root.join("go.mod")).ok()?;
+    for line in content.lines() {
+        if let Some(rest) = line.trim().strip_prefix("module") {
+            let trimmed = rest.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with('(') {
+                return trimmed.split_whitespace().next().map(str::to_string);
+            }
+        }
+    }
+    None
 }

@@ -3,16 +3,16 @@
 //! Parses each `tests/fixtures/simple-<lang>/` fixture with the matching language
 //! adapter, builds a dependency graph, and asserts the exact edge count.
 //!
-//! These tests are the regression sentinel for M25. Expected edge counts:
+//! These tests are the regression sentinel for M25+M26. Expected edge counts:
 //!
 //! | Fixture | Edges | Notes |
 //! |---------|-------|-------|
 //! | simple-rust | 0 | all imports are external std/serde |
-//! | simple-python | 0 | bare names not resolved until M26 |
+//! | simple-python | 2 | main.py → utils.py + models.py (bare dotted, M26) |
 //! | simple-typescript | 3 | ./utils, ./models edges resolve |
 //! | simple-javascript | 3 | ES6 + require() edges resolve |
-//! | simple-go | 0 | Go module paths not resolved until M26 |
-//! | simple-java | 0 | Java dotted paths not resolved until M26 |
+//! | simple-go | 0 | no go.mod at test cwd; all Go external |
+//! | simple-java | 0 | java.util.* is stdlib, not in fixture graph |
 //!
 //! If grammar updates change adapter output and edges shift, update the pinned
 //! counts deliberately — that is the intent of `assert_eq!` rather than `>=`.
@@ -72,11 +72,12 @@ fn simple_rust_edge_count() {
 
 #[test]
 fn simple_python_edge_count() {
-    // bare module names ("os", "utils") not resolved until M26
+    // main.py has `from utils import helper` → "utils" and `from models import User` → "models".
+    // Both resolve to files in the fixture (utils.py, models.py). M26 bare-dotted resolution.
     assert_eq!(
         edge_count("python"),
-        0,
-        "simple-python: bare names not resolved until M26"
+        2,
+        "simple-python: main.py → utils.py + models.py (2 bare-dotted edges)"
     );
 }
 
@@ -108,11 +109,13 @@ fn simple_javascript_edge_count() {
 
 #[test]
 fn simple_go_edge_count() {
-    // Go module paths ("fmt", "os") not resolved until M26
+    // simple-go only imports "fmt" and "os" (stdlib). No go.mod present at the
+    // test cwd (sdivi-rust workspace root is a Rust project), so all Go imports
+    // are treated as external regardless of M26.
     assert_eq!(
         edge_count("go"),
         0,
-        "simple-go: module paths not resolved until M26"
+        "simple-go: stdlib + no go.mod → all external"
     );
 }
 
@@ -120,11 +123,12 @@ fn simple_go_edge_count() {
 
 #[test]
 fn simple_java_edge_count() {
-    // Java dotted names not resolved until M26
+    // simple-java only imports java.util.List and java.util.ArrayList (stdlib).
+    // These are not in the fixture graph even with M26 Java resolution.
     assert_eq!(
         edge_count("java"),
         0,
-        "simple-java: dotted paths not resolved until M26"
+        "simple-java: java.util.* stdlib, not in graph"
     );
 }
 
@@ -133,11 +137,10 @@ fn simple_java_edge_count() {
 /// End-to-end regression sentinel for Python relative-import specifiers.
 ///
 /// `pkg/__init__.py` contains `from . import models` (specifier `"."`) and
-/// `from .models import User` (specifier `".models"`).  Neither specifier
-/// starts with `"./"` or `"../"`, so the current resolver (M25) drops them;
-/// edges will be 0 until M26 adds dot-relative path navigation.
+/// `from .models import User` (specifier `".models"`).
 ///
-/// When M26 lands, update this count to 2 (one edge per resolved specifier).
+/// Post-M26: `".models"` resolves to `pkg/models.py` (1 edge). `"."` resolves
+/// to `pkg/__init__.py` — a self-loop that is dropped — so edge count is 1.
 #[test]
 fn simple_python_relative_import_edge_count() {
     let config = Config::default();
@@ -160,11 +163,11 @@ fn simple_python_relative_import_edge_count() {
         init_record.imports
     );
 
-    // Graph resolver drops dot-relative specifiers until M26.
+    // ".models" → pkg/models.py (edge); "." → pkg/__init__.py is a self-loop, dropped.
     let dg = build_dependency_graph(&records);
     assert_eq!(
         dg.edge_count(),
-        0,
-        "Python dot-relative imports (\".\", \".models\") not resolved until M26"
+        1,
+        "Python '.models' resolves to pkg/models.py; '.' self-loop is dropped"
     );
 }
