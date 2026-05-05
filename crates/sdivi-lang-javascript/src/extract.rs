@@ -29,7 +29,8 @@ const DECLARATION_KINDS: &[&str] = &[
 ///
 /// - `import { foo } from "./utils"` → `["./utils"]`
 /// - `const x = require("./utils")` → `["./utils"]`
-/// - `import("./utils")` → `["./utils"]` (dynamic import with string literal arg)
+/// - `import("./utils")` → `["./utils"]` when the grammar represents the callee
+///   as an `import` node; best-effort and grammar-version-dependent
 /// - `require(varName)` / `import(expr)` with non-string arg → skipped
 pub(crate) fn extract_imports(root: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut imports = Vec::new();

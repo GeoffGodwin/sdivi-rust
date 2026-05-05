@@ -1,28 +1,36 @@
-# JR Coder Summary — 2026-05-04
+# Jr Coder Summary
 
-## What Was Fixed
+**Date:** 2026-05-05  
+**Task:** Architect Remediation — Cleanup (Staleness Fixes)
 
-### Staleness Fixes
-1. **CI step in `.github/workflows/wasm.yml`** — Updated the Node.js smoke test step to invoke `npm test` instead of separate `node index.cjs` and `node index.mjs` commands. This ensures CI exercises the same paths as local development and validates both CommonJS and ESM distribution targets with a single invocation.
+## Changes Made
 
-2. **WasmCategoryInfo and WasmCategoryCatalog missing PartialEq** — No changes required. Both struct types in `bindings/sdivi-wasm/src/category_types.rs` already derive `PartialEq` (verified on lines 11 and 23). The task was already complete.
+### DRIFT_LOG.md Staleness Fixes
 
-### Dead Code Removal
-1. **Deleted `bindings/sdivi-wasm/package.json`** — Removed the superseded root-level package manifest. This file was replaced by `bindings/sdivi-wasm/pkg-template/package.json` in M24 but was left in place, causing confusion about which manifest governs the npm package.
+1. **Moved four stale observations to "Resolved" section**  
+   Four duplicate entries tracking `truncate_to_256_bytes` and `string_content` consolidation have been moved from "Unresolved Observations" to the "Resolved" section and marked with annotation: "Resolved during M25–M27: consolidated into `sdivi-parsing::text`."
+   - [2026-05-05 M27] `truncate_to_256_bytes` duplication in five adapter files
+   - [2026-05-05 M27] `string_content` duplication in TS/JS adapters
+   - [2026-05-04 M26] `truncate_to_256_bytes` duplication (duplicate of M27 entry)
+   - [2026-05-04 M26] `string_content` duplication (duplicate of M27 entry)
 
-2. **Updated all references to the old package.json** — Modified `tools/release.sh` to point to the canonical template path:
-   - Line 27: Changed `WASM_PKG_JSON` path from `bindings/sdivi-wasm/package.json` to `bindings/sdivi-wasm/pkg-template/package.json`
-   - Updated comments on lines 8 and 49 to reflect the new location
-   - Verified the script still correctly validates version synchronization
+2. **Deleted orphan meta-comment**  
+   Removed the line: `[2026-05-04 | "architect audit"] Stays in DRIFT_LOG.md for next cycle.`  
+   This was an empty meta-instruction with no associated observation text.
 
-## Files Modified
+3. **Kept escalated observations in "Unresolved"**  
+   The `import_extraction.rs` cross-crate test placement observation remains in "Unresolved Observations" as it is escalated to human decision per the architect's Design Doc Observations.
 
-- `.github/workflows/wasm.yml` — Consolidated separate CJS/ESM smoke test steps into single `npm test` invocation
-- `tools/release.sh` — Updated WASM package.json path to reference the canonical template location
-- `bindings/sdivi-wasm/package.json` — **Deleted** (superseded by pkg-template/package.json)
+## Items NOT Touched
+
+Per architect plan scope:
+- No items under "Dead Code Removal" (none identified)
+- No items under "Naming Normalization" (none identified)
+- No items under "Simplification" (out of jr-coder scope)
+- No items under "Design Doc Observations" (routed to human via HUMAN_ACTION_REQUIRED)
 
 ## Verification
 
-- `cargo check --workspace` passes cleanly
-- `tools/release.sh prepare` correctly reads the template package.json and validates version matching
-- Template package.json at canonical location verified to exist
+- `cargo build --workspace` ✓
+- `cargo test --workspace` ✓
+- DRIFT_LOG.md structure intact; observations moved to appropriate sections

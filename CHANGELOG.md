@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.2.16] - 2026-05-05
+
+### Added
+- Softened the dynamic import doc comment in `crates/sdivi-lang-javascript/src/extract.rs` (line 32) from a definitive claim (`import("./utils") → ["./utils"]`) to a best-effort, grammar-version-dependent description. The test already correctly accepts both outcomes; the doc now matches the test's intent.
 
 ## [0.2.15] - 2026-05-05
 
