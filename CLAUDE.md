@@ -402,7 +402,7 @@ M01–M11 done. Remaining: **M12** (sdivi-wasm + consumer-app integration) and *
   - 80%+ for `sdivi-core`, `sdivi-parsing`, `sdivi-graph`, `sdivi-detection`, `sdivi-patterns`, `sdivi-snapshot`
   - 60%+ for `sdivi-cli` (rest covered by integration tests)
 - **Per-crate integration tests** in each crate's `tests/` directory exercising real tree-sitter parsing, real graphs, real fixture repos.
-- **Workspace-level integration tests** in `tests/` (top level) covering cross-crate scenarios: full pipeline, snapshot/diff/trend lifecycles, boundary lifecycle.
+- **Cross-crate integration tests** live in the `tests/` directory of the most structurally appropriate member crate, reaching workspace fixtures via `concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/")`. The top-level `tests/` directory holds layout placeholders and the shared `fixtures/` tree until a root `[package]` crate is introduced; Cargo cannot compile files in `tests/` at the workspace root without one. When a root package is added in a future milestone, migrate the cross-crate suites (full pipeline, snapshot/diff/trend lifecycles, boundary lifecycle, multi-language import extraction) there.
 - **Doc tests** via `cargo test --doc`. Every public function with an `# Examples` block has a runnable doc test. Broken examples fail CI.
 - **Property tests** in `crates/<crate>/tests/proptest.rs` files: `prop_test_pipeline_deterministic`, `prop_test_delta_pure`, `prop_test_leiden_seeded`. `proptest-regressions/` directories committed.
 - **KDD-2 verification suite** in `crates/sdivi-detection/tests/leiden_quality.rs`, gated `#[cfg(feature = "verify-leiden")]`. Pass criteria: modularity within 1%, community count within ±10%. **Not** bit-identity.
