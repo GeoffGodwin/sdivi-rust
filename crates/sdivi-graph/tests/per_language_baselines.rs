@@ -138,8 +138,8 @@ fn baseline_tsconfig_alias() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../tests/fixtures/tsconfig-alias"
     ));
-    let json = std::fs::read_to_string(root.join("tsconfig.json"))
-        .expect("tsconfig.json must exist");
+    let json =
+        std::fs::read_to_string(root.join("tsconfig.json")).expect("tsconfig.json must exist");
     let tc = parse_tsconfig_content(&json, Path::new("")).expect("must parse");
     let adapters: Vec<Box<dyn LanguageAdapter>> = vec![Box::new(TypeScriptAdapter)];
     let records = parse_repository(&Config::default(), &root, &adapters);

@@ -169,6 +169,7 @@ pub(crate) fn try_path(
 /// An empty vec means the import is external or unresolvable; the caller logs
 /// at `DEBUG` and drops it. A vec with more than one element occurs for Java
 /// wildcard imports and Go package-directory imports.
+#[allow(clippy::too_many_arguments)] // 8 args: per-language resolver inputs (stem map, path map, go module, java roots, tsconfig) all load-bearing; bundling would just push the same fields into a struct
 pub(crate) fn resolve_imports(
     import: &str,
     from_path: &Path,
@@ -296,4 +297,3 @@ fn resolve_super(
         .into_iter()
         .collect()
 }
-

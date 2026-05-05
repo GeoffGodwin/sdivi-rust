@@ -194,11 +194,7 @@ fn java_multi_module_wildcard_import_across_roots() {
             &[],
             "java",
         ),
-        rec(
-            "module-b/src/main/java/com/acme/lib/Beta.java",
-            &[],
-            "java",
-        ),
+        rec("module-b/src/main/java/com/acme/lib/Beta.java", &[], "java"),
     ];
     let dg = build_dependency_graph(&records);
     assert_eq!(
@@ -216,7 +212,11 @@ fn java_multi_module_wildcard_import_across_roots() {
 #[test]
 fn build_dependency_graph_is_deterministic() {
     let records = vec![
-        rec("app/index.ts", &["../shared/utils", "./components/button"], "typescript"),
+        rec(
+            "app/index.ts",
+            &["../shared/utils", "./components/button"],
+            "typescript",
+        ),
         rec("shared/utils.ts", &[], "typescript"),
         rec("app/components/button/index.ts", &["../icon"], "typescript"),
         rec("app/components/icon.ts", &[], "typescript"),
@@ -267,7 +267,11 @@ fn build_dependency_graph_go_module_is_deterministic() {
         edges1, edges2,
         "Go multi-edge resolution must produce identical edge sets across builds"
     );
-    assert_eq!(dg1.edge_count(), 3, "three .go files in package = three edges");
+    assert_eq!(
+        dg1.edge_count(),
+        3,
+        "three .go files in package = three edges"
+    );
 }
 
 // ── Python relative import triple-dot ────────────────────────────────────────

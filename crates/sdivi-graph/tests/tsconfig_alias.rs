@@ -53,7 +53,11 @@ fn wildcard_alias_at_slash_resolves_edge() {
         ts_record("lib/utils.ts", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
-    assert_eq!(dg.edge_count(), 1, "@/lib/utils must resolve to lib/utils.ts");
+    assert_eq!(
+        dg.edge_count(),
+        1,
+        "@/lib/utils must resolve to lib/utils.ts"
+    );
 }
 
 #[test]
@@ -123,7 +127,11 @@ fn matched_alias_target_absent_produces_no_edge() {
         ts_record("lib/utils.ts", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
-    assert_eq!(dg.edge_count(), 0, "unresolvable alias target must not add edge");
+    assert_eq!(
+        dg.edge_count(),
+        0,
+        "unresolvable alias target must not add edge"
+    );
 }
 
 // ── no tsconfig → alias specifiers are external ──────────────────────────────
@@ -135,7 +143,11 @@ fn no_tsconfig_alias_specifier_is_external() {
         ts_record("lib/utils.ts", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, None);
-    assert_eq!(dg.edge_count(), 0, "without tsconfig @/lib/utils must be external");
+    assert_eq!(
+        dg.edge_count(),
+        0,
+        "without tsconfig @/lib/utils must be external"
+    );
 }
 
 // ── JavaScript uses alias map too ────────────────────────────────────────────
@@ -148,7 +160,11 @@ fn javascript_alias_resolves_edge() {
         js_record("helpers.js", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
-    assert_eq!(dg.edge_count(), 1, "JS alias @/helpers must resolve to helpers.js");
+    assert_eq!(
+        dg.edge_count(),
+        1,
+        "JS alias @/helpers must resolve to helpers.js"
+    );
 }
 
 // ── prefix+suffix pattern ────────────────────────────────────────────────────
@@ -162,7 +178,11 @@ fn prefix_suffix_pattern_resolves() {
         ts_record("src/types/foo.types.ts", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
-    assert_eq!(dg.edge_count(), 1, "#int/foo.types must resolve via prefix+suffix");
+    assert_eq!(
+        dg.edge_count(),
+        1,
+        "#int/foo.types must resolve via prefix+suffix"
+    );
 }
 
 // ── relative imports bypass alias dispatch ────────────────────────────────────
@@ -175,7 +195,11 @@ fn relative_imports_not_affected_by_tsconfig() {
         ts_record("src/utils.ts", &[]),
     ];
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
-    assert_eq!(dg.edge_count(), 1, "./utils must resolve via relative, not alias");
+    assert_eq!(
+        dg.edge_count(),
+        1,
+        "./utils must resolve via relative, not alias"
+    );
 }
 
 // ── parse_tsconfig_content ────────────────────────────────────────────────────
@@ -280,7 +304,10 @@ fn determinism_two_builds_produce_identical_edge_list() {
     // Critical Rule 1: same inputs → bit-identical outputs.  Run
     // build_dependency_graph_with_tsconfig twice with the same records and
     // tsconfig and assert the edge list is identical both times.
-    let tc = paths("", vec![("@/*", vec!["./*"]), ("~lib", vec!["./src/lib/index.ts"])]);
+    let tc = paths(
+        "",
+        vec![("@/*", vec!["./*"]), ("~lib", vec!["./src/lib/index.ts"])],
+    );
     let records = vec![
         ts_record("src/app.ts", &["@/lib/utils", "~lib"]),
         ts_record("lib/utils.ts", &[]),
@@ -312,6 +339,7 @@ fn no_panic_on_varied_specifiers_and_patterns() {
     // a node in path_to_node or an empty Vec for every (specifier, alias config)
     // combination below.  Covers: exact, wildcard, prefix+suffix, empty
     // specifier, path-separator edge cases, Unicode, very long strings.
+    #[allow(clippy::type_complexity)] // (specifier, [(pattern, [target])]) — flat tuple is the clearest shape for this property-style table
     let cases: &[(&str, Vec<(&str, Vec<&str>)>)] = &[
         ("@/foo/bar", vec![("@/*", vec!["./*"])]),
         ("~lib", vec![("~lib", vec!["./src/lib/index.ts"])]),
@@ -382,5 +410,9 @@ fn tsconfig_alias_fixture_edge_count() {
     let records = parse_repository(&Config::default(), &fixture_root, &adapters);
     let dg = build_dependency_graph_with_tsconfig(&records, None, Some(&tc));
     // src/app.ts → src/lib/utils.ts (@/src/lib/utils) and src/lib/index.ts (~lib)
-    assert_eq!(dg.edge_count(), 2, "tsconfig-alias fixture must produce 2 alias-resolved edges");
+    assert_eq!(
+        dg.edge_count(),
+        2,
+        "tsconfig-alias fixture must produce 2 alias-resolved edges"
+    );
 }

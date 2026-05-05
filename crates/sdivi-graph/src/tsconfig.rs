@@ -36,24 +36,44 @@ pub(crate) fn strip_jsonc(input: &str) -> String {
         let (mut in_str, mut in_block, mut in_line) = (false, false, false);
         while let Some(c) = chars.next() {
             if in_line {
-                if c == '\n' { out.push('\n'); in_line = false; }
+                if c == '\n' {
+                    out.push('\n');
+                    in_line = false;
+                }
                 continue;
             }
             if in_block {
-                if c == '*' && chars.peek() == Some(&'/') { chars.next(); in_block = false; }
+                if c == '*' && chars.peek() == Some(&'/') {
+                    chars.next();
+                    in_block = false;
+                }
                 continue;
             }
             if in_str {
                 out.push(c);
-                if c == '\\' { if let Some(e) = chars.next() { out.push(e); } }
-                else if c == '"' { in_str = false; }
+                if c == '\\' {
+                    if let Some(e) = chars.next() {
+                        out.push(e);
+                    }
+                } else if c == '"' {
+                    in_str = false;
+                }
                 continue;
             }
             match c {
-                '"' => { in_str = true; out.push(c); }
+                '"' => {
+                    in_str = true;
+                    out.push(c);
+                }
                 '/' => match chars.peek() {
-                    Some('/') => { chars.next(); in_line = true; }
-                    Some('*') => { chars.next(); in_block = true; }
+                    Some('/') => {
+                        chars.next();
+                        in_line = true;
+                    }
+                    Some('*') => {
+                        chars.next();
+                        in_block = true;
+                    }
                     _ => out.push(c),
                 },
                 _ => out.push(c),
@@ -68,8 +88,13 @@ pub(crate) fn strip_jsonc(input: &str) -> String {
     while i < chars.len() {
         if chars[i] == ',' {
             let mut j = i + 1;
-            while j < chars.len() && chars[j].is_whitespace() { j += 1; }
-            if j < chars.len() && (chars[j] == '}' || chars[j] == ']') { i += 1; continue; }
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
+            if j < chars.len() && (chars[j] == '}' || chars[j] == ']') {
+                i += 1;
+                continue;
+            }
         }
         out.push(chars[i]);
         i += 1;
@@ -80,7 +105,9 @@ pub(crate) fn strip_jsonc(input: &str) -> String {
 fn normalize_rel(p: PathBuf) -> PathBuf {
     let mut out = PathBuf::new();
     for comp in p.components() {
-        if let Component::Normal(n) = comp { out.push(n); }
+        if let Component::Normal(n) = comp {
+            out.push(n);
+        }
     }
     out
 }
@@ -91,10 +118,7 @@ fn normalize_rel(p: PathBuf) -> PathBuf {
 /// (pass `""` for a root-level config). Returns `None` on parse failure (logs a
 /// `WARN`) or when neither `baseUrl` nor `paths` is present. Patterns with two
 /// or more `*` chars are skipped with a `WARN`.
-pub fn parse_tsconfig_content(
-    content: &str,
-    tsconfig_rel_dir: &Path,
-) -> Option<TsConfigPaths> {
+pub fn parse_tsconfig_content(content: &str, tsconfig_rel_dir: &Path) -> Option<TsConfigPaths> {
     let value: serde_json::Value = match serde_json::from_str(&strip_jsonc(content)) {
         Ok(v) => v,
         Err(e) => {
@@ -114,7 +138,12 @@ pub fn parse_tsconfig_content(
     };
     let paths_obj = match opts.get("paths").and_then(|v| v.as_object()) {
         Some(obj) => obj,
-        None => return Some(TsConfigPaths { base, mappings: vec![] }),
+        None => {
+            return Some(TsConfigPaths {
+                base,
+                mappings: vec![],
+            })
+        }
     };
     let mut mappings = Vec::new();
     for (key, val) in paths_obj {
@@ -124,7 +153,11 @@ pub fn parse_tsconfig_content(
         }
         let targets: Vec<String> = val
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default();
         mappings.push((key.clone(), targets));
     }
@@ -167,13 +200,14 @@ pub(crate) fn resolve_tsconfig_alias(
     path_to_node: &BTreeMap<PathBuf, NodeIndex>,
 ) -> Vec<NodeIndex> {
     for (pattern, targets) in &paths.mappings {
-        let Some(capture) = match_alias(pattern, specifier) else { continue };
+        let Some(capture) = match_alias(pattern, specifier) else {
+            continue;
+        };
         for target in targets {
             let sub = apply_capture(target, &capture);
             let rem = sub.strip_prefix("./").unwrap_or(&sub);
-            let node =
-                crate::resolve::try_path(&paths.base, rem, "typescript", path_to_node)
-                    .or_else(|| crate::resolve::try_path(&paths.base, rem, "javascript", path_to_node));
+            let node = crate::resolve::try_path(&paths.base, rem, "typescript", path_to_node)
+                .or_else(|| crate::resolve::try_path(&paths.base, rem, "javascript", path_to_node));
             if let Some(ni) = node {
                 return vec![ni];
             }
@@ -226,7 +260,10 @@ mod tests {
     }
     #[test]
     fn match_prefix_suffix() {
-        assert_eq!(match_alias("#int/*.t", "#int/foo.t"), Some("foo".to_string()));
+        assert_eq!(
+            match_alias("#int/*.t", "#int/foo.t"),
+            Some("foo".to_string())
+        );
     }
     #[test]
     fn apply_no_star() {

@@ -75,7 +75,7 @@ fn dynamic_import_string_literal_yields_specifier() {
     // adapter should extract "./chunk.js" when it can, and produce nothing when
     // the grammar represents it differently. Both outcomes are valid.
     assert!(
-        record.imports.is_empty() || record.imports == &["./chunk.js"],
+        record.imports.is_empty() || record.imports == ["./chunk.js"],
         "dynamic import('./chunk.js') must yield [\"./chunk.js\"] or nothing (grammar-dependent), got: {:?}",
         record.imports
     );

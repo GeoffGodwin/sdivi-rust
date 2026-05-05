@@ -45,7 +45,7 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 
 /// Canonical category names in stable alphabetical order.
 ///
-/// Derived from [`CATALOG_ENTRIES`] — the two cannot diverge.
+/// Derived from the private `CATALOG_ENTRIES` table — the two cannot diverge.
 /// Every name here is a permanent contract entry for `snapshot_version "1.0"`.
 /// Once a name is in this list it cannot be removed — only deprecated.
 ///

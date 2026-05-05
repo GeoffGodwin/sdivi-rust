@@ -175,7 +175,11 @@ fn unknown_language_relative_import_does_not_panic() {
 #[test]
 fn all_resolved_edges_point_to_nodes_from_input_records() {
     let records = vec![
-        rec("app/index.ts", &["../shared/utils", "./components", "react"], "typescript"),
+        rec(
+            "app/index.ts",
+            &["../shared/utils", "./components", "react"],
+            "typescript",
+        ),
         rec("shared/utils.ts", &[], "typescript"),
         rec("app/components/index.ts", &[], "typescript"),
     ];

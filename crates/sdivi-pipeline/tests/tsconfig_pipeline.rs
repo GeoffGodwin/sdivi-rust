@@ -41,7 +41,10 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn isolated_fixture_with_extra(extra_name: &str, extra_content: &str) -> (tempfile::TempDir, PathBuf) {
+fn isolated_fixture_with_extra(
+    extra_name: &str,
+    extra_content: &str,
+) -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let dst = tmp.path().join("repo");
     copy_dir_recursive(fixture_root(), &dst).expect("copy fixture");
@@ -53,7 +56,12 @@ fn run_ephemeral(root: &Path) -> Result<sdivi_snapshot::Snapshot, sdivi_pipeline
     let adapters: Vec<Box<dyn sdivi_parsing::adapter::LanguageAdapter>> =
         vec![Box::new(RustAdapter)];
     let pipeline = Pipeline::new(Config::default(), adapters);
-    pipeline.snapshot_with_mode(root, None, "2026-05-04T00:00:00Z", WriteMode::EphemeralForCheck)
+    pipeline.snapshot_with_mode(
+        root,
+        None,
+        "2026-05-04T00:00:00Z",
+        WriteMode::EphemeralForCheck,
+    )
 }
 
 // ── malformed tsconfig.json ───────────────────────────────────────────────────
