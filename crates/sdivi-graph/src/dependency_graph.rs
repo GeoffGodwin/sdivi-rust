@@ -151,7 +151,7 @@ pub fn build_dependency_graph_from_edges(
 pub fn build_dependency_graph(
     records: &[sdivi_parsing::feature_record::FeatureRecord],
 ) -> DependencyGraph {
-    build_dependency_graph_with_go_module(records, None)
+    build_dependency_graph_with_tsconfig(records, None, None)
 }
 
 /// Builds a [`DependencyGraph`] with an explicit Go module prefix for resolution.
@@ -178,6 +178,31 @@ pub fn build_dependency_graph_with_go_module(
     records: &[sdivi_parsing::feature_record::FeatureRecord],
     go_module: Option<&str>,
 ) -> DependencyGraph {
+    build_dependency_graph_with_tsconfig(records, go_module, None)
+}
+
+/// Builds a [`DependencyGraph`] with Go module prefix and tsconfig path aliases.
+///
+/// Combines M26 Go-module resolution with M27 tsconfig path-alias resolution.
+/// `tsconfig` is parsed by the pipeline from `tsconfig.json` / `jsconfig.json`
+/// at the repository root and passed here; `None` disables alias resolution.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_graph::dependency_graph::build_dependency_graph_with_tsconfig;
+/// use sdivi_parsing::feature_record::FeatureRecord;
+///
+/// let records: Vec<FeatureRecord> = vec![];
+/// let dg = build_dependency_graph_with_tsconfig(&records, None, None);
+/// assert_eq!(dg.node_count(), 0);
+/// ```
+#[cfg(feature = "pipeline-records")]
+pub fn build_dependency_graph_with_tsconfig(
+    records: &[sdivi_parsing::feature_record::FeatureRecord],
+    go_module: Option<&str>,
+    tsconfig: Option<&crate::tsconfig::TsConfigPaths>,
+) -> DependencyGraph {
     use crate::resolve::{build_stem_map, compute_java_roots, resolve_imports};
 
     let mut graph: Graph<PathBuf, ()> = Graph::new();
@@ -202,6 +227,7 @@ pub fn build_dependency_graph_with_go_module(
                 &path_to_node,
                 go_module,
                 &java_roots,
+                tsconfig,
             );
             if targets.is_empty() {
                 debug!(%import, path = ?record.path, "unresolved import dropped");

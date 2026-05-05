@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-04
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -47,6 +47,9 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-05 | "Implement Milestone 27: tsconfig Path Alias Support"] `truncate_to_256_bytes` is defined identically (`pub(crate)`) in all five adapter `extract.rs` files (Python, TypeScript, JavaScript, Go, Java) and has inline unit tests only in the Python file. Factoring it into `sdivi-parsing` as a shared utility would eliminate the duplication; lower priority than M26 work but worth a cleanup ticket.
+- [2026-05-05 | "Implement Milestone 27: tsconfig Path Alias Support"] `string_content` (unquote a `string` AST node) is byte-for-byte identical in `crates/sdivi-lang-typescript/src/extract.rs:74-100` and `crates/sdivi-lang-javascript/src/extract.rs:98-123`. Same consolidation opportunity as above.
+- [2026-05-05 | "Implement Milestone 27: tsconfig Path Alias Support"] `crates/sdivi-parsing/tests/import_extraction.rs` is a cross-crate integration test (uses sdivi-graph + six language adapters) placed inside `sdivi-parsing/tests/`. CLAUDE.md calls for workspace-level cross-crate tests to live under the top-level `tests/` directory. Pragmatically fine here (`CARGO_MANIFEST_DIR` path resolution is the reason), but the pattern drifts from the stated convention.
 - [2026-05-04 | "Implement Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions"] `truncate_to_256_bytes` is defined identically (`pub(crate)`) in all five adapter `extract.rs` files (Python, TypeScript, JavaScript, Go, Java) and has inline unit tests only in the Python file. Factoring it into `sdivi-parsing` as a shared utility would eliminate the duplication; lower priority than M26 work but worth a cleanup ticket.
 - [2026-05-04 | "Implement Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions"] `string_content` (unquote a `string` AST node) is byte-for-byte identical in `crates/sdivi-lang-typescript/src/extract.rs:74-100` and `crates/sdivi-lang-javascript/src/extract.rs:98-123`. Same consolidation opportunity as above.
 - [2026-05-04 | "Implement Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions"] `crates/sdivi-parsing/tests/import_extraction.rs` is a cross-crate integration test (uses sdivi-graph + six language adapters) placed inside `sdivi-parsing/tests/`. CLAUDE.md calls for workspace-level cross-crate tests to live under the top-level `tests/` directory. Pragmatically fine here (`CARGO_MANIFEST_DIR` path resolution is the reason), but the pattern drifts from the stated convention.

@@ -2,7 +2,7 @@
 
 <!-- milestone-meta
 id: "27"
-status: "pending"
+status: "done"
 -->
 
 **Scope:** Add support for TypeScript / JavaScript path aliases declared in `tsconfig.json` (or `jsconfig.json`) so specifiers like `@/lib/foo` and `~components/Button` resolve to the correct files. The resolver added in M26 handles relative paths and external packages but treats any unrecognized prefix as external. Modern Next.js, Vite, Nx, and bare-tsc projects commonly use `compilerOptions.paths` (with optional `baseUrl`) to define short aliases — and bifl-tracker is one such project (`paths: { "@/*": ["./*"] }`). Without alias support, every `@/foo` import in such codebases is dropped, leaving a noticeable hole in the dependency graph even after M25 + M26 land.

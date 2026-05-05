@@ -14,7 +14,7 @@ use tracing::debug;
 use crate::resolve_lang::{
     resolve_go_module, resolve_java_dotted, resolve_python_bare, resolve_python_relative,
 };
-// ─── extension tables ─────────────────────────────────────────────────────────
+use crate::tsconfig::TsConfigPaths;
 
 /// Returns `(file_extensions, directory_index_names)` for a language.
 ///
@@ -65,8 +65,6 @@ fn lang_from_path_ext(path: &Path) -> &'static str {
     }
 }
 
-// ─── stem map ─────────────────────────────────────────────────────────────────
-
 /// Builds a stem → `[NodeIndex]` lookup for Rust `crate::` / `self::` / `super::`.
 pub(crate) fn build_stem_map(
     path_to_node: &BTreeMap<PathBuf, NodeIndex>,
@@ -113,8 +111,6 @@ fn find_stem_in_subtree(
     }
 }
 
-// ─── Java source roots ────────────────────────────────────────────────────────
-
 /// Builds the list of Java source roots for the repository.
 ///
 /// Starts from `["", "src/main/java", "src/test/java", "src", "java"]` and
@@ -142,12 +138,10 @@ pub(crate) fn compute_java_roots(path_to_node: &BTreeMap<PathBuf, NodeIndex>) ->
     roots
 }
 
-// ─── path lookup ─────────────────────────────────────────────────────────────
-
 /// Tries `base/rem` with language-specific extensions; files beat directory-index.
 ///
 /// Order: (1) file extensions, (2) verbatim path, (3) directory-index files.
-fn try_path(
+pub(crate) fn try_path(
     base: &Path,
     rem: &str,
     lang: &str,
@@ -170,8 +164,6 @@ fn try_path(
     None
 }
 
-// ─── main dispatch ────────────────────────────────────────────────────────────
-
 /// Resolves `import` from `from_path` and returns matching [`NodeIndex`] targets.
 ///
 /// An empty vec means the import is external or unresolvable; the caller logs
@@ -185,6 +177,7 @@ pub(crate) fn resolve_imports(
     path_to_node: &BTreeMap<PathBuf, NodeIndex>,
     go_mod_prefix: Option<&str>,
     java_roots: &[PathBuf],
+    tsconfig: Option<&TsConfigPaths>,
 ) -> Vec<NodeIndex> {
     // Relative specifiers always use resolve_relative; extension list is inferred
     // from the importer's file extension so test fixtures with language:"rust"
@@ -207,6 +200,15 @@ pub(crate) fn resolve_imports(
             None => vec![],
         },
         "java" => resolve_java_dotted(import, java_roots, path_to_node),
+        "typescript" | "javascript" => {
+            if let Some(tc) = tsconfig {
+                let v = crate::tsconfig::resolve_tsconfig_alias(import, tc, path_to_node);
+                if !v.is_empty() {
+                    return v;
+                }
+            }
+            vec![]
+        }
         _ => {
             if let Some(local) = import
                 .strip_prefix("crate::")
@@ -223,7 +225,6 @@ pub(crate) fn resolve_imports(
     }
 }
 
-// ─── relative (./  ../) ──────────────────────────────────────────────────────
 fn resolve_relative(
     import: &str,
     from_path: &Path,
@@ -263,7 +264,6 @@ fn resolve_relative(
         .collect()
 }
 
-// ─── Rust super:: ────────────────────────────────────────────────────────────
 fn resolve_super(
     import: &str,
     from_path: &Path,

@@ -13,13 +13,14 @@ use crate::error::PipelineError;
 use crate::helpers::{
     build_edge_weight_map, compute_path_partition, graph_to_boundary_input, spec_to_boundary_input,
 };
+use crate::readers::{read_go_mod_prefix, read_tsconfig_paths};
 use crate::store::{enforce_retention, write_snapshot};
 pub use crate::time::current_timestamp;
 use sdivi_config::{BoundarySpec, Config};
 use sdivi_core::input::ChangeCouplingConfigInput;
 use sdivi_detection::warm_start::CACHE_FILENAME;
 use sdivi_detection::{run_leiden, run_leiden_with_weights, LeidenConfig};
-use sdivi_graph::dependency_graph::build_dependency_graph_with_go_module;
+use sdivi_graph::dependency_graph::build_dependency_graph_with_tsconfig;
 use sdivi_graph::metrics::compute_metrics;
 use sdivi_parsing::adapter::LanguageAdapter;
 use sdivi_parsing::parse::parse_repository;
@@ -176,7 +177,12 @@ impl Pipeline {
         }
         // ── Stage 2: Graph ───────────────────────────────────────────────
         let go_mod_prefix = read_go_mod_prefix(parse_root);
-        let dg = build_dependency_graph_with_go_module(&records, go_mod_prefix.as_deref());
+        let tsconfig = read_tsconfig_paths(parse_root);
+        let dg = build_dependency_graph_with_tsconfig(
+            &records,
+            go_mod_prefix.as_deref(),
+            tsconfig.as_ref(),
+        );
         let metrics = compute_metrics(&dg);
         // ── Change-coupling analysis ─────────────────────────────────────
         let cc_cfg = ChangeCouplingConfigInput {
@@ -283,17 +289,3 @@ impl Pipeline {
     }
 }
 
-/// Reads `go.mod` from `root` and returns the module path, or `None` if
-/// absent or unparseable (Go imports treated as external on failure).
-fn read_go_mod_prefix(root: &Path) -> Option<String> {
-    let content = std::fs::read_to_string(root.join("go.mod")).ok()?;
-    for line in content.lines() {
-        if let Some(rest) = line.trim().strip_prefix("module") {
-            let trimmed = rest.trim();
-            if !trimmed.is_empty() && !trimmed.starts_with('(') {
-                return trimmed.split_whitespace().next().map(str::to_string);
-            }
-        }
-    }
-    None
-}

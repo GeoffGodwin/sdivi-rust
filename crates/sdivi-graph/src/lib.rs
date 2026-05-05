@@ -21,9 +21,15 @@ pub mod dependency_graph;
 pub mod metrics;
 pub(crate) mod resolve;
 pub(crate) mod resolve_lang;
+pub(crate) mod tsconfig;
 
 pub use dependency_graph::{build_dependency_graph_from_edges, DependencyGraph, GraphError};
 pub use metrics::{compute_metrics, GraphMetrics};
 
 #[cfg(feature = "pipeline-records")]
-pub use dependency_graph::{build_dependency_graph, build_dependency_graph_with_go_module};
+pub use dependency_graph::{
+    build_dependency_graph, build_dependency_graph_with_go_module,
+    build_dependency_graph_with_tsconfig,
+};
+#[cfg(feature = "pipeline-records")]
+pub use tsconfig::{parse_tsconfig_content, TsConfigPaths};

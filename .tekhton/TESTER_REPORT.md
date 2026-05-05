@@ -1,13 +1,13 @@
 ## Planned Tests
-- [x] `crates/sdivi-graph/tests/resolver_edge_cases.rs` — PEP 420 namespace pkg, multiple super:: levels, Java multi-module Maven roots, graph determinism
-- [x] `crates/sdivi-graph/tests/resolver_no_panic.rs` — resolver never panics on adversarial/garbage import specifiers
+- [x] `crates/sdivi-graph/tests/tsconfig_alias.rs` — JSONC/parse edge cases + determinism + property-style no-panic tests
+- [x] `crates/sdivi-pipeline/tests/tsconfig_pipeline.rs` — pipeline acceptance criteria: malformed tsconfig succeeds; jsconfig.json fallback succeeds
 
 ## Test Run Results
-Passed: 24  Failed: 0
+Passed: 118  Failed: 4 (pre-existing: wasm_package_json_* in sdivi-cli, bindings/sdivi-wasm/package.json not yet created — M12 scope)
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-graph/tests/resolver_edge_cases.rs`
-- [x] `crates/sdivi-graph/tests/resolver_no_panic.rs`
+- [x] `crates/sdivi-graph/tests/tsconfig_alias.rs`
+- [x] `crates/sdivi-pipeline/tests/tsconfig_pipeline.rs`
