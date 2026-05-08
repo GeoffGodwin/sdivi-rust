@@ -113,8 +113,8 @@ leiden_max_recursion_depth = 0
 #[test]
 fn validate_boundaries_accepts_default_values() {
     // No project config file → all defaults.  Must succeed.
-    let config = load_with_paths(None, None)
-        .expect("load with no config files must succeed using defaults");
+    let config =
+        load_with_paths(None, None).expect("load with no config files must succeed using defaults");
     assert_eq!(config.boundaries.leiden_min_compression_ratio, 0.1);
     assert_eq!(config.boundaries.leiden_max_recursion_depth, 32);
 }

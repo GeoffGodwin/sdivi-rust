@@ -28,8 +28,10 @@ fn summary(
 }
 
 fn cfg_with_override(entropy_rate: f64, expires: &str, today: NaiveDate) -> ThresholdsInput {
-    let mut cfg = ThresholdsInput::default();
-    cfg.today = today;
+    let mut cfg = ThresholdsInput {
+        today,
+        ..ThresholdsInput::default()
+    };
     cfg.overrides.insert(
         "error_handling".to_string(),
         ThresholdOverrideInput {
@@ -44,8 +46,10 @@ fn cfg_with_override(entropy_rate: f64, expires: &str, today: NaiveDate) -> Thre
 }
 
 fn cfg_with_drift_override(drift_rate: f64, expires: &str, today: NaiveDate) -> ThresholdsInput {
-    let mut cfg = ThresholdsInput::default();
-    cfg.today = today;
+    let mut cfg = ThresholdsInput {
+        today,
+        ..ThresholdsInput::default()
+    };
     cfg.overrides.insert(
         "error_handling".to_string(),
         ThresholdOverrideInput {

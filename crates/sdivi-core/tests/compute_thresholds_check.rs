@@ -23,8 +23,10 @@ fn summary(
 }
 
 fn cfg_with_override(entropy_rate: f64, expires: &str, today: NaiveDate) -> ThresholdsInput {
-    let mut cfg = ThresholdsInput::default();
-    cfg.today = today;
+    let mut cfg = ThresholdsInput {
+        today,
+        ..ThresholdsInput::default()
+    };
     cfg.overrides.insert(
         "error_handling".to_string(),
         ThresholdOverrideInput {
@@ -100,8 +102,10 @@ fn multiple_breaches_all_reported() {
 
 #[test]
 fn custom_rate_raises_aggregate_limit() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.pattern_entropy_rate = 10.0;
+    let cfg = ThresholdsInput {
+        pattern_entropy_rate: 10.0,
+        ..ThresholdsInput::default()
+    };
     let s = summary(Some(5.0), None, None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(!r.breached);

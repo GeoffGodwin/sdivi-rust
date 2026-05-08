@@ -8,7 +8,6 @@ use sdivi_wasm::types::{
     WasmLeidenConfigInput, WasmPatternMetricsResult, WasmQualityFunction,
 };
 use sdivi_wasm::{assemble_snapshot, compute_change_coupling, compute_delta, compute_trend};
-use serde_wasm_bindgen;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 /// Build a minimal [`WasmAssembleSnapshotInput`] with the given graph density.
