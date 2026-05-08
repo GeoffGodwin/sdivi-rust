@@ -6,10 +6,11 @@
 //! normalize_hash_deterministic` filter resolves to its own target.
 //! Snapshot assembly / delta / trend tests live in `wasm_snapshot.rs`.
 
+use sdivi_wasm::threshold_types::WasmThresholdsInput;
 use sdivi_wasm::types::{
     WasmBoundaryDefInput, WasmBoundarySpecInput, WasmDependencyGraphInput, WasmDivergenceSummary,
     WasmEdgeInput, WasmLeidenConfigInput, WasmNodeInput, WasmPatternInstanceInput,
-    WasmQualityFunction, WasmSnapshotPriorPartition, WasmThresholdsInput,
+    WasmQualityFunction, WasmSnapshotPriorPartition,
 };
 use sdivi_wasm::{
     compute_boundary_violations, compute_coupling_topology, compute_pattern_metrics,
@@ -52,6 +53,8 @@ fn default_leiden_cfg() -> WasmLeidenConfigInput {
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
         edge_weights: None,
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     }
 }
 

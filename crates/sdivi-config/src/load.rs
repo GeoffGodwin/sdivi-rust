@@ -118,7 +118,9 @@ pub fn load_with_paths(
 
     let merged = toml::to_string(&toml::Value::Table(base))
         .map_err(|e| ConfigError::Parse(e.to_string()))?;
-    toml::from_str(&merged).map_err(|e| ConfigError::Parse(e.to_string()))
+    let config: Config = toml::from_str(&merged).map_err(|e| ConfigError::Parse(e.to_string()))?;
+    validate_boundaries(&config)?;
+    Ok(config)
 }
 
 fn load_toml_file(path: &Path) -> Result<Option<toml::Table>, ConfigError> {
@@ -182,6 +184,23 @@ fn merge_overrides(base_section: &mut toml::Table, overlay_val: toml::Value) {
             base_section.insert("overrides".to_string(), toml::Value::Table(overlay_ov));
         }
     }
+}
+
+fn validate_boundaries(cfg: &Config) -> Result<(), ConfigError> {
+    let r = cfg.boundaries.leiden_min_compression_ratio;
+    if !(0.0..1.0).contains(&r) {
+        return Err(ConfigError::InvalidValue {
+            key: "boundaries.leiden_min_compression_ratio".to_string(),
+            message: format!("must be in [0.0, 1.0), got {r}"),
+        });
+    }
+    if cfg.boundaries.leiden_max_recursion_depth < 1 {
+        return Err(ConfigError::InvalidValue {
+            key: "boundaries.leiden_max_recursion_depth".to_string(),
+            message: "must be >= 1".to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn apply_env_overrides(config: &mut Config) {

@@ -8,6 +8,16 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M28 — Leiden performance (modularity values may shift slightly)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `LeidenPartition` JSON shape is unchanged. `BoundarySpec` YAML untouched.
+
+**Config:** two new optional `[boundaries]` keys (`leiden_min_compression_ratio`, `leiden_max_recursion_depth`). Existing configs without them inherit the defaults transparently via `#[serde(default)]`. No action needed.
+
+**Modularity values:** snapshots taken post-M28 may report modularity values that differ by up to ~1% from snapshots taken pre-M28 on the same repo state. This is within the `verify-leiden` 1% tolerance band — the same situation that arose with M18. The algorithm is mathematically equivalent; the numerical difference stems from the new compression-ratio cutoff stopping recursion a level earlier on sparse graphs. If you are running trend analysis that compares pre-M28 and post-M28 snapshots, treat the M28 cutover as a baseline reset for modularity-sensitive metrics.
+
+**WASM:** `WasmLeidenConfigInput` gains two optional TypeScript fields (`min_compression_ratio?: number`, `max_recursion_depth?: number`). Existing callers that omit these fields continue to work — they receive the defaults (0.1 and 32).
+
 ## 0.2.x → 0.3.0 (M25 + M26 resolver fixes — no schema break)
 
 ### Graph resolver: parent navigation and per-language dispatch (M26)

@@ -5,14 +5,16 @@
 //! tree-sitter, and no `std::time`.
 
 mod change_coupling_types;
+mod threshold_input;
 mod types;
 
 pub use change_coupling_types::{ChangeCouplingConfigInput, CoChangeEventInput};
 pub use edge_weight::{edge_weight_key, split_edge_weight_key};
+pub use threshold_input::{ThresholdOverrideInput, ThresholdsInput};
 pub use types::{
     BoundaryDefInput, BoundarySpecInput, DependencyGraphInput, EdgeInput, LeidenConfigInput,
     NodeInput, NormalizeNode, PatternInstanceInput, PatternLocationInput, PriorPartition,
-    QualityFunctionInput, ThresholdOverrideInput, ThresholdsInput,
+    QualityFunctionInput,
 };
 mod edge_weight;
 

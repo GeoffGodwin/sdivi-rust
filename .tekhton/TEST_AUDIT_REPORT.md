@@ -1,78 +1,107 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 0 modified test files; 3 fixture source files (freshness sample)
+Tests audited: 2 files, 12 test functions
 Verdict: PASS
 
 ---
 
 ### Findings
 
-#### SCOPE: Freshness-sample files are fixture sources, not test files
-- File: `tests/fixtures/simple-javascript/utils.js`, `tests/fixtures/simple-python/main.py`, `tests/fixtures/simple-python/models.py`
-- Issue: All three files listed in "Test Files Under Audit (freshness sample)" are static
-  fixture source files used as parser inputs, not test files. They contain no test functions,
-  no assertions, and no testing-framework usage. None of them were touched by the tester or
-  the coder in this run. They cannot be evaluated against any of the seven audit rubric
-  criteria. This is a meta-level labelling issue in the pipeline, not a code defect.
+#### COVERAGE: Incomplete error assertion at exact compression-ratio boundary
+- File: `crates/sdivi-config/tests/validate_boundaries.rs:23`
+- Issue: `validate_boundaries_rejects_compression_ratio_at_1_0` matches
+  `ConfigError::InvalidValue { key, .. }` and asserts only the `key` field;
+  the `message` field is silently discarded via `..`.  The structurally identical
+  test for the `1.5` case (line 44) asserts both `key` and `message` (checking
+  that the supplied value is echoed back).  The discrepancy leaves the
+  exact-boundary error message unverified.  The implementation at `load.rs:192`
+  produces `format!("must be in [0.0, 1.0), got {r}")`, so a
+  `message.contains("1.0")` check is straightforward to add.
 - Severity: LOW
-- Action: No code change needed. Fixture source files should be tracked separately from
-  test files in the audit manifest so the auditor's scope is unambiguous.
+- Action: Expand the match arm on line 33 to also bind and assert `message`:
+  ```rust
+  ConfigError::InvalidValue { key, message } => {
+      assert_eq!(key, "boundaries.leiden_min_compression_ratio");
+      assert!(message.contains("1.0"),
+              "error message must echo the supplied value, got: {message}");
+  }
+  ```
+
+#### COVERAGE: Soft conditional assertion in behavioral-difference test
+- File: `crates/sdivi-detection/tests/leiden_depth_cap.rs:139`
+- Issue: `depth_cap_at_1_produces_valid_but_different_partition_than_uncapped`
+  computes both a depth-1-capped and an uncapped partition, then enters an
+  `if !differ { eprintln!(...) }` branch where — if the two partitions
+  coincidentally agree — the test **makes zero assertions and passes
+  unconditionally**.  Because behavior is fully deterministic for a fixed seed
+  and graph, this branch is either always taken or never taken; no test run can
+  tell which.  The test name claims to verify a behavioral difference (i.e.,
+  that the depth cap returns an early-exit value rather than the fully converged
+  one), but enforcement is optional.  The other three tests in the file verify
+  *structural validity* (all nodes covered, community IDs in range), not the
+  *behavioral change* caused by the cap firing.
+- Severity: MEDIUM
+- Action: One of two clean fixes:
+  (a) **Assert unconditionally** — run both variants locally on this seed+graph
+  to confirm they differ (the 25-node ring-of-5-cliques with `seed=42` should
+  compress enough to trigger at least one recursive call), then replace
+  `if !differ { eprintln!(...) }` with
+  `assert!(differ, "depth-1 cap must produce a different partition than depth-32")`.
+  (b) **Remove the comparison test** — the three validity tests already exercise
+  the code path.  Delete this function to avoid the false impression of
+  behavioral coverage it does not deliver.
+
+#### NAMING: Test name implies depth cap fires; fixture prevents recursion
+- File: `crates/sdivi-detection/tests/leiden_depth_cap.rs:183`
+- Issue: `depth_cap_at_depth_1_is_minimum_working_configuration` uses an
+  isolated-nodes graph (no edges).  The test body comment correctly states
+  "The depth cap does NOT fire here because recursion requires compression."
+  On an edgeless graph, `local_move_phase` makes no moves on the first
+  iteration, so the outer loop exits immediately via `!moved`, never reaching
+  the aggregation step that triggers recursion.  The name "minimum working
+  configuration" implies the cap fires at its configured limit, when the test
+  actually verifies that Leiden exits cleanly on a trivially structured input
+  regardless of how the depth cap is set.
+- Severity: LOW
+- Action: Rename to `depth_cap_setting_of_1_does_not_prevent_trivial_convergence`
+  (or similar) and adjust the docstring to describe what is actually being
+  exercised — Leiden's graceful handling of edgeless graphs rather than the
+  depth-cap guard.
 
 ---
 
-### Tester Claim Verification
+### Scope and Isolation Notes
 
-The tester made no test file modifications — appropriate, since the sole implementation
-change was a doc comment softening on a `pub(crate)` function with no behavior change.
-The tester instead verified that three sets of pre-existing tests already cover the
-behaviours addressed by the six non-blocking notes. Those files were read to validate
-the claims even though they fall outside the formal audit scope.
+**No orphaned imports or stale symbol references detected.**  Both test files
+reference symbols present in the current codebase: `load_with_paths`,
+`ConfigError` (`sdivi-config`); `run_leiden`, `LeidenConfig`
+(`sdivi-detection`); `build_dependency_graph_from_edges` (`sdivi-graph`).
+None of the symbols deleted this milestone (`.tekhton/JR_CODER_SUMMARY.md`,
+`.tekhton/test_dedup.fingerprint`) are imported or referenced by any test
+under audit.
 
-**Claim 1 — JS dynamic import test at `crates/sdivi-lang-javascript/tests/extract_behavior.rs:70-82`**
+**Isolation is sound.**  `validate_boundaries.rs` writes all TOML content to
+`tempfile::NamedTempFile` and passes the temp path to
+`load_with_paths(Some(f.path()), None)`.  Both the global-config path
+argument and the env-var layer (`apply_env_overrides`) are bypassed; no
+machine-local sdivi config can influence the outcome.  `leiden_depth_cap.rs`
+constructs all graphs from inline literal edge lists and reads no project
+files.  Neither file's pass/fail outcome depends on build artifacts, pipeline
+state, or any mutable file in the repository.
 
-Verified correct. The test `dynamic_import_string_literal_yields_specifier` uses a
-disjunctive assertion (`record.imports.is_empty() || record.imports == &["./chunk.js"]`)
-that explicitly accepts both outcomes. This directly and correctly reflects the
-"best-effort and grammar-version-dependent" language now in the doc comment. The softened
-doc and the disjunctive test are consistent. No weakening; the test always behaved this
-way. ✓
+**Assertion honesty.**  All asserted constants are derived from the
+implementation:
+- The defaults `0.1` and `32` match `BoundariesConfig::default()` at
+  `config.rs:113-116`.
+- The node-coverage counts (12, 25, 5) match the fixture-construction
+  logic in the same test file.
+- The community-ID validity assertion (`comm < community_count`) is sound:
+  `compute_stability` in `quality.rs:7-43` skips empty communities; after
+  `renumber` in `leiden_recursive`, all community IDs lie in `[0, k)` where
+  `k == stability.len() == community_count()`.
+- `initial_assignment_from_cache(None, n)` returns `(0..n).collect()` (each
+  node in its own singleton), confirming the 5-community assertion in the
+  isolated-nodes test.
 
-**Claim 2 — Java wildcard tests at `crates/sdivi-lang-java/tests/extract_behavior.rs:40-44,55-58`**
-
-Verified correct. `wildcard_import_appends_star` asserts `record.imports == &["java.util.*"]`
-and `static_wildcard_import_yields_class_specifier` asserts `record.imports == &["org.junit.Assert"]`.
-Both exercise `java_import_specifier` via `extract_imports`. The `contains(".*")` wildcard
-detection in the implementation at line 81 is what makes both tests pass. The comment at
-lines 55-57 correctly describes the trade-off. Tests are honest assertions against real
-outputs. ✓
-
-**Claim 3 — Infinity weight tests at `bindings/sdivi-wasm/src/weight_keys.rs:171-192`**
-
-Verified correct. The implementation guard at line 25 is `weight.is_nan() || weight.is_infinite()`,
-which fires before the `weight < 0.0` check at line 30. For `f64::INFINITY`, `format!("{weight}")`
-produces `"inf"`, so the error message is `"is not finite (inf); all weights must be finite and >=
-0.0"`. The assertion `e.contains("finite") || e.contains("infinite") || e.contains("NaN")` is
-satisfied via "finite". For `f64::NEG_INFINITY`, `format!("{weight}")` produces `"-inf"`, so
-`e.contains("inf")` is satisfied. Both tests make honest assertions against real implementation
-output paths. ✓
-
-One minor observation (not flagged as a finding): `rejects_nan_weight` at line 97 asserts
-`e.contains("NaN")`, relying on Rust's stable `Display` rendering of `f64::NAN` as `"NaN"`.
-This is a reasonable assumption given Rust's long-term stability guarantees, but the assertion
-would be more robust as `e.contains("finite")` to match the actual static part of the error
-string. Not blocking.
-
----
-
-### Rubric Scores
-
-| Criterion           | Score | Notes |
-|---------------------|-------|-------|
-| Assertion Honesty   | PASS  | No hard-coded magic values. All assertions in the verified test files trace to real implementation outputs. |
-| Edge Case Coverage  | PASS  | For this task (doc-comment only), no new edge cases are introduced. Existing suite covers variable-arg require, empty maps, NaN, ±infinity, colons-in-node-ids. |
-| Implementation Exercise | PASS | All referenced tests call real adapter or parser functions with real tree-sitter grammars. No mocking of internals. |
-| Test Weakening      | PASS  | No test files were modified. No existing assertion was broadened or removed. |
-| Naming and Intent   | PASS  | All referenced test names encode the scenario and expected outcome (e.g., `rejects_positive_infinity_weight`, `wildcard_import_appends_star`). |
-| Scope Alignment     | PASS  | All test imports resolve to existing symbols. Implementation functions referenced by tests match what is present in the current source. |
-| Test Isolation      | PASS  | All referenced tests use inline string literals or `BTreeMap` literals; none read mutable pipeline state files or run artifacts. |
+No test asserts a hard-coded value that is not derivable from the implementation.

@@ -1,8 +1,18 @@
 # Drift Log
 
 ## Metadata
-- Last audit: 2026-05-05
+- Last audit: 2026-05-07
 - Runs since audit: 1
+
+## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
+
+M28 records two pre-existing perf bugs in the M18-era refinement implementation:
+
+- **Bug 1 — full-graph state allocation per coarse community.** `refine_community` allocated `vec![false; n]` (in_coarse) and called `RefinementState::from_partition(graph, ..., n)` iterating all `n` nodes and all edges at every call, regardless of the coarse community size. On a sparse graph with hundreds of small coarse communities this setup cost ran hundreds of times per outer-loop iteration, dominating runtime by 2–3 orders of magnitude.
+
+- **Bug 2 — recursion only halted on identity compression.** `leiden_recursive` broke the outer loop only when `agg_graph.n >= graph.n` (zero nodes merged). On sparse, weakly-connected graphs a single round of refinement typically merged only a handful of singletons (e.g. 1778 → 1750 → 1730 → …) so the identity break never fired, while neither did the algorithm make meaningful structural progress. Each recursion level still paid the full per-coarse-community setup cost.
+
+Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/medium/large all compress >50% per level and have <100 nodes total), so the fixture suite did not catch them. New regression coverage: a `leiden_perf.rs` test on a 1500-node 600-edge sparse graph that asserts wall-clock <5s in debug (passed in ~1.2s).
 
 ## Design Drift / Ratified
 - [2026-04-29 | "consumer-app-driven scope shift"] **KDD-12 (sdivi-core pure-compute reshape) and KDD-13 (WASM moves into v0) ratified.** Driver: a strict-mode TS consumer app at the user's workplace becomes the first concrete consumer of sdivi-rust ahead of mid-June reviews. Today's `sdivi-core` (Pipeline + I/O composition) cannot compile to WASM — transitively pulls `tree-sitter`, `walkdir`, `ignore`, `rayon`, `std::fs::*`. Plan: reshape the milestone schedule from M08 onward.
@@ -47,6 +57,8 @@
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-07 | "M28"] `refine.rs:270` `renumber_in_place` and `mod.rs:197` `renumber` are identical functions with different names. Both could be unified, but the current split causes no correctness issue.
+- [2026-05-07 | "M28"] `LeidenConfigInput::min_compression_ratio` and `max_recursion_depth` are validated at the `sdivi-config` load boundary but not in `sdivi-core::detect_boundaries`. An out-of-range value supplied by a WASM caller degrades gracefully (recursion always/never fires) but silently ignores the documented constraint. Consider adding the range check to `detect_boundaries` if the field is part of the public `sdivi-core` contract.
 - [2026-05-05 | "Address all 6 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/NON_BLOCKING_LOG.md` contains three pairs of duplicate entries (items 1+4, 2+5, 3+6): the M26 and M27 review cycles independently logged the same findings against the same lines before they were addressed. The log is factually accurate but the duplication suggests the review pipeline does not de-duplicate open notes before appending — accumulated duplicates will make the log harder to triage over time.
 - [2026-05-05 | "architect audit"] Stays in DRIFT_LOG.md for next cycle.
 - [2026-05-05 | "architect audit"] **`bindings/sdivi-wasm/src/weight_keys.rs:97` `rejects_nan_weight` test assertion.** Prior architect explicitly logged "Low-risk, no action required." The assertion `e.contains("NaN")` tests an error-message string; fragile but not architecturally significant. No new information changes this ruling.
@@ -55,10 +67,3 @@
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
-- [RESOLVED 2026-05-05] `crates/sdivi-parsing/tests/import_extraction.rs` is a cross-crate integration test (uses sdivi-graph + six language adapters) placed inside `sdivi-parsing/tests/`. CLAUDE.md calls for workspace-level cross-crate tests to live under the top-level `tests/` directory. Pragmatically fine here (`CARGO_MANIFEST_DIR` path resolution is the reason), but the pattern drifts from the stated convention.
-- [RESOLVED 2026-05-05] **`bindings/sdivi-wasm/src/weight_keys.rs:97` — `rejects_nan_weight` test** — Drift log explicitly records "Low-risk, no action required." The assertion tests an implementation detail (`e.contains("NaN")`), but the behavior is stable and the risk of regression is negligible. No action this cycle.
-- [RESOLVED 2026-05-05] **`list_categories()` placement in `bindings/sdivi-wasm/src/exports.rs`** — The drift log flags the placement as a carry-forward from M23/M24 but specifies no target location. Without a documented destination grouping in the architecture, no bounded relocation action can be taken. Carry forward until a specific placement rule is established.
-- [2026-05-05 | "Implement Milestone 27: tsconfig Path Alias Support"] `truncate_to_256_bytes` is defined identically (`pub(crate)`) in all five adapter `extract.rs` files (Python, TypeScript, JavaScript, Go, Java) and has inline unit tests only in the Python file — Resolved during M25–M27: consolidated into `sdivi-parsing::text`.
-- [2026-05-05 | "Implement Milestone 27: tsconfig Path Alias Support"] `string_content` (unquote a `string` AST node) is byte-for-byte identical in `crates/sdivi-lang-typescript/src/extract.rs:74-100` and `crates/sdivi-lang-javascript/src/extract.rs:98-123` — Resolved during M25–M27: consolidated into `sdivi-parsing::text`.
-- [2026-05-04 | "Implement Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions"] `truncate_to_256_bytes` is defined identically (`pub(crate)`) in all five adapter `extract.rs` files (Python, TypeScript, JavaScript, Go, Java) and has inline unit tests only in the Python file — Resolved during M25–M27: consolidated into `sdivi-parsing::text`.
-- [2026-05-04 | "Implement Milestone 26: Resolver — Parent Navigation and Per-Language Module Conventions"] `string_content` (unquote a `string` AST node) is byte-for-byte identical in `crates/sdivi-lang-typescript/src/extract.rs:74-100` and `crates/sdivi-lang-javascript/src/extract.rs:98-123` — Resolved during M25–M27: consolidated into `sdivi-parsing::text`.

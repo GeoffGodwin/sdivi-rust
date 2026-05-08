@@ -36,6 +36,8 @@ pub enum QualityFunction {
 /// let cfg = LeidenConfig::default();
 /// assert_eq!(cfg.seed, 42);
 /// assert_eq!(cfg.max_iterations, 100);
+/// assert_eq!(cfg.min_compression_ratio, 0.1);
+/// assert_eq!(cfg.max_recursion_depth, 32);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeidenConfig {
@@ -47,6 +49,10 @@ pub struct LeidenConfig {
     pub quality: QualityFunction,
     /// Resolution parameter forwarded to CPM; ignored for Modularity.
     pub gamma: f64,
+    /// Minimum graph compression ratio to continue Leiden recursion. Default `0.1`.
+    pub min_compression_ratio: f64,
+    /// Hard cap on Leiden recursion depth. Default `32`.
+    pub max_recursion_depth: u32,
 }
 
 impl Default for LeidenConfig {
@@ -56,6 +62,8 @@ impl Default for LeidenConfig {
             max_iterations: 100,
             quality: QualityFunction::Modularity,
             gamma: 1.0,
+            min_compression_ratio: 0.1,
+            max_recursion_depth: 32,
         }
     }
 }
@@ -68,6 +76,8 @@ impl LeidenConfig {
             max_iterations: 100,
             quality: QualityFunction::Modularity,
             gamma: cfg.boundaries.leiden_gamma,
+            min_compression_ratio: cfg.boundaries.leiden_min_compression_ratio,
+            max_recursion_depth: cfg.boundaries.leiden_max_recursion_depth,
         }
     }
 }

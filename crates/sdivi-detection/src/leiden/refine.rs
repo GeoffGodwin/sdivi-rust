@@ -141,7 +141,8 @@ pub fn well_connected(k_in_to: f64, size_candidate: usize, size_s: usize, gamma:
 
 /// Produces a refined partition from a coarse `partition`.
 ///
-/// Each community in `partition` is treated independently.  Within each
+/// Each community in `partition` is treated independently via an induced
+/// subgraph, giving O(|members|) setup cost instead of O(n).  Within each
 /// community, nodes start in singleton sub-communities and are greedily merged
 /// if the move improves the quality function.
 ///
@@ -190,47 +191,36 @@ fn refine_community(
     quality: &QualityFunction,
     gamma: f64,
 ) {
-    let n = graph.n;
-    let size_s = members.len();
+    let (sub, local_to_global) = graph.induced_subgraph(members);
+    let local_n = sub.n;
+    let size_s = local_n;
 
-    // O(1) coarse-community membership lookup.
-    let mut in_coarse = vec![false; n];
-    for &m in members {
-        in_coarse[m] = true;
-    }
+    // State sized to sub.n, not graph.n — O(|members|) setup instead of O(n).
+    let singleton: Vec<usize> = (0..local_n).collect();
+    let mut state = RefinementState::from_partition(&sub, &singleton, local_n);
 
-    // Singleton init: every member starts in its own sub-community.
-    let singleton_partition: Vec<usize> = (0..n).collect();
-    let mut state = RefinementState::from_partition(graph, &singleton_partition, n);
-
-    let mut order: Vec<usize> = members.to_vec();
+    let mut order: Vec<usize> = (0..local_n).collect();
     order.shuffle(rng);
 
-    let max_iter = MAX_REFINE_ITER;
-    for _ in 0..max_iter {
+    for _ in 0..MAX_REFINE_ITER {
         let mut moved = false;
         for &node in &order {
             let current_comm = state.assignment[node];
 
-            // Single-pass neighbour walk: accumulate k_in per candidate sub-community.
+            // No in_coarse filter needed — sub contains only members.
             let mut k_in_per_comm: BTreeMap<usize, f64> = BTreeMap::new();
-            for (idx, &nbr) in graph.adj[node].iter().enumerate() {
-                if !in_coarse[nbr] {
-                    continue;
-                }
+            for (idx, &nbr) in sub.adj[node].iter().enumerate() {
                 let nbr_comm = state.assignment[nbr];
                 if nbr_comm == current_comm {
                     continue;
                 }
-                *k_in_per_comm.entry(nbr_comm).or_insert(0.0) += graph.edge_weights[node][idx];
+                *k_in_per_comm.entry(nbr_comm).or_insert(0.0) += sub.edge_weights[node][idx];
             }
 
             if k_in_per_comm.is_empty() {
                 continue;
             }
 
-            // Argmax over positive gains; BTreeMap ascending iteration gives
-            // deterministic smallest-ID tie-break (documented in docs/determinism.md).
             let mut best_comm = current_comm;
             let mut best_gain = 0.0f64;
 
@@ -240,7 +230,7 @@ fn refine_community(
                     continue;
                 }
                 let gain = match quality {
-                    QualityFunction::Modularity => state.move_gain(graph, node, comm, k_in_to),
+                    QualityFunction::Modularity => state.move_gain(&sub, node, comm, k_in_to),
                     QualityFunction::Cpm { gamma: _ } => k_in_to - gamma * state.size[comm] as f64,
                 };
                 if gain > best_gain {
@@ -250,7 +240,7 @@ fn refine_community(
             }
 
             if best_gain > 1e-10 {
-                state.apply_move(graph, node, current_comm, best_comm);
+                state.apply_move(&sub, node, current_comm, best_comm);
                 moved = true;
             }
         }
@@ -259,9 +249,20 @@ fn refine_community(
         }
     }
 
-    // Write back sub-community assignments for all members.
-    for &member in members {
-        refined[member] = state.assignment[member];
+    // Map each local sub-community to a globally unique ID using the smallest
+    // global member of that sub-community.  Prevents ID collisions between sibling
+    // refine_community calls, which operate on disjoint member sets.
+    let mut sc_to_global: BTreeMap<usize, usize> = BTreeMap::new();
+    for (local, &sc) in state.assignment.iter().enumerate() {
+        let global = local_to_global[local];
+        let entry = sc_to_global.entry(sc).or_insert(global);
+        if global < *entry {
+            *entry = global;
+        }
+    }
+
+    for (local, &sc) in state.assignment.iter().enumerate() {
+        refined[local_to_global[local]] = sc_to_global[&sc];
     }
 }
 

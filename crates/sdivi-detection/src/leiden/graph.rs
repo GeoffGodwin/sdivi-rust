@@ -177,6 +177,69 @@ impl LeidenGraph {
             Err(_) => 0.0,
         }
     }
+
+    /// Builds an induced subgraph over `nodes` and returns `(subgraph, local_to_global)`.
+    ///
+    /// Local IDs are assigned in ascending order of global ID: the smallest global
+    /// ID in `nodes` becomes local ID 0.  Cross-community edges are dropped;
+    /// self-loops are preserved.  The returned `Vec<usize>` maps `local_id →
+    /// global_id` and can be used to translate sub-community assignments back to
+    /// the original graph's node space.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use sdivi_detection::internal::LeidenGraph;
+    /// // K₅: complete graph on 5 nodes.
+    /// let edges: Vec<(usize, usize, f64)> = (0..5_usize)
+    ///     .flat_map(|u| ((u + 1)..5).map(move |v| (u, v, 1.0)))
+    ///     .collect();
+    /// let k5 = LeidenGraph::from_edges_weighted(5, &edges);
+    /// let (sub, l2g) = k5.induced_subgraph(&[0, 2, 4]);
+    /// assert_eq!(sub.n, 3);
+    /// assert_eq!(l2g, vec![0, 2, 4]);
+    /// assert_eq!(sub.edge_weight(0, 1), 1.0);
+    /// assert_eq!(sub.edge_weight(0, 2), 1.0);
+    /// assert_eq!(sub.edge_weight(1, 2), 1.0);
+    /// ```
+    pub fn induced_subgraph(&self, nodes: &[usize]) -> (LeidenGraph, Vec<usize>) {
+        // Sort and deduplicate so local IDs are assigned in ascending global-ID order.
+        let mut members: Vec<usize> = nodes.to_vec();
+        members.sort_unstable();
+        members.dedup();
+
+        let local_n = members.len();
+
+        // global_id → local_id lookup.
+        let global_to_local: BTreeMap<usize, usize> = members
+            .iter()
+            .enumerate()
+            .map(|(local, &global)| (global, local))
+            .collect();
+
+        // Collect edges (upper triangle only to avoid double-counting; self-loops preserved).
+        let mut edges: Vec<(usize, usize, f64)> = Vec::new();
+
+        for &global_id in &members {
+            let local_id = global_to_local[&global_id];
+            for (idx, &nbr) in self.adj[global_id].iter().enumerate() {
+                // Upper triangle: emit each cross-edge once.
+                if nbr <= global_id {
+                    continue;
+                }
+                if let Some(&local_nbr) = global_to_local.get(&nbr) {
+                    edges.push((local_id, local_nbr, self.edge_weights[global_id][idx]));
+                }
+            }
+            let sl = self.self_loops[global_id];
+            if sl > 0.0 {
+                edges.push((local_id, local_id, sl));
+            }
+        }
+
+        let sub = LeidenGraph::from_edges_weighted(local_n, &edges);
+        (sub, members)
+    }
 }
 
 #[cfg(test)]

@@ -85,6 +85,23 @@ pub struct BoundariesConfig {
     pub stability_threshold: u32,
     /// Whether to weight graph edges by coupling frequency.
     pub weighted_edges: bool,
+    /// Stop recursive Leiden when an aggregation level would compress the graph by
+    /// less than this fraction of nodes (e.g. `0.1` = stop when fewer than 10%
+    /// of nodes were merged). Must be in `[0.0, 1.0)`. Default `0.1`.
+    #[serde(default = "default_leiden_min_compression_ratio")]
+    pub leiden_min_compression_ratio: f64,
+    /// Hard cap on Leiden recursion depth. A value of `32` handles graphs up
+    /// to ~4 billion nodes. Must be `>= 1`. Default `32`.
+    #[serde(default = "default_leiden_max_recursion_depth")]
+    pub leiden_max_recursion_depth: u32,
+}
+
+fn default_leiden_min_compression_ratio() -> f64 {
+    0.1
+}
+
+fn default_leiden_max_recursion_depth() -> u32 {
+    32
 }
 
 impl Default for BoundariesConfig {
@@ -94,6 +111,8 @@ impl Default for BoundariesConfig {
             leiden_gamma: 1.0,
             stability_threshold: 3,
             weighted_edges: false,
+            leiden_min_compression_ratio: 0.1,
+            leiden_max_recursion_depth: 32,
         }
     }
 }

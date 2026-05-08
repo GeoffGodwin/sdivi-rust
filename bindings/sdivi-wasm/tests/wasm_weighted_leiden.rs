@@ -67,6 +67,8 @@ fn unweighted_cfg() -> WasmLeidenConfigInput {
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
         edge_weights: None,
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     }
 }
 
@@ -77,6 +79,8 @@ fn weighted_cfg(weights: BTreeMap<String, f64>) -> WasmLeidenConfigInput {
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
         edge_weights: Some(weights),
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     }
 }
 

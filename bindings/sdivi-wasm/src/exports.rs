@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use crate::category_types::*;
+use crate::threshold_types::*;
 use crate::types::*;
 use crate::weight_keys::parse_wasm_edge_weights;
 
