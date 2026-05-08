@@ -3,7 +3,7 @@
 
 <!-- milestone-meta
 id: "28"
-status: "in_progress"
+status: "done"
 -->
 
 **Scope:** Eliminate two performance bugs in `sdivi-detection`'s Leiden implementation that cause `Pipeline::snapshot` to hang for minutes-to-hours on large, sparse, weakly-connected graphs (e.g. an MFE shell with ~1778 files and ~700 import edges). The first bug forces every `refine_community` call to allocate state for the entire graph and walk every edge, regardless of how few nodes are actually in the coarse community being refined. The second bug only stops the recursive Leiden descent when refinement compresses the graph by literally zero nodes, so a graph that compresses by 1-3% per level recurses dozens of times — each level paying the full per-coarse-community refinement setup cost. After this milestone, refinement is `O(|members| + induced_edges)` per coarse community, recursion stops as soon as compression falls below a configurable ratio (default 10%), and a configurable hard recursion-depth cap (default 32) provides belt-and-suspenders against any pathological case the ratio gate misses. Modularity quality stays inside the existing `verify-leiden` 1% tolerance band; snapshot determinism is preserved. The two new knobs ship as `[boundaries]` config keys (`leiden_min_compression_ratio`, `leiden_max_recursion_depth`) and as fields on `LeidenConfig` / `LeidenConfigInput` so WASM consumers can tune them too.

@@ -1,107 +1,70 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 12 test functions
+Tests audited: 1 file (inline test module `bindings/sdivi-wasm/src/weight_keys.rs`),
+13 test functions; 3 freshness-sample files are TypeScript fixture data, not test logic.
 Verdict: PASS
-
----
 
 ### Findings
 
-#### COVERAGE: Incomplete error assertion at exact compression-ratio boundary
-- File: `crates/sdivi-config/tests/validate_boundaries.rs:23`
-- Issue: `validate_boundaries_rejects_compression_ratio_at_1_0` matches
-  `ConfigError::InvalidValue { key, .. }` and asserts only the `key` field;
-  the `message` field is silently discarded via `..`.  The structurally identical
-  test for the `1.5` case (line 44) asserts both `key` and `message` (checking
-  that the supplied value is echoed back).  The discrepancy leaves the
-  exact-boundary error message unverified.  The implementation at `load.rs:192`
-  produces `format!("must be in [0.0, 1.0), got {r}")`, so a
-  `message.contains("1.0")` check is straightforward to add.
-- Severity: LOW
-- Action: Expand the match arm on line 33 to also bind and assert `message`:
-  ```rust
-  ConfigError::InvalidValue { key, message } => {
-      assert_eq!(key, "boundaries.leiden_min_compression_ratio");
-      assert!(message.contains("1.0"),
-              "error message must echo the supplied value, got: {message}");
-  }
-  ```
-
-#### COVERAGE: Soft conditional assertion in behavioral-difference test
-- File: `crates/sdivi-detection/tests/leiden_depth_cap.rs:139`
-- Issue: `depth_cap_at_1_produces_valid_but_different_partition_than_uncapped`
-  computes both a depth-1-capped and an uncapped partition, then enters an
-  `if !differ { eprintln!(...) }` branch where — if the two partitions
-  coincidentally agree — the test **makes zero assertions and passes
-  unconditionally**.  Because behavior is fully deterministic for a fixed seed
-  and graph, this branch is either always taken or never taken; no test run can
-  tell which.  The test name claims to verify a behavioral difference (i.e.,
-  that the depth cap returns an early-exit value rather than the fully converged
-  one), but enforcement is optional.  The other three tests in the file verify
-  *structural validity* (all nodes covered, community IDs in range), not the
-  *behavioral change* caused by the cap firing.
-- Severity: MEDIUM
-- Action: One of two clean fixes:
-  (a) **Assert unconditionally** — run both variants locally on this seed+graph
-  to confirm they differ (the 25-node ring-of-5-cliques with `seed=42` should
-  compress enough to trigger at least one recursive call), then replace
-  `if !differ { eprintln!(...) }` with
-  `assert!(differ, "depth-1 cap must produce a different partition than depth-32")`.
-  (b) **Remove the comparison test** — the three validity tests already exercise
-  the code path.  Delete this function to avoid the false impression of
-  behavioral coverage it does not deliver.
-
-#### NAMING: Test name implies depth cap fires; fixture prevents recursion
-- File: `crates/sdivi-detection/tests/leiden_depth_cap.rs:183`
-- Issue: `depth_cap_at_depth_1_is_minimum_working_configuration` uses an
-  isolated-nodes graph (no edges).  The test body comment correctly states
-  "The depth cap does NOT fire here because recursion requires compression."
-  On an edgeless graph, `local_move_phase` makes no moves on the first
-  iteration, so the outer loop exits immediately via `!moved`, never reaching
-  the aggregation step that triggers recursion.  The name "minimum working
-  configuration" implies the cap fires at its configured limit, when the test
-  actually verifies that Leiden exits cleanly on a trivially structured input
-  regardless of how the depth cap is set.
-- Severity: LOW
-- Action: Rename to `depth_cap_setting_of_1_does_not_prevent_trivial_convergence`
-  (or similar) and adjust the docstring to describe what is actually being
-  exercised — Leiden's graceful handling of edgeless graphs rather than the
-  depth-cap guard.
+None — no issues found.
 
 ---
 
-### Scope and Isolation Notes
+### Detailed Evaluation
 
-**No orphaned imports or stale symbol references detected.**  Both test files
-reference symbols present in the current codebase: `load_with_paths`,
-`ConfigError` (`sdivi-config`); `run_leiden`, `LeidenConfig`
-(`sdivi-detection`); `build_dependency_graph_from_edges` (`sdivi-graph`).
-None of the symbols deleted this milestone (`.tekhton/JR_CODER_SUMMARY.md`,
-`.tekhton/test_dedup.fingerprint`) are imported or referenced by any test
-under audit.
+#### 1. Assertion Honesty
+All 13 assertions test real behavior. The two security-critical tests
+(`rejects_positive_infinity_weight` line 172, `rejects_negative_infinity_weight` line 184)
+call `parse_wasm_edge_weights` with `f64::INFINITY` and `f64::NEG_INFINITY` respectively
+and call `.unwrap_err()`, which panics if the function accidentally returns `Ok(...)` —
+making the assertion load-bearing before any message check.
 
-**Isolation is sound.**  `validate_boundaries.rs` writes all TOML content to
-`tempfile::NamedTempFile` and passes the temp path to
-`load_with_paths(Some(f.path()), None)`.  Both the global-config path
-argument and the env-var layer (`apply_env_overrides`) are bypassed; no
-machine-local sdivi config can influence the outcome.  `leiden_depth_cap.rs`
-constructs all graphs from inline literal edge lists and reads no project
-files.  Neither file's pass/fail outcome depends on build artifacts, pipeline
-state, or any mutable file in the repository.
+The `e.contains("finite")` predicate in both tests is derived directly from the error
+format string at `weight_keys.rs:27`:
+  `"edge weight for key \"{key}\" is not finite ({weight}); all weights must be finite and >= 0.0"`
+Both `f64::INFINITY` (Rust display: `inf`) and `f64::NEG_INFINITY` (display: `-inf`)
+produce a message containing `"finite"`, satisfying the check. No hard-coded magic values
+disconnected from the implementation.
 
-**Assertion honesty.**  All asserted constants are derived from the
-implementation:
-- The defaults `0.1` and `32` match `BoundariesConfig::default()` at
-  `config.rs:113-116`.
-- The node-coverage counts (12, 25, 5) match the fixture-construction
-  logic in the same test file.
-- The community-ID validity assertion (`comm < community_count`) is sound:
-  `compute_stability` in `quality.rs:7-43` skips empty communities; after
-  `renumber` in `leiden_recursive`, all community IDs lie in `[0, k)` where
-  `k == stability.len() == community_count()`.
-- `initial_assignment_from_cache(None, n)` returns `(0..n).collect()` (each
-  node in its own singleton), confirming the 5-community assertion in the
-  isolated-nodes test.
+The OR-chain `e.contains("finite") || e.contains("infinite") || e.contains("inf")` in
+`rejects_negative_infinity_weight:188` is broad but not an integrity concern: the
+`"finite"` branch matches the actual error message, so the looser alternatives never
+become the only passing path.
 
-No test asserts a hard-coded value that is not derivable from the implementation.
+#### 2. Edge Case Coverage
+13 tests cover: valid input, empty map, zero weight, NaN, positive infinity, negative
+infinity, negative finite weight, no-colon key, empty source, empty target,
+colon-in-node-ID split correctness, NUL-separator key content verification, weight
+value preservation. Error-path : happy-path ratio ≈ 8:5 — healthy.
+
+#### 3. Implementation Exercise
+Every test calls `parse_wasm_edge_weights` directly with no mocking. Two tests
+(`converted_key_uses_nul_separator` line 121, `colon_in_node_id_produces_correct_nul_key`
+line 136) also call `sdivi_core::input::edge_weight_key` to derive the expected NUL key,
+cross-checking real inter-crate behavior. No test is self-referential.
+
+#### 4. Test Weakening Detection
+No tests were modified this run (tester report and coder summary both confirm
+"Files Modified: None"). Weakening check not applicable.
+
+#### 5. Test Naming and Intent
+All 13 names follow the `<scenario>_<outcome>` convention
+(e.g., `rejects_positive_infinity_weight`, `colon_in_node_id_produces_correct_nul_key`).
+No opaque names.
+
+#### 6. Scope Alignment
+`weight_keys.rs` was not modified this run — the M28 fix (`is_nan() || is_infinite()`)
+was already present. Tests reference `parse_wasm_edge_weights` and
+`sdivi_core::input::edge_weight_key`, both of which exist and compile. No orphaned,
+stale, or dead tests detected.
+
+The three freshness-sample files (`tests/fixtures/simple-typescript/utils.ts`,
+`tests/fixtures/tsconfig-alias/src/app.ts`, `tests/fixtures/tsconfig-alias/src/lib/index.ts`)
+are TypeScript source fixtures used as parsing input data — they contain no test logic
+and are unrelated to the weight-validation change. No action required.
+
+#### 7. Test Isolation
+All tests construct `BTreeMap` instances inline in function scope. No test reads from
+`.tekhton/`, `.sdivi/`, `Cargo.lock`, build artifacts, or any mutable project-state
+file. Fully isolated.

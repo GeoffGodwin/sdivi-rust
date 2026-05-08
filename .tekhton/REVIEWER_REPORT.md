@@ -1,20 +1,25 @@
+# Reviewer Report
+Review cycle: 1 of 2
+Reviewed by: reviewer agent
+
 ## Verdict
-APPROVED_WITH_NOTES
+APPROVED
 
 ## Complex Blockers (senior coder)
-- None
+None
 
 ## Simple Blockers (jr coder)
-- None
+None
 
 ## Non-Blocking Notes
-- `leiden_perf.rs` uses wall-clock `Instant::now()` with a 5s hard limit. On heavily-loaded CI debug builds this can flap. Consider marking it `#[ignore]` and running it only in release or via a dedicated perf job, consistent with the bench-feature gating in `benches/`.
-- Security agent [LOW] finding (pre-existing, not introduced by M28): `weight_keys.rs:25-34` — `parse_wasm_edge_weights` does not reject `f64::INFINITY`. Weights of `INFINITY` pass the NaN and negative guards and reach the Leiden algorithm. Fix: add `if weight.is_infinite()` guard after the NaN check (line 25) and a `rejects_infinite_weight` unit test.
+None
 
 ## Coverage Gaps
-- `validate_boundaries` in `sdivi-config/src/load.rs` is called during config load but there is no test that supplies `leiden_min_compression_ratio >= 1.0` or `leiden_max_recursion_depth = 0` and asserts `ConfigError::InvalidValue`. The happy-path round-trip in `leiden_config_serde.rs` does not exercise these error branches.
-- `leiden_recursive` depth-cap path (the `depth >= max_recursion_depth` early return) has no dedicated test. The perf fixture runs with default depth 32 but never actually saturates the cap.
+None
 
 ## Drift Observations
-- `refine.rs:270` `renumber_in_place` and `mod.rs:197` `renumber` are identical functions with different names. Both could be unified, but the current split causes no correctness issue.
-- `LeidenConfigInput::min_compression_ratio` and `max_recursion_depth` are validated at the `sdivi-config` load boundary but not in `sdivi-core::detect_boundaries`. An out-of-range value supplied by a WASM caller degrades gracefully (recursion always/never fires) but silently ignores the documented constraint. Consider adding the range check to `detect_boundaries` if the field is part of the public `sdivi-core` contract.
+None
+
+---
+
+**Rationale:** The task was to resolve 1 open item in `.tekhton/NON_BLOCKING_LOG.md` — a security finding that `parse_wasm_edge_weights` did not reject `f64::INFINITY`. The coder correctly determined the fix was already present in M28: `weight_keys.rs:25` has `if weight.is_nan() || weight.is_infinite()`, and tests `rejects_positive_infinity_weight` (line 172) and `rejects_negative_infinity_weight` (line 182) both exist and correctly assert the behavior. No code change was needed; the log entry was moved from Open to Resolved with an accurate description. The NON_BLOCKING_LOG.md Open section is now empty and in a clean state. Everything checks out.
