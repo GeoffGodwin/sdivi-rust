@@ -1,10 +1,10 @@
-/// Tests verifying M13 metadata requirements:
-/// - Workspace `[workspace.package].version` is set to a 0.1.x semver
-/// - bindings/sdivi-wasm/pkg-template/package.json version matches the workspace version
-/// - All published crates have `readme`, `keywords`, and `categories` fields
-/// - Coverage Gap 2 (REVIEWER_REPORT.md): sdivi-wasm package.json declares
-///   the expected artifact files (.wasm, .d.ts) so the npm dry-run is
-///   exercising a well-formed package.
+//! Tests verifying M13 metadata requirements:
+//! - Workspace `[workspace.package].version` is set to a 0.1.x semver
+//! - bindings/sdivi-wasm/pkg-template/package.json version matches the workspace version
+//! - All published crates have `readme`, `keywords`, and `categories` fields
+//! - Coverage Gap 2 (REVIEWER_REPORT.md): sdivi-wasm package.json declares
+//!   the expected artifact files (.wasm, .d.ts) so the npm dry-run is
+//!   exercising a well-formed package.
 
 fn workspace_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

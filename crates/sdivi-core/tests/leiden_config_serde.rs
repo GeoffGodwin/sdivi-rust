@@ -28,6 +28,8 @@ fn leiden_config_none_edge_weights_round_trips() {
         iterations: 50,
         quality: QualityFunctionInput::Cpm,
         edge_weights: None,
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     };
     let value = serde_json::to_value(&cfg).expect("None edge_weights must serialize");
     let back: LeidenConfigInput = serde_json::from_value(value).expect("must deserialize back");
@@ -45,6 +47,8 @@ fn leiden_config_populated_edge_weights_round_trips_through_serde_json() {
         iterations: 100,
         quality: QualityFunctionInput::Modularity,
         edge_weights: Some(weights.clone()),
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     };
     let value = serde_json::to_value(&cfg)
         .expect("LeidenConfigInput with populated edge_weights must serialize");
@@ -110,6 +114,8 @@ fn detect_boundaries_normalizes_wrong_order_edge_weight_keys() {
         iterations: 50,
         quality: QualityFunctionInput::Modularity,
         edge_weights: Some(weights),
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     };
 
     let result = detect_boundaries(&graph, &cfg, &[]).expect("detect_boundaries should succeed");

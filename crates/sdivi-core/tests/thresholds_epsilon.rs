@@ -39,8 +39,10 @@ fn threshold_epsilon_value() {
 /// delta = limit + 5e-10 (below epsilon): must NOT breach.
 #[test]
 fn epsilon_below_threshold_does_not_breach_pattern_entropy() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.pattern_entropy_rate = 2.0;
+    let cfg = ThresholdsInput {
+        pattern_entropy_rate: 2.0,
+        ..ThresholdsInput::default()
+    };
     let s = summary(Some(2.0 + 5e-10), None, None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(
@@ -52,8 +54,10 @@ fn epsilon_below_threshold_does_not_breach_pattern_entropy() {
 /// delta = limit + 2e-9 (above epsilon): must breach.
 #[test]
 fn epsilon_above_threshold_breaches_pattern_entropy() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.pattern_entropy_rate = 2.0;
+    let cfg = ThresholdsInput {
+        pattern_entropy_rate: 2.0,
+        ..ThresholdsInput::default()
+    };
     let s = summary(Some(2.0 + 2e-9), None, None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(
@@ -68,8 +72,10 @@ fn epsilon_above_threshold_breaches_pattern_entropy() {
 /// Epsilon boundary tests for convention_drift.
 #[test]
 fn epsilon_below_threshold_does_not_breach_convention_drift() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.convention_drift_rate = 3.0;
+    let cfg = ThresholdsInput {
+        convention_drift_rate: 3.0,
+        ..ThresholdsInput::default()
+    };
     let s = summary(None, Some(3.0 + 5e-10), None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(
@@ -80,8 +86,10 @@ fn epsilon_below_threshold_does_not_breach_convention_drift() {
 
 #[test]
 fn epsilon_above_threshold_breaches_convention_drift() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.convention_drift_rate = 3.0;
+    let cfg = ThresholdsInput {
+        convention_drift_rate: 3.0,
+        ..ThresholdsInput::default()
+    };
     let s = summary(None, Some(3.0 + 2e-9), None, None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(
@@ -94,8 +102,10 @@ fn epsilon_above_threshold_breaches_convention_drift() {
 /// Epsilon boundary tests for coupling_delta.
 #[test]
 fn epsilon_below_threshold_does_not_breach_coupling_delta() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.coupling_delta_rate = 0.15;
+    let cfg = ThresholdsInput {
+        coupling_delta_rate: 0.15,
+        ..ThresholdsInput::default()
+    };
     let s = summary(None, None, Some(0.15 + 5e-10), None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(
@@ -106,8 +116,10 @@ fn epsilon_below_threshold_does_not_breach_coupling_delta() {
 
 #[test]
 fn epsilon_above_threshold_breaches_coupling_delta() {
-    let mut cfg = ThresholdsInput::default();
-    cfg.coupling_delta_rate = 0.15;
+    let cfg = ThresholdsInput {
+        coupling_delta_rate: 0.15,
+        ..ThresholdsInput::default()
+    };
     let s = summary(None, None, Some(0.15 + 2e-9), None);
     let r = compute_thresholds_check(&s, &cfg);
     assert!(

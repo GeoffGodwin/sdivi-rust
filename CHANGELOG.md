@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.18] - 2026-05-08
+
+### Performance
+
+- **Leiden community detection no longer hangs on large sparse weakly-connected graphs** (M28; e.g. an MFE shell with thousands of files but few imports). Two fixes: (1) `refine_community` now operates on an induced subgraph over the coarse community's members rather than allocating state for the full graph at every call; (2) recursive Leiden now stops descending when an aggregation level would compress the graph by less than `boundaries.leiden_min_compression_ratio` (default 10%), with an additional hard depth cap at `boundaries.leiden_max_recursion_depth` (default 32). Modularity stays inside the existing 1% verify-leiden tolerance. Snapshot determinism is preserved. Adopters who had `sdivi snapshot` runs taking many minutes on sparse graphs should see them complete in seconds.
+
+### Added
+
+- `boundaries.leiden_min_compression_ratio` config key (default `0.1`): stop Leiden recursion when an aggregation level would compress the graph by less than this fraction of nodes.
+- `boundaries.leiden_max_recursion_depth` config key (default `32`): hard cap on Leiden recursion depth. Belt-and-suspenders safeguard; `32` corresponds to ~4 billion nodes.
+- Both new keys are optional in existing `.sdivi/config.toml` files — old configs deserialize with the defaults transparently.
+- `LeidenConfig::min_compression_ratio` and `LeidenConfig::max_recursion_depth` fields.
+- `LeidenConfigInput::min_compression_ratio` and `LeidenConfigInput::max_recursion_depth` fields (WASM / pure-compute callers).
+- `WasmLeidenConfigInput::min_compression_ratio` and `WasmLeidenConfigInput::max_recursion_depth` optional TypeScript fields.
+- `LeidenGraph::induced_subgraph` method for efficient per-community subgraph construction.
+
+### Security
+
+- WASM `parse_wasm_edge_weights` now rejects `f64::INFINITY` and `f64::NEG_INFINITY` in the same guard as `NaN`. Two regression tests (`rejects_positive_infinity_weight`, `rejects_negative_infinity_weight`) added.
+
+### Fixed
+
+- Restored CI green: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `tests/workspace_version.rs::wasm_package_json_version_matches_workspace` all pass on `milestone/M28`. No user-visible behaviour change.
+
 ## [0.2.16] - 2026-05-05
 
 ### Added

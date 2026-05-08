@@ -8,7 +8,6 @@ use sdivi_wasm::types::{
     WasmLeidenConfigInput, WasmPatternMetricsResult, WasmQualityFunction,
 };
 use sdivi_wasm::{assemble_snapshot, compute_change_coupling, compute_delta, compute_trend};
-use serde_wasm_bindgen;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 /// Build a minimal [`WasmAssembleSnapshotInput`] with the given graph density.
@@ -141,6 +140,8 @@ fn test_m21_wasm_leiden_config_input_edge_weights_optional() {
         iterations: 100,
         quality: WasmQualityFunction::Modularity,
         edge_weights: None,
+        min_compression_ratio: 0.1,
+        max_recursion_depth: 32,
     };
     assert_eq!(config.seed, 42);
     assert!(config.edge_weights.is_none());

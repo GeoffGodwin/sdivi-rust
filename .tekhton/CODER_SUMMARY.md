@@ -2,20 +2,20 @@
 ## Status: COMPLETE
 
 ## What Was Implemented
-- Softened the dynamic import doc comment in `crates/sdivi-lang-javascript/src/extract.rs` (line 32) from a definitive claim (`import("./utils") → ["./utils"]`) to a best-effort, grammar-version-dependent description. The test already correctly accepts both outcomes; the doc now matches the test's intent.
-- Confirmed `crates/sdivi-lang-java/src/extract.rs` wildcard detection comment (lines 55-57) already sufficiently acknowledges the `contains(".*")` limitation — no code change needed.
-- Confirmed the "Docs Updated: None" informational notes (items 3 & 6) require no action.
-- Moved all 6 open items in `.tekhton/NON_BLOCKING_LOG.md` from `## Open` to `## Resolved` with disposition notes.
+- Investigated the non-blocking security finding: `parse_wasm_edge_weights` allegedly not rejecting `f64::INFINITY`.
+- Confirmed the fix was already applied in M28: line 25 of `weight_keys.rs` checks `weight.is_nan() || weight.is_infinite()` in a single combined guard, and two dedicated tests (`rejects_positive_infinity_weight`, `rejects_negative_infinity_weight`) already exist and pass.
+- All 13 unit tests in `weight_keys::tests` pass (verified with `cargo test -p sdivi-wasm --lib`).
+- Marked the item resolved in `.tekhton/NON_BLOCKING_LOG.md` and moved it to the Resolved section.
 
 ## Root Cause (bugs only)
-N/A — documentation correctness fix, not a bug.
+The security finding described a real gap that existed before M28. The fix (adding `|| weight.is_infinite()` to the NaN guard, plus two infinity-rejection tests) was already applied as part of M28 — confirmed by reading the current source and running the test suite. No additional code change was required.
 
 ## Files Modified
-- `crates/sdivi-lang-javascript/src/extract.rs` — softened dynamic import doc comment at line 32 to say "best-effort and grammar-version-dependent"
-- `.tekhton/NON_BLOCKING_LOG.md` — moved all 6 open items to Resolved
+- `.tekhton/NON_BLOCKING_LOG.md` — moved item from Open to Resolved; updated description to note the fix was already in M28.
+- `.tekhton/CODER_SUMMARY.md` — this file.
 
 ## Human Notes Status
-No Human Notes section in this task.
+- [COMPLETED] Security agent [LOW] `weight_keys.rs:25-34` infinity guard — fix was already present in M28; confirmed all tests pass.
 
 ## Docs Updated
-None — no public-surface changes in this task. The change is to an internal doc comment on a `pub(crate)` function.
+None — no public-surface changes in this task.

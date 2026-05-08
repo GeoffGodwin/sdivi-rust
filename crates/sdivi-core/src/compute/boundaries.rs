@@ -102,6 +102,8 @@ pub fn detect_boundaries(
         max_iterations: cfg.iterations,
         quality,
         gamma: cfg.gamma,
+        min_compression_ratio: cfg.min_compression_ratio,
+        max_recursion_depth: cfg.max_recursion_depth,
     };
 
     let partition = if let Some(ref ew) = cfg.edge_weights {

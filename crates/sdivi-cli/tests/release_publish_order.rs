@@ -1,12 +1,12 @@
-/// Coverage Gap 1 (REVIEWER_REPORT.md): Validates that `release.yml`
-/// publishes crates in the correct dependency order so that crates.io
-/// index propagation sleeps come after a crate's dependencies are live.
-///
-/// Specifically: sdivi-parsing must be published before any sdivi-lang-* crate,
-/// because all six language adapter crates depend on sdivi-parsing.
-///
-/// These tests parse the workflow YAML as text rather than building the WASM
-/// bundle — they catch publish-order regressions without requiring CI secrets.
+//! Coverage Gap 1 (REVIEWER_REPORT.md): Validates that `release.yml`
+//! publishes crates in the correct dependency order so that crates.io
+//! index propagation sleeps come after a crate's dependencies are live.
+//!
+//! Specifically: sdivi-parsing must be published before any sdivi-lang-* crate,
+//! because all six language adapter crates depend on sdivi-parsing.
+//!
+//! These tests parse the workflow YAML as text rather than building the WASM
+//! bundle — they catch publish-order regressions without requiring CI secrets.
 
 fn release_yml() -> String {
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

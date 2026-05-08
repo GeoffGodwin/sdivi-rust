@@ -14,11 +14,16 @@ pub mod assemble_types;
 pub mod category_types;
 pub mod change_coupling;
 mod exports;
+pub mod threshold_types;
 pub mod types;
 pub(crate) mod weight_keys;
 
 pub use change_coupling::*;
 pub use exports::*;
+pub use threshold_types::{
+    WasmAppliedOverrideInfo, WasmThresholdBreachInfo, WasmThresholdCheckResult,
+    WasmThresholdOverrideInput, WasmThresholdsInput,
+};
 
 /// Initialise WASM — installs the console_error_panic_hook so that Rust
 /// panics surface as readable JS errors in dev builds.

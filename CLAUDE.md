@@ -234,7 +234,7 @@ Config is loaded via TOML files plus environment variables, resolved through a 5
 |---|---|
 | `[core]` | `languages = "auto"`; standard exclude globs (vendor, node_modules, __pycache__, dist, build, target, .git); `random_seed = 42` |
 | `[snapshots]` | `dir = ".sdivi/snapshots"`, `retention = 100` (`0` = unlimited) |
-| `[boundaries]` | `spec_file = ".sdivi/boundaries.yaml"`, `leiden_gamma = 1.0`, `stability_threshold = 3`, `weighted_edges = false` |
+| `[boundaries]` | `spec_file = ".sdivi/boundaries.yaml"`, `leiden_gamma = 1.0`, `stability_threshold = 3`, `weighted_edges = false`, `leiden_min_compression_ratio = 0.1`, `leiden_max_recursion_depth = 32` |
 | `[patterns]` | `categories = "auto"`, `min_pattern_nodes = 5`, `scope_exclude = []` (excludes from catalog only — files remain in graph) |
 | `[thresholds]` | `pattern_entropy_rate = 2.0`, `convention_drift_rate = 3.0`, `coupling_delta_rate = 0.15`, `boundary_violation_rate = 2.0` |
 | `[change_coupling]` | `min_frequency = 0.6`, `history_depth = 500` |
