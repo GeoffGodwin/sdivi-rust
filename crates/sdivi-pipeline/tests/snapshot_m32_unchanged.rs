@@ -58,8 +58,7 @@ fn m32_pipeline_output_byte_identical_for_same_params() {
     let run_a = pipeline_json(42);
     let run_b = pipeline_json(42);
     assert_eq!(
-        run_a,
-        run_b,
+        run_a, run_b,
         "Pipeline::snapshot must produce byte-identical JSON for the same fixed \
          seed and timestamp — any difference means the pipeline is non-deterministic \
          or M32 accidentally modified the classification path"
@@ -80,14 +79,16 @@ fn m32_different_seeds_may_differ() {
     let _ = (seed_a, seed_b);
 }
 
-/// The snapshot catalog must not contain a `logging` key for the simple-rust fixture.
+/// M33: the pipeline now produces a `logging` entry for the simple-rust fixture.
 ///
-/// `logging` can only appear in the catalog if `classify_hint` is called by the
-/// pipeline's pattern stage. In M32, the pipeline still calls `category_for_node_kind`,
-/// which never returns `Some("logging")`.  If this assertion fails, the pipeline
-/// was unintentionally wired to `classify_hint` ahead of the M33 switchover.
+/// The simple-rust fixture was extended in M33 to include `tracing::info!()` calls
+/// in `utils.rs`. With M33's switch from `category_for_node_kind` to `classify_hint`,
+/// those `macro_invocation` nodes are now classified as `logging` instead of
+/// `resource_management`. This test locks in the M33 positive behavior.
+///
+/// re-baselined in M33: switched to classify_hint — logging bucket is now expected.
 #[test]
-fn m32_pipeline_snapshot_has_no_logging_entry_in_catalog() {
+fn m33_pipeline_snapshot_has_logging_entry_for_tracing_macros() {
     let json = pipeline_json(42);
     let snap: serde_json::Value = serde_json::from_str(&json).expect("snapshot must parse");
     let entries = snap
@@ -95,13 +96,13 @@ fn m32_pipeline_snapshot_has_no_logging_entry_in_catalog() {
         .and_then(|c| c.get("entries"))
         .expect("snapshot must have catalog.entries");
     assert!(
-        !entries
+        entries
             .as_object()
             .expect("catalog.entries must be a JSON object")
             .contains_key("logging"),
-        "Pipeline::snapshot must NOT produce a `logging` entry in the catalog — \
-         that would indicate classify_hint was called instead of category_for_node_kind. \
-         M33 is the intentional switchover milestone."
+        "Pipeline::snapshot MUST produce a `logging` entry for simple-rust — \
+         tracing::info! calls in utils.rs are classified as logging via classify_hint (M33). \
+         Absent entry means the M33 switchover did not take effect."
     );
 }
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The native pattern-catalog pipeline now classifies hints via `classify_hint`
+  (M32) instead of `category_for_node_kind`. Per-category instance counts and
+  entropy values shift on the next snapshot post-upgrade — `data_access`
+  typically narrows (non-data calls are dropped), `logging` becomes non-empty
+  on languages with logging regex tables, `async_patterns` grows on TS/JS
+  (`.then()/.catch()` Promise chains), and Rust `macro_invocation` calls to
+  `tracing::*!`/`log::*!`/`println!`-family macros land in `logging` instead
+  of `resource_management`. Threshold gates configured against pre-M33
+  baseline numbers may trip; use `[thresholds.overrides.<category>]` with
+  an `expires` date to defer recalibration during migration. `snapshot_version`
+  stays `"1.0"` — the contract has not broken; only the per-category instance
+  distribution has shifted. Note: the M20 epsilon for cross-architecture
+  threshold comparisons is far smaller than the M33 instance-count shifts —
+  adopters should not expect the epsilon to absorb the change.
+
 ### Added
 
 - `sdivi_core::classify_hint(hint, language) -> Vec<&'static str>` — callee-text-aware classification API. Inspects `PatternHintInput.text` against per-language regex tables for `call_expression`, `call`, and `macro_invocation` node kinds. Returns `["logging"]` for `console.log(...)` in TypeScript/JavaScript, `tracing::info!(...)` in Rust, etc. Disambiguates Rust `macro_invocation` between `logging` and `resource_management`. **The native pipeline (`Pipeline::snapshot`) continues to use `category_for_node_kind` in M32 — M33 will switch the pipeline over.** Catalog-only `logging` (M30) is now natively classifiable via this API. Available as a WASM export `classify_hint(hint: PatternHintInput, language: string): string[]` in `@geoffgodwin/sdivi-wasm`.

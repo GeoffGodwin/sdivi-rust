@@ -3,89 +3,60 @@
 
 ## What Was Implemented
 
-### M32: Callee-Text Classification API (`classify_hint`)
+### M33: Native Pipeline Switchover to `classify_hint`
 
-- **`crates/sdivi-patterns/src/hint_input.rs`** (NEW) — `PatternHintInput` struct with `node_kind: String` and `text: String`. WASM-safe, no sdivi-parsing dependency.
+- **`crates/sdivi-patterns/src/catalog.rs`** — Core behavioral change: replaced `category_for_node_kind` (node-kind-only) with `classify_hint` (node-kind + callee-text). The loop now constructs a `PatternHintInput` from each `PatternHint`, calls `queries::classify_hint`, and fans out into all returned categories. `PatternLocation` is cloned inside the inner loop (correct for the disjoint-regex invariant; cold path in v0). Empty `Vec` return silently drops the hint (same as prior `None` path).
 
-- **`crates/sdivi-patterns/src/lib.rs`** — Added `pub mod hint_input; pub use hint_input::PatternHintInput;`.
+- **`crates/sdivi-patterns/src/queries/mod.rs`** — Strengthened rustdoc on `category_for_node_kind` ("no longer called directly by the native pipeline since M33"). Updated M30 sentinel comment to cross-reference M33. Added reference to `tests/m33_sentinels.rs` for M33 positive sentinels.
 
-- **`crates/sdivi-patterns/src/queries/data_access.rs`** — Added `pub fn matches_callee(text, language) -> bool` with `LazyLock<Regex>` tables for TypeScript/JavaScript/Go and Python. Rust/Java return `false` in v0.
+- **`crates/sdivi-patterns/tests/m33_sentinels.rs`** (NEW) — Three M33 load-bearing invariant tests:
+  - `classify_hint_returns_logging_for_console_log` (TypeScript positive sentinel)
+  - `classify_hint_returns_logging_for_tracing_macro` (Rust positive sentinel)
+  - `classify_hint_drops_unrecognised_calls` (negative/drop sentinel)
 
-- **`crates/sdivi-patterns/src/queries/logging.rs`** — Added `pub fn matches_callee(text, language) -> bool` with `LazyLock<Regex>` tables for TypeScript/JavaScript, Python, Go, Rust, and Java.
+- **`tests/fixtures/simple-typescript/app.ts`** — Extended with `console.log("Starting run")` (→ `logging`) and `fetch(...)` (→ `data_access`) calls. Satisfies the acceptance criterion "logging bucket is non-empty post-M33."
 
-- **`crates/sdivi-patterns/src/queries/async_patterns.rs`** — Added `pub fn matches_callee(text, language) -> bool` for Promise-chain `.then/.catch/.finally` in TypeScript/JavaScript.
+- **`tests/fixtures/simple-rust/src/lib.rs`** — Added 3 `tracing::info!/debug!/trace!` calls so the pipeline produces ≥5 matching `macro_invocation` nodes for the `logging` bucket to survive the default `min_pattern_nodes = 5` filter.
 
-- **`crates/sdivi-patterns/src/queries/resource_management.rs`** — Added `pub fn excludes_callee(text, language) -> bool` (inverted). Rust logging macros return `true`; all others return `false`.
+- **`tests/fixtures/simple-rust/src/utils.rs`** — Added 2 `tracing::info!/debug!` calls.
 
-- **`crates/sdivi-patterns/src/queries/mod.rs`** — Added `pub fn classify_hint(hint: &PatternHintInput, language) -> Vec<&'static str>` with dispatch logic. Updated rustdoc on `category_for_node_kind` with "See also" cross-reference.
+- **`tests/fixtures/simple-python/main.py`** — Added `requests.get(url)` (→ `data_access`) and `logging.info(...)` (→ `logging`) to restore the `data_access` bucket that now requires callee matching.
 
-- **`crates/sdivi-core/src/lib.rs`** — Re-exported `classify_hint` and `PatternHintInput` from `sdivi-patterns`.
+- **`crates/sdivi-patterns/tests/logging_fixture.rs`** — Rewrote from M30 negative sentinel (no logging bucket) to M33 positive sentinels: `simple_typescript_fixture_produces_logging_bucket_after_m33` and `simple_typescript_fixture_data_access_requires_matching_callee`.
 
-- **`bindings/sdivi-wasm/src/types.rs`** — Added `WasmPatternHintInput` (Tsify-derived).
+- **`crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs`** — Replaced `m32_pipeline_snapshot_has_no_logging_entry_in_catalog` (which asserted logging absent) with `m33_pipeline_snapshot_has_logging_entry_for_tracing_macros` (asserts logging present). Determinism and schema-version tests unchanged.
 
-- **`bindings/sdivi-wasm/src/exports.rs`** — Added `#[wasm_bindgen] classify_hint(hint, language) -> Vec<String>` export.
+- **`docs/pattern-categories.md`** — Updated canonical category list (data_access narrower, resource_management excludes logging macros, async_patterns adds Promise chains). Per-language tables updated for all 5 language groups: Rust, Python, TypeScript/JavaScript, Go/Java. Updated "Callee-text classification" section header to note regex tables are now load-bearing for native output. Updated embedder responsibilities §5 and §6 to reflect M33 promotion of logging and narrowing of data_access.
 
-- **`crates/sdivi-patterns/tests/classify_hint.rs`** (NEW) — 22 unit tests covering all per-language matches_callee cases, dispatch priority, disjoint-regex invariant.
+- **`CHANGELOG.md`** — Added `Changed` section entry under `[Unreleased]` documenting the per-category distribution shift, the escape hatch, and the M20 epsilon note.
 
-- **`bindings/sdivi-wasm/tests/classify_hint_wasm.rs`** (NEW) — 8 WASM integration tests including cross-platform determinism assertion.
-
-- **`docs/pattern-categories.md`** — "Callee-text classification (`classify_hint`)" section with per-language regex tables, worked examples, dispatch order, regex change log. Updated embedder responsibilities §6.
-
-- **`CHANGELOG.md`** — M32 entries for `classify_hint`, `PatternHintInput`, and the four callee-helper functions.
-
-- **`Cargo.toml` (workspace)** — Added `regex = "1"` workspace dep.
-
-- **`crates/sdivi-patterns/Cargo.toml`** — Added `regex = { workspace = true }`.
-
-### Native pipeline unchanged
-`crates/sdivi-patterns/src/catalog.rs` is untouched. `Pipeline::snapshot` still calls `category_for_node_kind`. Snapshot output is bit-identical pre/post M32.
-
-### M30 sentinel still green
-`category_for_node_kind_never_returns_logging` test passes unchanged. Updated comment to note `classify_hint` as the precision-aware alternative.
+- **`MIGRATION_NOTES.md`** — Added M33 section with worked example (pre/post `pattern_metrics` JSON from `simple-typescript` fixture), escape hatch TOML snippet, and foreign-extractor guidance.
 
 ## Root Cause (bugs only)
-N/A — feature implementation
+N/A — feature milestone
 
 ## Files Modified
-- `crates/sdivi-patterns/src/hint_input.rs` (NEW)
-- `crates/sdivi-patterns/src/lib.rs`
+- `crates/sdivi-patterns/src/catalog.rs`
 - `crates/sdivi-patterns/src/queries/mod.rs`
-- `crates/sdivi-patterns/src/queries/data_access.rs`
-- `crates/sdivi-patterns/src/queries/logging.rs`
-- `crates/sdivi-patterns/src/queries/async_patterns.rs`
-- `crates/sdivi-patterns/src/queries/resource_management.rs`
-- `crates/sdivi-patterns/tests/classify_hint.rs` (NEW)
-- `crates/sdivi-core/src/lib.rs`
-- `bindings/sdivi-wasm/src/types.rs`
-- `bindings/sdivi-wasm/src/exports.rs`
-- `bindings/sdivi-wasm/tests/classify_hint_wasm.rs` (NEW)
+- `crates/sdivi-patterns/tests/m33_sentinels.rs` (NEW)
+- `crates/sdivi-patterns/tests/logging_fixture.rs`
+- `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs`
+- `tests/fixtures/simple-typescript/app.ts`
+- `tests/fixtures/simple-rust/src/lib.rs`
+- `tests/fixtures/simple-rust/src/utils.rs`
+- `tests/fixtures/simple-python/main.py`
 - `docs/pattern-categories.md`
 - `CHANGELOG.md`
-- `Cargo.toml` (workspace)
-- `crates/sdivi-patterns/Cargo.toml`
+- `MIGRATION_NOTES.md`
 
 ## Human Notes Status
-- M31 reviewer APPROVED_WITH_NOTES — no blockers to fix from prior run
-- Non-Blocking Notes from reviewer: noted, out of scope for M32
-- Tester passed all 28 tests, no bugs to fix
+No human notes provided in this task.
 
 ## Docs Updated
-- `docs/pattern-categories.md` — "Callee-text classification" section + embedder responsibilities §6 update.
-- `CHANGELOG.md` — M32 Added entries.
-
-## Architecture Change Proposals
-
-### PatternHintInput in sdivi-patterns (not re-exporting PatternHint from sdivi-parsing)
-
-- **Current constraint:** Milestone spec said "Re-export `PatternHint` from `sdivi-parsing` if not already exposed." Implicit assumption it could go via `sdivi-core`.
-- **What triggered this:** `sdivi-parsing` is explicitly excluded from the WASM dep tree (Rule 21). `sdivi-core` cannot depend on it. Re-exporting `PatternHint` would pull in tree-sitter.
-- **Proposed change:** Defined `PatternHintInput` in `sdivi-patterns::hint_input` with the two fields `classify_hint` needs. Re-exported via `sdivi-core`. Follows the existing `*Input` struct family pattern.
-- **Backward compatible:** Yes — classify_hint is new.
-- **ARCHITECTURE.md update needed:** No — CLAUDE.md already describes the `*Input` struct family pattern for sdivi-core.
+- `docs/pattern-categories.md` — per-language tables, canonical category list, embedder responsibilities, callee-text classification header.
+- `CHANGELOG.md` — Changed section under [Unreleased].
+- `MIGRATION_NOTES.md` — M33 section with worked example.
 
 ## Observed Issues (out of scope)
-- `wasm_package_json_version_matches_workspace` — pre-existing: package.json at 0.2.18 vs workspace 0.2.21.
-- `cargo build -p sdivi-core --target wasm32-unknown-unknown --no-default-features` — pre-existing getrandom build failure.
-- `tempfile` in wasm32 dep tree for sdivi-core — pre-existing (confirmed via git stash comparison).
-- `RUSTDOCFLAGS=-D warnings cargo doc --workspace --no-deps` — pre-existing unresolved links in `bindings/sdivi-wasm/`.
-- `crates/sdivi-core/src/categories.rs` — `CATEGORIES` const still uses explicit index references (Seeds Forward debt from M29–M31).
+- `wasm_package_json_version_matches_workspace` — pre-existing: package.json at 0.2.18 vs workspace 0.2.22. Not introduced by M33.
+- `data_access_fixture.rs::call_expression_maps_to_data_access_for_go` — conceptually misleading post-M33 (tests `category_for_node_kind`, which still maps all `call_expression` to data_access, but the pipeline now uses `classify_hint` which filters); test is still correct for what it asserts but no longer documents actual pipeline behavior.

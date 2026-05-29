@@ -29,14 +29,7 @@ const NON_SPECIAL_NODE_KINDS: &[&str] = &[
     "type_cast_expression",
 ];
 
-const TEST_LANGUAGES: &[&str] = &[
-    "rust",
-    "python",
-    "typescript",
-    "javascript",
-    "go",
-    "java",
-];
+const TEST_LANGUAGES: &[&str] = &["rust", "python", "typescript", "javascript", "go", "java"];
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]

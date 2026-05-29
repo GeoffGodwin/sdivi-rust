@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 6
+- Runs since audit: 7
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-29 | "unknown"] `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` â The file name and determinism test (`m32_pipeline_output_byte_identical_for_same_params`) are labelled M32 but the file now hosts the M33 positive sentinel (`m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`). The M32 determinism test is still correct and load-bearing. Consider renaming the file to `snapshot_pipeline_regression.rs` in a future cleanup pass to avoid reader confusion.
+- [2026-05-29 | "unknown"] `catalog.rs:110-113` â `crate::hint_input::PatternHintInput` is referenced by its full path inline rather than imported at the top of the file via `use`. The other feature-gated items (`fingerprint_node_kind`, `queries`) are imported normally. Cosmetic inconsistency only.
+- [2026-05-29 | "unknown"] `resource_management::excludes_callee` and `logging::matches_callee` are both tested in the `macro_invocation` arm of `classify_hint` â they use the same regex in v0, so the double check is harmless but redundant. The prior M32 Drift Observation about these two identical `RUST_LOGGING_RE` / `RUST_RE` literals being maintained separately remains open; M33 does not worsen it.
 - [2026-05-29 | "unknown"] `crates/sdivi-patterns/Cargo.toml`: `regex` is an unconditional dependency (not gated by `pipeline-records`). This is intentional (regex is needed in both the pipeline and WASM paths), but the only documentation of this decision is the `# ââ pattern classification ââ` comment in the workspace `Cargo.toml`. A note near the `pipeline-records` feature definition in `sdivi-patterns/Cargo.toml` explaining why `regex` is unconditional would prevent a future contributor from mistakenly gating it.
 - [2026-05-29 | "unknown"] `crates/sdivi-patterns/src/queries/resource_management.rs:20â22` and `crates/sdivi-patterns/src/queries/logging.rs:57â60` â `RUST_LOGGING_RE` and `logging::RUST_RE` contain identical regex literals. Both are `LazyLock<Regex>` and compile independently. In v0 the duplication is harmless, but if one is updated and the other is not, Rust macros will be silently mis-classified. A cross-reference comment at the `resource_management::RUST_LOGGING_RE` definition pointing to `logging::matches_callee` (which owns the canonical pattern) would surface the invariant.
 - [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` const remains in the hand-indexed `CATALOG_ENTRIES[N].0` form noted in prior reviews (M29, M30, M31). The indices are correct at 8 entries but the index-shift hazard accumulates as new categories are added. Seeds Forward cleanup remains open.

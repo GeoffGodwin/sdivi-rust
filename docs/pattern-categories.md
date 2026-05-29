@@ -17,12 +17,12 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 
 | Category | Description |
 |---|---|
-| async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. |
+| async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. In TypeScript/JavaScript, Promise-chain calls (`.then()`, `.catch()`, `.finally()`) are also classified here via callee-text inspection. |
 | class_hierarchy | Code constructs that establish inheritance, interface implementation, or trait conformance relationships — e.g. classes with `extends`/`implements` clauses, Python classes with base classes, and Rust `impl Trait for Type` blocks. All declaration kinds are classified here regardless of whether they carry a heritage clause; heritage-aware narrowing is the embedder's responsibility. |
-| data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), file reads (`open`, `read`), and ORM method calls. All `call_expression` / `call` nodes are classified here; callee-name narrowing is the embedder's responsibility. |
+| data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`db.query`, `cursor.*`), HTTP fetches (`fetch`, `axios`), file reads (`open`, `requests.*`). As of M33, only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here; unrecognised callees are dropped. |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
-| logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Catalog-only in sdivi-rust v0** — see Embedder responsibilities. |
-| resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., macro invocations such as `drop!`, `vec!`, or standard I/O macros. |
+| logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Natively classified since M33** via callee-text inspection in `classify_hint` — see Callee-text classification section. |
+| resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., Rust macro invocations such as `drop!`, `vec!`, `assert!`. As of M33, Rust logging macros (`tracing::*!`, `log::*!`, `println!`/`eprintln!`/`print!`/`eprint!`/`dbg!`) are excluded and classified as `logging` instead. |
 | state_management | Code constructs that capture, transform, or share mutable or shared state — e.g., closures that close over mutable bindings or shared references. |
 | type_assertions | Code constructs that assert or coerce between types at compile or runtime — e.g., `as` casts (`as_expression`) and language-specific type-cast expressions. |
 
@@ -38,8 +38,8 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | class_hierarchy | `impl_item` | All `impl` blocks, including inherent `impl Type {…}` (no trait) and trait conformance `impl Trait for Type {…}`. Inherent-only narrowing is the embedder's responsibility. |
 | data_access | (none in v0) | — |
 | error_handling | `try_expression`, `match_expression` | None (both `?` and `match` are counted; callers may apply finer-grained filters in their own extractors) |
-| logging | (consumer extractor responsibility — `macro_invocation` overlaps with `resource_management` at the AST level) | — |
-| resource_management | `macro_invocation` | None |
+| logging | `macro_invocation` where callee matches `^(tracing\|log)::\|^(println\|eprintln\|print\|eprint\|dbg)!` | Natively classified since M33 via `classify_hint`. Examples: `tracing::info!(x)`, `log::debug!(x)`, `println!(x)`. |
+| resource_management | `macro_invocation` where callee does NOT match the logging regex above | Logging macros are excluded and routed to `logging` instead. Remaining: `vec!`, `assert!`, `drop!`, `format!`, etc. |
 | state_management | `closure_expression` | None |
 | type_assertions | `as_expression` | None |
 
@@ -49,9 +49,9 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 |---|---|---|
 | async_patterns | `await` | None |
 | class_hierarchy | `class_definition` | All `class` definitions, including those with no base classes (which are effectively `class Foo(object)` and contribute low entropy). |
-| data_access | `call` | None (all Python function calls; callee-name narrowing is the embedder's responsibility) |
+| data_access | `call` where callee matches `^(open\(\|requests\.\|httpx\.\|cursor\.\|session\.\|conn\.)` | Natively filtered since M33. Examples: `open(path)`, `cursor.execute(q)`, `requests.get(url)`. Unrecognised calls (e.g. `len(x)`) are dropped. |
 | error_handling | `try_statement` | None |
-| logging | (consumer extractor responsibility — `call` overlaps with `data_access` at the AST level) | — |
+| logging | `call` where callee matches `^(logging\.\|print\b)` | Natively classified since M33. Examples: `logging.info(x)`, `print(x)`. |
 | resource_management | (none in v0) | — |
 | state_management | `lambda` | None |
 | type_assertions | (none in v0) | — |
@@ -60,24 +60,24 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 
 | Category | Node kinds | Structural constraint |
 |---|---|---|
-| async_patterns | `await_expression` | None |
+| async_patterns | `await_expression`; `call_expression` where callee matches `\.(then\|catch\|finally)\(` | `await_expression` via node-kind; Promise chains via callee-text. Examples: `future.await`, `p.then(r)`, `fetch().catch(e => {})`. |
 | class_hierarchy | `class_declaration`, `abstract_class_declaration`, `interface_declaration` | Abstract classes and interfaces always count. Concrete classes count regardless of `extends` / `implements`; entropy survives the broader collection because heritage-free classes have similar structure and contribute low entropy. (JavaScript: only `class_declaration` is emitted; `interface_declaration` and `abstract_class_declaration` are TS-only AST shapes.) |
-| data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
+| data_access | `call_expression` where callee matches `^(fetch\|axios)\b\|\b(query\|read\|write\|get\|post\|put\|delete\|patch)\(\|\b(db\|sql)\.\|\.(query\|read\|write\|fetch)\(` | Natively filtered since M33. Examples: `fetch(url)`, `db.query(sql)`. Unrecognised calls (e.g. `Math.max(a, b)`) are dropped. |
 | error_handling | `try_statement` | None |
-| logging | (consumer extractor responsibility — `call_expression` overlaps with `data_access` at the AST level) | — |
+| logging | `call_expression` where callee matches `^(console\|logger\|log)\.` | Natively classified since M33. Examples: `console.log(x)`, `logger.info(x)`. |
 | resource_management | (none in v0) | — |
 | state_management | `arrow_function` | None |
 | type_assertions | `type_cast_expression`, `as_expression` | None |
 
 ### Go / Java
 
-These languages share the Rust classifier in v0 except for `data_access`, which maps `call_expression` across all languages. Language-specific refinements are deferred until concrete user feedback warrants them.
+These languages share the common callee-text filter via `classify_hint`. Go and Java `call_expression` nodes are filtered the same way as TypeScript/JavaScript for `data_access` (shared regex table); logging uses per-language regex tables.
 
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | class_hierarchy | Java: `class_declaration`, `interface_declaration`. Go: (none in v0 — Go has no class/interface AST shape; the duck-typed interface model does not surface as a `class_hierarchy` declaration. The category exists in the catalog so cross-language reporting is uniform, but it produces zero Go hits.) | Java: same broader-collection caveat as other languages — all declaration kinds are classified regardless of heritage. |
-| data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
-| logging | (consumer extractor responsibility — `call_expression` overlaps with `data_access` at the AST level) | — |
+| data_access | `call_expression` where callee matches the shared TS/JS/Go regex (`^(fetch\|axios)\b\|\b(db\|sql)\.` etc.) | Natively filtered since M33. Examples: `db.query(sql)`, `sql.Open(dsn)`. Java `call_expression` returns `false` in v0 — data-access detection is library-shaped and deferred. |
+| logging | Go: `call_expression` where callee matches `^fmt\.(Print\|Println\|Printf\|Errorf\|Fprint\|Sprint)`. Java: `call_expression` where callee matches `^(System\.(out\|err)\.\|logger\.\|Log\.\|LOG\.)` | Natively classified since M33. Go examples: `fmt.Println(x)`, `fmt.Printf(f, x)`. Java examples: `System.out.println(x)`, `LOG.info(x)`. |
 
 > **Note on per-language node-kind tables:** The v0 tables above are written by hand.
 > A future milestone could derive them from the tree-sitter query definitions to eliminate
@@ -87,15 +87,16 @@ These languages share the Rust classifier in v0 except for `data_access`, which 
 
 ## Callee-text classification (`classify_hint`)
 
-As of M32, `sdivi_core::classify_hint(hint, language) -> Vec<String>` provides a
+`sdivi_core::classify_hint(hint, language) -> Vec<String>` provides a
 higher-precision classifier that inspects both the `node_kind` and `hint.text` (the
 truncated source text of the node). Foreign extractors should prefer `classify_hint`
 over hand-rolled callee filters — the regex tables below are part of the canonical
 contract and are versioned with `snapshot_version "1.0"`.
 
-The native `Pipeline::snapshot` continues to use `category_for_node_kind` in M32
-(see M33 for the pipeline switchover). Snapshot output is bit-identical before and
-after M32.
+**As of M33, the regex tables are load-bearing for native pipeline output, not just
+embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead of
+`category_for_node_kind`. Per-category instance counts shift on upgrade — see
+`MIGRATION_NOTES.md` for the M33 migration story and a worked example.
 
 ### `data_access::matches_callee(text, language)`
 
@@ -181,8 +182,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 2. Compute fingerprints via `normalize_and_hash(node_kind, children)` (Rust) or the WASM export `normalize_and_hash(nodeKind, children)`. Do not implement a custom fingerprint algorithm.
 3. When calling `normalize_and_hash`, pass the tree-sitter `node_kind` string and, if available, the ordered child subtree. For v0 language adapters, children is always empty — leaf-level fingerprints only.
 4. The fingerprint must be a 64-character lowercase hex string as returned by `normalize_and_hash`.
-5. **`data_access` covers all call nodes at the sdivi-rust layer.** The `data_access` category classifies every `call_expression` node (TypeScript, JavaScript, Go) and every `call` node (Python) — no callee-name filtering is applied at the sdivi-rust layer. Embedders that want callee-name precision (e.g. filtering to only `fetch`, `query`, or `cursor.*` calls) must filter `PatternInstanceInput` records themselves before calling `compute_pattern_metrics`.
-6. **The `logging` category in `snapshot_version "1.0"` is catalog-only for `category_for_node_kind`.** `sdivi_patterns::queries::category_for_node_kind` never returns `Some("logging")`. **Updated in M32:** `classify_hint` *does* return `["logging"]` for matching callees — see the "Callee-text classification" section above. Embedders using `classify_hint` get canonical callee filtering for free. Embedders that do not use `classify_hint` MUST apply callee-text filtering on their side and pass `PatternInstanceInput { category: "logging", … }` directly into `compute_pattern_metrics`.
+5. **`data_access` is callee-filtered since M33.** Only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here. Embedders that supply `PatternInstanceInput { category: "data_access", … }` directly continue to work — their instances merge with natively classified ones. Embedders that want custom callee filters should apply them before calling `compute_pattern_metrics`.
+6. **As of M33, the `logging` category is natively classified by the pipeline via `classify_hint`.** `sdivi_patterns::queries::category_for_node_kind` still never returns `Some("logging")` — that sentinel is unchanged — but the native pipeline now calls `classify_hint`, which routes matching callees to `logging`. Embedders that pass `PatternInstanceInput { category: "logging" }` directly will continue to round-trip — their instances merge with the natively-classified ones in `compute_pattern_metrics` output. Embedders that previously hand-rolled their own logging filter should consider switching to `classify_hint` (M32) to stay aligned with the canonical regex set.
 7. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.

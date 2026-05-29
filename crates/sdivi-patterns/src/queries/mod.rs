@@ -56,11 +56,12 @@ pub const ALL_CATEGORIES: &[&str] = &[
 /// Returns `None` if the node kind does not belong to any category.
 /// The `_language` parameter is reserved for future per-language overrides.
 ///
-/// This function is **node-kind-only**. It is kept as a convenience for callers
-/// that have a node kind but no source text. Foreign extractors with full
-/// [`PatternHintInput`] access should prefer [`classify_hint`] for higher
-/// precision — in particular, `category_for_node_kind` never returns
-/// `Some("logging")` (that category requires callee-text inspection).
+/// **Used internally by `classify_hint` for non-call/non-macro node kinds;
+/// the native pipeline no longer calls this function directly (as of M33).**
+/// Foreign extractors with full [`PatternHintInput`] access should call
+/// [`classify_hint`] instead. This function is preserved for callers that have a
+/// node kind but no source text — and for backward compatibility with embedders
+/// that integrated against the M29 API.
 ///
 /// # Examples
 ///
@@ -76,7 +77,7 @@ pub const ALL_CATEGORIES: &[&str] = &[
 ///
 /// [`classify_hint`] — callee-text-aware classifier that returns `["logging"]` for
 /// matching callees and disambiguates Rust `macro_invocation` into `logging` vs
-/// `resource_management`.
+/// `resource_management`. This is what the native pipeline calls since M33.
 pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'static str> {
     if async_patterns::NODE_KINDS.contains(&node_kind) {
         Some("async_patterns")
@@ -263,13 +264,13 @@ mod tests {
         );
     }
 
+    // M30 sentinel: tests `category_for_node_kind` (node-kind-only, unchanged).
+    // M33 promoted `logging` via `classify_hint`; `category_for_node_kind` is
+    // intentionally unchanged. See `tests/m33_sentinels.rs` for the M33 counterpart.
     #[test]
     fn category_for_node_kind_never_returns_logging() {
-        // `category_for_node_kind` is the node-kind-only classifier; it never
-        // returns logging because logging requires callee-text inspection.
-        // `classify_hint` IS the precision-aware classifier — it does return
-        // "logging" for matching callees. This test documents that the OLD API
-        // is unchanged even after M32 added `classify_hint`.
+        // `category_for_node_kind` never returns logging — that requires callee-text
+        // inspection (see `classify_hint`). This is unchanged through M32 and M33.
         for kind in ["call_expression", "call", "macro_invocation"] {
             for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
                 assert_ne!(
@@ -281,6 +282,8 @@ mod tests {
             }
         }
     }
+
+    // M33 positive sentinels live in `tests/m33_sentinels.rs` (file ceiling).
 
     #[test]
     fn call_expression_is_data_access() {
