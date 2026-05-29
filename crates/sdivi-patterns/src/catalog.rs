@@ -3,11 +3,16 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+#[cfg(feature = "pipeline-records")]
 use globset::{Glob, GlobSet, GlobSetBuilder};
+#[cfg(feature = "pipeline-records")]
 use sdivi_config::PatternsConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::fingerprint::{fingerprint_node_kind, PatternFingerprint};
+use crate::fingerprint::PatternFingerprint;
+#[cfg(feature = "pipeline-records")]
+use crate::fingerprint::fingerprint_node_kind;
+#[cfg(feature = "pipeline-records")]
 use crate::queries;
 
 /// The file path and source position of a single pattern instance.

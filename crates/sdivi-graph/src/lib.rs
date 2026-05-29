@@ -19,8 +19,11 @@
 
 pub mod dependency_graph;
 pub mod metrics;
+#[cfg(feature = "pipeline-records")]
 pub(crate) mod resolve;
+#[cfg(feature = "pipeline-records")]
 pub(crate) mod resolve_lang;
+#[cfg(feature = "pipeline-records")]
 pub(crate) mod tsconfig;
 
 pub use dependency_graph::{build_dependency_graph_from_edges, DependencyGraph, GraphError};
