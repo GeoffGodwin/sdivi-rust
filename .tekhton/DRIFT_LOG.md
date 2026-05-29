@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 3
+- Runs since audit: 4
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,7 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:81-88` â `CATEGORIES` const uses explicit `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[6].0` index references. Each category addition requires manually re-verifying every index. Seeds Forward section in M30 flags this; nominating for cleanup: derive `CATEGORIES` from `CATALOG_ENTRIES` without hardcoded indices so the index-shift risk disappears. (Also observed in M29 review at lines 69-76 â still unresolved.)
 - [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:69-76` â `CATEGORIES` is a hand-indexed slice of `CATALOG_ENTRIES[N].0` literals. Fragile to insertions; the milestone's "Seeds Forward" already flags a `const fn` cleanup. Worth tracking: the next category milestone will shift indices again.
 - [2026-05-29 | "unknown"] `docs/pattern-categories.md` â Go/Java section only shows the `data_access` override row and states the other categories inherit from Rust via prose, while the TypeScript/JavaScript section shows all six categories explicitly. The asymmetric table format may confuse readers comparing per-language tables. Pre-existing design; no code change required but a follow-up alignment pass would reduce ambiguity.
 - [2026-05-07 | "M28"] `refine.rs:270` `renumber_in_place` and `mod.rs:197` `renumber` are identical functions with different names. Both could be unified, but the current split causes no correctness issue.

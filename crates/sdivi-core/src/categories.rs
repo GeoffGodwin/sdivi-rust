@@ -35,6 +35,17 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         on `Result` or `Option` variants.",
     ),
     (
+        "logging",
+        "Code constructs that produce diagnostic or observability output — \
+        e.g., `console.*` calls, structured logger invocations (`logger.info`), \
+        `print` statements, and logging macros (`tracing::info!`, `log::debug!`). \
+        Classification at the sdivi-rust layer is catalog-only: native code does \
+        not auto-classify by node kind alone (the relevant kinds — `call_expression`, \
+        `call`, `macro_invocation` — are already claimed by `data_access` and \
+        `resource_management`). Foreign extractors apply callee-name filtering \
+        and emit `PatternInstanceInput { category: \"logging\", … }` directly.",
+    ),
+    (
         "resource_management",
         "Code constructs that allocate, release, or manage system or heap resources — \
         e.g., macro invocations such as `drop!`, `vec!`, or standard I/O macros.",
@@ -64,7 +75,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 ///
 /// assert!(CATEGORIES.contains(&"error_handling"));
 /// assert!(CATEGORIES.contains(&"data_access"));
-/// assert_eq!(CATEGORIES.len(), 6);
+/// assert!(CATEGORIES.contains(&"logging"));
+/// assert_eq!(CATEGORIES.len(), 7);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -73,6 +85,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[3].0,
     CATALOG_ENTRIES[4].0,
     CATALOG_ENTRIES[5].0,
+    CATALOG_ENTRIES[6].0,
 ];
 
 /// Metadata for a single canonical pattern category.

@@ -45,15 +45,19 @@ fn wasm_category_catalog_json_field_names_are_schema_version_and_categories() {
 }
 
 #[test]
-fn list_categories_wasm_export_returns_six_categories() {
+fn list_categories_wasm_export_returns_seven_categories() {
     // Call the export function via sdivi_core directly (wasm-bindgen not involved in native builds)
     let catalog = sdivi_core::list_categories();
     assert_eq!(catalog.schema_version, "1.0");
-    assert_eq!(catalog.categories.len(), 6);
+    assert_eq!(catalog.categories.len(), 7);
     let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
     assert!(
         names.contains(&"data_access"),
         "expected category \"data_access\" in list_categories()"
+    );
+    assert!(
+        names.contains(&"logging"),
+        "expected category \"logging\" in list_categories()"
     );
 }
 
@@ -65,6 +69,7 @@ fn list_categories_includes_all_expected_names() {
         "async_patterns",
         "data_access",
         "error_handling",
+        "logging",
         "resource_management",
         "state_management",
         "type_assertions",

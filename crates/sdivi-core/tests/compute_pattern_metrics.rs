@@ -85,3 +85,21 @@ fn convention_drift_in_zero_one_range() {
     let r = compute_pattern_metrics(&patterns);
     assert!(r.convention_drift >= 0.0 && r.convention_drift <= 1.0);
 }
+
+#[test]
+fn logging_category_round_trips_through_compute_pattern_metrics() {
+    // logging is catalog-only: no native classifier emits it, but embedders
+    // supply PatternInstanceInput { category: "logging", … } directly.
+    // Assert that those instances flow through compute_pattern_metrics unchanged.
+    let patterns = vec![inst("logging", "fp_log_a"), inst("logging", "fp_log_b")];
+    let r = compute_pattern_metrics(&patterns);
+    assert!(
+        r.entropy_per_category.contains_key("logging"),
+        "logging bucket must be present when embedder supplies logging instances"
+    );
+    // Two distinct fingerprints → H = 1.0 bit
+    assert!(
+        (r.entropy_per_category["logging"] - 1.0).abs() < 1e-9,
+        "entropy for two distinct logging fingerprints must be 1.0"
+    );
+}

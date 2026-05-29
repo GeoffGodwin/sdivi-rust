@@ -1,5 +1,5 @@
 ## Summary
-This change adds a new `data_access` pattern category by registering static string constants (`"call_expression"`, `"call"`) in the classification tables across `sdivi-patterns`, `sdivi-core`, and `sdivi-lang-python`. All modified code is pure static data, linear string matching against tree-sitter node kinds, and AST text collection with existing truncation. No new I/O, no new dependencies, no network paths, no authentication surface, and no cryptographic operations are introduced. The security posture of the change is sound.
+This change adds the `logging` pattern category as a catalog-only entry across `sdivi-patterns`, `sdivi-core`, WASM bindings tests, and documentation. All modifications are additive static string constants (`NODE_KINDS`, `ALL_CATEGORIES`, `CATALOG_ENTRIES`) with no logic changes, no I/O, no user-input handling, no cryptographic operations, no authentication paths, and no network calls. The surface area is minimal and entirely within the deterministic, pure-compute layer.
 
 ## Findings
 None

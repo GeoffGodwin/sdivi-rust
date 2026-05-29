@@ -1,9 +1,9 @@
-# Reviewer Report — M29: Pattern Category `data_access`
+# Reviewer Report — M30: Pattern Category `logging`
 Review cycle: 1 of 4
 Reviewed by: reviewer agent
 
 ## Verdict
-APPROVED_WITH_NOTES
+APPROVED
 
 ## Complex Blockers (senior coder)
 - None
@@ -12,13 +12,11 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- Pre-existing `cargo doc --workspace --no-deps -D warnings` failure in `bindings/sdivi-wasm/src/types.rs:218,226` (unresolved links to `infer_boundaries` and `compute_trend`) means the doc-clean acceptance criterion does not pass for the workspace as a whole. Not introduced by this milestone; all new pub items in `sdivi-core` carry correct doc comments. Should be tracked as a separate cleanup item.
-- The milestone Tests section implies a named `call_is_data_access` test alongside `call_expression_is_data_access`. The implementation merges both TS and Python assertions into the single `call_expression_is_data_access` test. Functionally equivalent and the milestone marks the separate Python test as implicit. No action required.
+- `docs/pattern-categories.md` Go/Java table only shows 2 rows (`data_access`, `logging`); other categories are absent from that sub-section. Pre-existing gap, not introduced by M30 — the new row correctly follows the established pattern. No action needed now, but the table remains a human-review liability on every category milestone.
+- `crates/sdivi-patterns/src/queries/mod.rs:35` — `ALL_CATEGORIES` doc-example hard-codes `assert_eq!(ALL_CATEGORIES.len(), 7)` and will need bumping again on M31. Acknowledged ergonomic hazard in the milestone's Seeds Forward section; not actionable until the const is restructured.
 
 ## Coverage Gaps
-- No fixture-level integration test confirms that `snapshot` against `tests/fixtures/simple-typescript` or `tests/fixtures/simple-python` produces a non-empty `data_access` bucket in `pattern_metrics`. The milestone acceptance criteria and Tests section explicitly require this. Not present in any modified file.
-- No Go-specific assertion in `call_expression_is_data_access` (milestone flags this as optional insurance). Low priority.
+- No integration test runs `Pipeline::snapshot` against `tests/fixtures/simple-typescript` and asserts zero `logging` keys in `pattern_metrics`. The milestone's "Tests" section designates the unit-level `category_for_node_kind_never_returns_logging` as the correct vehicle for this guarantee — the gap is accepted by the milestone design, but a pipeline-level smoke test would add integration depth.
 
 ## Drift Observations
-- `crates/sdivi-core/src/categories.rs:69-76` — `CATEGORIES` is a hand-indexed slice of `CATALOG_ENTRIES[N].0` literals. Fragile to insertions; the milestone's "Seeds Forward" already flags a `const fn` cleanup. Worth tracking: the next category milestone will shift indices again.
-- `docs/pattern-categories.md` — Go/Java section only shows the `data_access` override row and states the other categories inherit from Rust via prose, while the TypeScript/JavaScript section shows all six categories explicitly. The asymmetric table format may confuse readers comparing per-language tables. Pre-existing design; no code change required but a follow-up alignment pass would reduce ambiguity.
+- `crates/sdivi-core/src/categories.rs:81-88` — `CATEGORIES` const uses explicit `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[6].0` index references. Each category addition requires manually re-verifying every index. Seeds Forward section in M30 flags this; nominating for cleanup: derive `CATEGORIES` from `CATALOG_ENTRIES` without hardcoded indices so the index-shift risk disappears. (Also observed in M29 review at lines 69-76 — still unresolved.)

@@ -10,11 +10,18 @@
 pub mod async_patterns;
 pub mod data_access;
 pub mod error_handling;
+pub mod logging;
 pub mod resource_management;
 pub mod state_management;
 pub mod type_assertions;
 
 /// All built-in category names in stable alphabetical order.
+///
+/// Note: `logging` is a catalog-only category for `snapshot_version "1.0"`.
+/// It is present here so embedders can emit `PatternInstanceInput { category: "logging", … }`
+/// and have those instances round-trip through `compute_pattern_metrics` and
+/// `compute_delta`. [`category_for_node_kind`] never returns `Some("logging")` —
+/// the relevant node kinds overlap with `data_access` and `resource_management`.
 ///
 /// # Examples
 ///
@@ -24,12 +31,14 @@ pub mod type_assertions;
 /// assert!(ALL_CATEGORIES.contains(&"error_handling"));
 /// assert!(ALL_CATEGORIES.contains(&"async_patterns"));
 /// assert!(ALL_CATEGORIES.contains(&"data_access"));
-/// assert_eq!(ALL_CATEGORIES.len(), 6);
+/// assert!(ALL_CATEGORIES.contains(&"logging"));
+/// assert_eq!(ALL_CATEGORIES.len(), 7);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "data_access",
     "error_handling",
+    "logging",
     "resource_management",
     "state_management",
     "type_assertions",
@@ -109,9 +118,31 @@ mod tests {
     }
 
     #[test]
-    fn all_categories_has_six_entries() {
-        assert_eq!(ALL_CATEGORIES.len(), 6);
+    fn all_categories_has_seven_entries() {
+        assert_eq!(ALL_CATEGORIES.len(), 7);
         assert!(ALL_CATEGORIES.contains(&"data_access"));
+    }
+
+    #[test]
+    fn logging_is_in_all_categories() {
+        assert!(ALL_CATEGORIES.contains(&"logging"));
+    }
+
+    #[test]
+    fn category_for_node_kind_never_returns_logging() {
+        // logging is a catalog-only category for v0 — foreign extractors emit
+        // it directly. Document the contract here so a future change that adds
+        // a native routing must update this test deliberately, not by accident.
+        for kind in ["call_expression", "call", "macro_invocation"] {
+            for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
+                assert_ne!(
+                    category_for_node_kind(kind, lang),
+                    Some("logging"),
+                    "logging is catalog-only in v0; routing for ({kind}, {lang}) \
+                     would steal from data_access/resource_management"
+                );
+            }
+        }
     }
 
     #[test]
