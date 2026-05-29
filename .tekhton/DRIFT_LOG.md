@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 2
+- Runs since audit: 3
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:69-76` â `CATEGORIES` is a hand-indexed slice of `CATALOG_ENTRIES[N].0` literals. Fragile to insertions; the milestone's "Seeds Forward" already flags a `const fn` cleanup. Worth tracking: the next category milestone will shift indices again.
+- [2026-05-29 | "unknown"] `docs/pattern-categories.md` â Go/Java section only shows the `data_access` override row and states the other categories inherit from Rust via prose, while the TypeScript/JavaScript section shows all six categories explicitly. The asymmetric table format may confuse readers comparing per-language tables. Pre-existing design; no code change required but a follow-up alignment pass would reduce ambiguity.
 - [2026-05-07 | "M28"] `refine.rs:270` `renumber_in_place` and `mod.rs:197` `renumber` are identical functions with different names. Both could be unified, but the current split causes no correctness issue.
 - [2026-05-07 | "M28"] `LeidenConfigInput::min_compression_ratio` and `max_recursion_depth` are validated at the `sdivi-config` load boundary but not in `sdivi-core::detect_boundaries`. An out-of-range value supplied by a WASM caller degrades gracefully (recursion always/never fires) but silently ignores the documented constraint. Consider adding the range check to `detect_boundaries` if the field is part of the public `sdivi-core` contract.
 - [2026-05-05 | "Address all 6 open non-blocking notes in .tekhton/NON_BLOCKING_LOG.md. Fix each item and note what you changed."] `.tekhton/NON_BLOCKING_LOG.md` contains three pairs of duplicate entries (items 1+4, 2+5, 3+6): the M26 and M27 review cycles independently logged the same findings against the same lines before they were addressed. The log is factually accurate but the duplication suggests the review pipeline does not de-duplicate open notes before appending — accumulated duplicates will make the log harder to triage over time.

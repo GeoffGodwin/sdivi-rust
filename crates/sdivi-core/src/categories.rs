@@ -21,6 +21,14 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         e.g., `.await` expressions on `Future` values and `async fn` definitions.",
     ),
     (
+        "data_access",
+        "Code constructs that perform I/O against data stores or external resources — \
+        e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), \
+        file reads (`open`, `read`), and ORM method calls. All `call_expression` / \
+        `call` nodes are classified here; callee-name narrowing is the embedder's \
+        responsibility.",
+    ),
+    (
         "error_handling",
         "Code constructs that propagate, transform, or handle error conditions — \
         e.g., the `?` operator (`try_expression`) and `match` arms that dispatch \
@@ -55,7 +63,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// use sdivi_core::CATEGORIES;
 ///
 /// assert!(CATEGORIES.contains(&"error_handling"));
-/// assert_eq!(CATEGORIES.len(), 5);
+/// assert!(CATEGORIES.contains(&"data_access"));
+/// assert_eq!(CATEGORIES.len(), 6);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -63,6 +72,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[2].0,
     CATALOG_ENTRIES[3].0,
     CATALOG_ENTRIES[4].0,
+    CATALOG_ENTRIES[5].0,
 ];
 
 /// Metadata for a single canonical pattern category.

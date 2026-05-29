@@ -6,6 +6,7 @@ use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
 const PATTERN_KINDS: &[&str] = &[
+    "call",
     "try_statement",
     "except_clause",
     "with_statement",

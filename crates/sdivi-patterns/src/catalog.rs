@@ -9,9 +9,9 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use sdivi_config::PatternsConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::fingerprint::PatternFingerprint;
 #[cfg(feature = "pipeline-records")]
 use crate::fingerprint::fingerprint_node_kind;
+use crate::fingerprint::PatternFingerprint;
 #[cfg(feature = "pipeline-records")]
 use crate::queries;
 

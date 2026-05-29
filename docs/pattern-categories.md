@@ -18,6 +18,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | Category | Description |
 |---|---|
 | async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. |
+| data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), file reads (`open`, `read`), and ORM method calls. All `call_expression` / `call` nodes are classified here; callee-name narrowing is the embedder's responsibility. |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
 | resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., macro invocations such as `drop!`, `vec!`, or standard I/O macros. |
 | state_management | Code constructs that capture, transform, or share mutable or shared state — e.g., closures that close over mutable bindings or shared references. |
@@ -32,6 +33,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await_expression` | None |
+| data_access | (none in v0) | — |
 | error_handling | `try_expression`, `match_expression` | None (both `?` and `match` are counted; callers may apply finer-grained filters in their own extractors) |
 | resource_management | `macro_invocation` | None |
 | state_management | `closure_expression` | None |
@@ -42,6 +44,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await` | None |
+| data_access | `call` | None (all Python function calls; callee-name narrowing is the embedder's responsibility) |
 | error_handling | `try_statement` | None |
 | resource_management | (none in v0) | — |
 | state_management | `lambda` | None |
@@ -52,6 +55,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await_expression` | None |
+| data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
 | error_handling | `try_statement` | None |
 | resource_management | (none in v0) | — |
 | state_management | `arrow_function` | None |
@@ -59,7 +63,11 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 
 ### Go / Java
 
-These languages share the Rust classifier in v0. Language-specific refinements are deferred until concrete user feedback warrants them.
+These languages share the Rust classifier in v0 except for `data_access`, which maps `call_expression` across all languages. Language-specific refinements are deferred until concrete user feedback warrants them.
+
+| Category | Node kinds | Structural constraint |
+|---|---|---|
+| data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
 
 > **Note on per-language node-kind tables:** The v0 tables above are written by hand.
 > A future milestone could derive them from the tree-sitter query definitions to eliminate
@@ -84,6 +92,7 @@ An embedder that supplies `PatternInstanceInput` values must:
 2. Compute fingerprints via `normalize_and_hash(node_kind, children)` (Rust) or the WASM export `normalize_and_hash(nodeKind, children)`. Do not implement a custom fingerprint algorithm.
 3. When calling `normalize_and_hash`, pass the tree-sitter `node_kind` string and, if available, the ordered child subtree. For v0 language adapters, children is always empty — leaf-level fingerprints only.
 4. The fingerprint must be a 64-character lowercase hex string as returned by `normalize_and_hash`.
+5. **`data_access` covers all call nodes at the sdivi-rust layer.** The `data_access` category classifies every `call_expression` node (TypeScript, JavaScript, Go) and every `call` node (Python) — no callee-name filtering is applied at the sdivi-rust layer. Embedders that want callee-name precision (e.g. filtering to only `fetch`, `query`, or `cursor.*` calls) must filter `PatternInstanceInput` records themselves before calling `compute_pattern_metrics`.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

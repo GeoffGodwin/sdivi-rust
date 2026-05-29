@@ -28,7 +28,9 @@ globset     = { workspace = true }
 [dev-dependencies]
 serde_json    = { workspace = true }
 # Path-only — see sdivi-detection's dev-deps for rationale.
-sdivi-parsing   = { path = "../sdivi-parsing" }
-sdivi-lang-rust = { path = "../sdivi-lang-rust" }
+sdivi-parsing         = { path = "../sdivi-parsing" }
+sdivi-lang-rust       = { path = "../sdivi-lang-rust" }
+sdivi-lang-python     = { path = "../sdivi-lang-python" }
+sdivi-lang-typescript = { path = "../sdivi-lang-typescript" }
 sdivi-config    = { path = "../sdivi-config" }
 proptest      = { workspace = true }

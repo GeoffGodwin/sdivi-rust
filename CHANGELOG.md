@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New pattern category `data_access` covering call expressions across all supported languages. `call_expression` nodes in TypeScript, JavaScript, and Go are now bucketed under `data_access` in the pattern catalog (these were already collected as `PatternHint`s but previously classified as `None`). Adds `"call"` to the Python adapter's collected node kinds, so all Python function calls now emit a `PatternHint` and are bucketed under `data_access`. **Migration note:** a `compute_delta` between a pre-upgrade snapshot (no `data_access` key) and a post-upgrade snapshot (new `data_access` key) is a one-time recalibration event — the new top-level key should not be read as a sudden drift spike.
+
 ## [0.2.18] - 2026-05-08
 
 ### Performance
