@@ -10,6 +10,7 @@ const PATTERN_KINDS: &[&str] = &[
     "macro_invocation",
     "await_expression",
     "closure_expression",
+    "impl_item",
 ];
 
 /// Node kinds that can be exported from a Rust file.

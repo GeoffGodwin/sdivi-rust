@@ -129,3 +129,36 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
         assert!(hint.text.is_char_boundary(hint.text.len()));
     }
 }
+
+// ── class_hierarchy negative-result sentinel (M31) ───────────────────────────
+//
+// Go has no class/interface AST shape. The duck-typed interface model does not
+// produce hierarchy-shaped declarations. The `class_hierarchy` category exists
+// in the catalog so cross-language reporting is uniform, but the Go adapter has
+// nothing to contribute. This test is the negative-result sentinel: it asserts
+// that running the Go parser over a real Go file produces zero class_hierarchy
+// node kinds in pattern_hints.
+
+#[test]
+fn go_source_produces_no_class_declaration_hints() {
+    let source = concat!(
+        "package main\n",
+        "import \"fmt\"\n",
+        "type Animal interface { Speak() string }\n",
+        "type Dog struct { Name string }\n",
+        "func (d Dog) Speak() string { return \"Woof\" }\n",
+        "func main() { fmt.Println(\"Go\") }\n",
+    );
+    let record = parse(source);
+    let class_hierarchy_kinds = ["class_declaration", "class_definition", "abstract_class_declaration", "interface_declaration", "impl_item"];
+    let found: Vec<&str> = record
+        .pattern_hints
+        .iter()
+        .map(|h| h.node_kind.as_str())
+        .filter(|k| class_hierarchy_kinds.contains(k))
+        .collect();
+    assert!(
+        found.is_empty(),
+        "Go adapter must produce zero class_hierarchy pattern hints; found: {found:?}"
+    );
+}

@@ -8,6 +8,7 @@
 //! breaking change requiring a `MIGRATION_NOTES.md` entry.
 
 pub mod async_patterns;
+pub mod class_hierarchy;
 pub mod data_access;
 pub mod error_handling;
 pub mod logging;
@@ -32,10 +33,11 @@ pub mod type_assertions;
 /// assert!(ALL_CATEGORIES.contains(&"async_patterns"));
 /// assert!(ALL_CATEGORIES.contains(&"data_access"));
 /// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert_eq!(ALL_CATEGORIES.len(), 7);
+/// assert_eq!(ALL_CATEGORIES.len(), 8);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
+    "class_hierarchy",
     "data_access",
     "error_handling",
     "logging",
@@ -61,6 +63,8 @@ pub const ALL_CATEGORIES: &[&str] = &[
 pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'static str> {
     if async_patterns::NODE_KINDS.contains(&node_kind) {
         Some("async_patterns")
+    } else if class_hierarchy::NODE_KINDS.contains(&node_kind) {
+        Some("class_hierarchy")
     } else if data_access::NODE_KINDS.contains(&node_kind) {
         Some("data_access")
     } else if error_handling::NODE_KINDS.contains(&node_kind) {
@@ -118,14 +122,59 @@ mod tests {
     }
 
     #[test]
-    fn all_categories_has_seven_entries() {
-        assert_eq!(ALL_CATEGORIES.len(), 7);
+    fn all_categories_has_eight_entries() {
+        assert_eq!(ALL_CATEGORIES.len(), 8);
         assert!(ALL_CATEGORIES.contains(&"data_access"));
     }
 
     #[test]
     fn logging_is_in_all_categories() {
         assert!(ALL_CATEGORIES.contains(&"logging"));
+    }
+
+    #[test]
+    fn class_hierarchy_is_in_all_categories() {
+        assert!(ALL_CATEGORIES.contains(&"class_hierarchy"));
+    }
+
+    #[test]
+    fn class_declaration_is_class_hierarchy() {
+        assert_eq!(
+            category_for_node_kind("class_declaration", "typescript"),
+            Some("class_hierarchy")
+        );
+    }
+
+    #[test]
+    fn class_definition_is_class_hierarchy() {
+        assert_eq!(
+            category_for_node_kind("class_definition", "python"),
+            Some("class_hierarchy")
+        );
+    }
+
+    #[test]
+    fn impl_item_is_class_hierarchy() {
+        assert_eq!(
+            category_for_node_kind("impl_item", "rust"),
+            Some("class_hierarchy")
+        );
+    }
+
+    #[test]
+    fn interface_declaration_is_class_hierarchy() {
+        assert_eq!(
+            category_for_node_kind("interface_declaration", "java"),
+            Some("class_hierarchy")
+        );
+    }
+
+    #[test]
+    fn abstract_class_declaration_is_class_hierarchy() {
+        assert_eq!(
+            category_for_node_kind("abstract_class_declaration", "typescript"),
+            Some("class_hierarchy")
+        );
     }
 
     #[test]

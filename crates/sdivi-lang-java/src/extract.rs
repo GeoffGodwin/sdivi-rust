@@ -12,6 +12,8 @@ const PATTERN_KINDS: &[&str] = &[
     "lambda_expression",
     "enhanced_for_statement",
     "throw_statement",
+    "class_declaration",
+    "interface_declaration",
 ];
 
 /// Top-level declaration kinds whose public visibility makes them exports.

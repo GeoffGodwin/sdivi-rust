@@ -17,6 +17,7 @@ const PATTERN_KINDS: &[&str] = &[
     "dictionary_comprehension",
     "set_comprehension",
     "decorated_definition",
+    "class_definition",
 ];
 
 /// Top-level definition kinds that can be exported from a Python module.

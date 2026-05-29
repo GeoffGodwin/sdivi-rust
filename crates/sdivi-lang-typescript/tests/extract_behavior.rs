@@ -150,3 +150,78 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
         assert!(hint.text.is_char_boundary(hint.text.len()));
     }
 }
+
+// ── class_hierarchy pattern hints (M31) ──────────────────────────────────────
+
+#[test]
+fn plain_class_declaration_captured_as_class_hierarchy_hint() {
+    let record = parse_ts("class Foo { bar(): void {} }\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_declaration");
+    assert!(has_class, "class_declaration must appear in pattern_hints for a plain class");
+}
+
+#[test]
+fn class_with_extends_captured_as_class_hierarchy_hint() {
+    let record = parse_ts("class Child extends Parent { constructor() { super(); } }\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_declaration");
+    assert!(
+        has_class,
+        "class_declaration must appear in pattern_hints for a class with extends clause"
+    );
+}
+
+#[test]
+fn abstract_class_declaration_captured_as_class_hierarchy_hint() {
+    let record = parse_ts("abstract class Shape { abstract area(): number; }\n");
+    let has_abstract = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "abstract_class_declaration");
+    assert!(
+        has_abstract,
+        "abstract_class_declaration must appear in pattern_hints"
+    );
+}
+
+#[test]
+fn interface_declaration_captured_as_class_hierarchy_hint() {
+    let record = parse_ts("interface Drawable { draw(): void; }\n");
+    let has_iface = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "interface_declaration");
+    assert!(has_iface, "interface_declaration must appear in pattern_hints");
+}
+
+#[test]
+fn all_three_class_hierarchy_kinds_collected_in_one_file() {
+    let source = concat!(
+        "interface Printable { print(): void; }\n",
+        "abstract class Base { abstract run(): void; }\n",
+        "class Concrete extends Base implements Printable { run(): void {} print(): void {} }\n",
+    );
+    let record = parse_ts(source);
+    let kinds: Vec<&str> = record
+        .pattern_hints
+        .iter()
+        .map(|h| h.node_kind.as_str())
+        .collect();
+    assert!(
+        kinds.contains(&"interface_declaration"),
+        "interface_declaration must appear in pattern_hints, got: {kinds:?}"
+    );
+    assert!(
+        kinds.contains(&"abstract_class_declaration"),
+        "abstract_class_declaration must appear in pattern_hints, got: {kinds:?}"
+    );
+    assert!(
+        kinds.contains(&"class_declaration"),
+        "class_declaration must appear in pattern_hints, got: {kinds:?}"
+    );
+}

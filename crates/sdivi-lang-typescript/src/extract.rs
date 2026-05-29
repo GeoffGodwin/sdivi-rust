@@ -12,6 +12,9 @@ const PATTERN_KINDS: &[&str] = &[
     "call_expression",
     "generator_function",
     "generator_function_declaration",
+    "class_declaration",
+    "abstract_class_declaration",
+    "interface_declaration",
 ];
 
 /// Declaration kinds that may appear as the `declaration` child of an

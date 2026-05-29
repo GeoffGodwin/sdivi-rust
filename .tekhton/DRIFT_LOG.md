@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 4
+- Runs since audit: 5
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-29 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `category_for_node_kind` is a linear `if/else if` chain with no `logging` branch (intentionally absent â catalog-only). With eight categories the omission is only visible to someone who knows to look. The existing `category_for_node_kind_never_returns_logging` test is the only guard; a brief inline comment noting the intentional absence of a `logging` branch would prevent future confusion when a ninth category is added.
+- [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:89â98` â `CATEGORIES` const is still the hand-indexed `CATALOG_ENTRIES[N].0` form. The indices are correct post-M31 (0â7 inclusive), but this is the third consecutive milestone where the index-shift hazard has appeared as a Watch For. The Seeds Forward cleanup (`const fn` or `LazyLock` derivation from `CATALOG_ENTRIES`) remains open.
+- [2026-05-29 | "unknown"] `docs/pattern-categories.md:74` â Go/Java section claims "these languages share the Rust classifier except for `data_access`" but the table only shows three rows. The other five categories are absent without explanation. Pre-existing; M31 correctly added the `class_hierarchy` row within the existing pattern, but the table is still incomplete for a new reader.
 - [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:81-88` â `CATEGORIES` const uses explicit `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[6].0` index references. Each category addition requires manually re-verifying every index. Seeds Forward section in M30 flags this; nominating for cleanup: derive `CATEGORIES` from `CATALOG_ENTRIES` without hardcoded indices so the index-shift risk disappears. (Also observed in M29 review at lines 69-76 â still unresolved.)
 - [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:69-76` â `CATEGORIES` is a hand-indexed slice of `CATALOG_ENTRIES[N].0` literals. Fragile to insertions; the milestone's "Seeds Forward" already flags a `const fn` cleanup. Worth tracking: the next category milestone will shift indices again.
 - [2026-05-29 | "unknown"] `docs/pattern-categories.md` â Go/Java section only shows the `data_access` override row and states the other categories inherit from Rust via prose, while the TypeScript/JavaScript section shows all six categories explicitly. The asymmetric table format may confuse readers comparing per-language tables. Pre-existing design; no code change required but a follow-up alignment pass would reduce ambiguity.

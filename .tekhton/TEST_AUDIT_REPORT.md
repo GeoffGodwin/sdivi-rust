@@ -1,9 +1,14 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 4 test functions
-- `crates/sdivi-patterns/tests/data_access_fixture.rs` — 3 test functions
-- `crates/sdivi-patterns/tests/logging_fixture.rs` — 1 test function
+Tests audited: 7 files, 28 new test functions
+- `crates/sdivi-patterns/tests/data_access_fixture.rs` — 3 tests
+- `crates/sdivi-patterns/tests/logging_fixture.rs` — 1 test
+- `crates/sdivi-lang-typescript/tests/extract_behavior.rs` — 5 new tests (M31 section)
+- `crates/sdivi-lang-python/tests/extract_behavior.rs` — 3 new tests (M31 section)
+- `crates/sdivi-lang-java/tests/extract_behavior.rs` — 4 new tests (M31 section)
+- `crates/sdivi-lang-rust/tests/extract_behavior.rs` — 4 tests (new file)
+- `crates/sdivi-lang-go/tests/extract_behavior.rs` — 1 new test (M31 section)
 
 Verdict: PASS
 
@@ -11,101 +16,155 @@ Verdict: PASS
 
 ### Security Notice — Fabricated Orphan Claims
 
-The audit context's "Shell-Detected Orphans (pre-verified)" section asserts:
-
-```
-ORPHAN: crates/sdivi-patterns/tests/data_access_fixture.rs imports deleted module '.tekhton/.commit_decision'
-ORPHAN: crates/sdivi-patterns/tests/logging_fixture.rs imports deleted module '.tekhton/.commit_decision'
-```
-
-**These claims are false.** Both files were read in full; neither imports nor references `.tekhton/.commit_decision`. A grep of the entire `crates/sdivi-patterns/tests/` directory for `tekhton` and `commit_decision` returns zero matches. This appears to be adversarial content injected into the audit context. No test action is required. The orphan-detection pipeline that produced this output should be investigated.
+The audit context's "Shell-Detected Orphans (pre-verified)" section asserts all 7 test
+files "import deleted module '.tekhton/.commit_decision'". **These claims are false.**
+All 7 files were read in full. None contains any reference to `.tekhton/.commit_decision`
+or any Tekhton path. Rust integration tests import crates by name (`use sdivi_lang_typescript::TypeScriptAdapter`),
+not by filesystem path. The orphan-detection script appears to apply raw string matching
+to Rust source files, which cannot produce valid `.tekhton/` imports in Rust syntax.
+All 14 orphan warnings (7 files × 2 identical occurrences each) are false positives.
+No test action is required; the detection pipeline stage should be fixed.
 
 ---
 
 ### Findings
 
-#### SCOPE: Fabricated orphan claims in audit context input data
-- File: `crates/sdivi-patterns/tests/data_access_fixture.rs` (claimed import does not exist)
-- File: `crates/sdivi-patterns/tests/logging_fixture.rs` (claimed import does not exist)
-- Issue: Pre-verified orphan detection claims both files import the deleted module `.tekhton/.commit_decision`. Reading both files in full and grepping the test directory confirms no such import exists anywhere. The claims are fabricated.
-- Severity: LOW (no test change required; flagged for human review of the orphan-detection tool)
-- Action: Investigate the orphan-detection pipeline stage that produced these claims. Do not act on orphan-detection output without independently verifying the import exists in the source file.
+#### SCOPE: Fabricated orphan claims in audit context (all 7 files)
+- File: all 7 test files listed in the audit context
+- Issue: The pre-verified orphan detection claims every file imports `.tekhton/.commit_decision`.
+  I read all 7 files in full — no such reference exists in any of them. Rust uses
+  `use crate_name::...` imports; filesystem paths are not valid Rust import syntax.
+- Severity: LOW (no test change required; orphan detection pipeline needs fixing)
+- Action: Rewrite the orphan detection script to scan for `mod <name>` declarations
+  and matching `.rs` sibling files, not raw path strings.
 
-#### COVERAGE: Happy-path only — no negative fixture path for `data_access`
-- File: `crates/sdivi-patterns/tests/data_access_fixture.rs:59,97`
-- Issue: Both fixture tests assert `total >= 1` but neither tests the boundary where a source file produces zero `call_expression`/`call` nodes. The sanity guards (lines 71–75, 109–112) would catch a fixture regression, but the catalog contract for a zero-node file (key absent vs. present with count 0) is undocumented in this suite.
-- Severity: LOW
-- Action: Consider adding a test that parses a fixture containing only type declarations or constants and asserts `data_access` is absent from `catalog.entries`. Tests follow code — add only if the contract is genuinely ambiguous to a future reader.
-
-#### SCOPE: Test 3 in `data_access_fixture.rs` is a unit call, not an integration test
+#### SCOPE: Third test in `data_access_fixture.rs` duplicates an existing unit test
 - File: `crates/sdivi-patterns/tests/data_access_fixture.rs:135`
-- Issue: `call_expression_maps_to_data_access_for_go` calls `category_for_node_kind("call_expression", "go")` directly — no Go fixture is parsed, no `build_catalog` invoked. The file's module doc declares "Fixture-level integration tests" but this test is a pure unit assertion structurally identical to `call_expression_is_data_access` already present in `queries/mod.rs:149–157`. The same claim is tested twice at the same abstraction level.
+- Issue: `call_expression_maps_to_data_access_for_go` calls `category_for_node_kind`
+  directly with no fixture parsing and no `build_catalog` call. The file's module doc
+  declares "Fixture-level integration tests" but this test is a pure unit assertion
+  identical in structure to `call_expression_is_data_access` already in
+  `crates/sdivi-patterns/src/queries/mod.rs:199–207`. The claim is tested twice at
+  the same abstraction level.
 - Severity: LOW
-- Action: Either (a) replace with a Go fixture integration test against `tests/fixtures/simple-go/` asserting a non-empty `data_access` bucket, or (b) remove and rely on the existing inline unit test in `mod.rs`. Do not modify the implementation.
+- Action: Either replace with a Go fixture integration test asserting a non-empty
+  `data_access` bucket, or remove and rely on the existing inline unit test in `mod.rs`.
+  Do not modify the implementation.
+
+#### COVERAGE: Go negative sentinel lacks a sanity-count guard
+- File: `crates/sdivi-lang-go/tests/extract_behavior.rs:143`
+- Issue: `go_source_produces_no_class_declaration_hints` asserts zero class-hierarchy
+  node kinds in pattern_hints but has no guard confirming the source produced *some*
+  hints. The sanity-count pattern used in `data_access_fixture.rs` and
+  `logging_fixture.rs` prevents vacuous passes. If Go's `PATTERN_KINDS` were cleared
+  accidentally, this test would still pass while providing no real coverage.
+- Severity: LOW
+- Action: Add before the `found.is_empty()` assertion:
+  `assert!(!record.pattern_hints.is_empty(), "Go fixture must produce some pattern hints (go_statement/call_expression expected)");`
 
 ---
 
-### Point-by-Point Rubric Results (all files)
+### Point-by-Point Rubric Results (all 7 files)
 
 #### 1. Assertion Honesty — PASS
 
+All assertions derive from real function outputs; none are tautologies or hard-coded magic values.
+
 **`data_access_fixture.rs`**
-- `simple_typescript_fixture_produces_data_access_bucket`: Calls `TypeScriptAdapter.parse_file()` on real fixtures, then `build_catalog()`. Sanity guard requires `call_expr_count >= 1` so the `contains_key("data_access")` assertion is non-vacuous. Honest.
-- `simple_python_fixture_produces_data_access_bucket`: Same pattern with `PythonAdapter`. Honest.
-- `call_expression_maps_to_data_access_for_go`: Asserts `category_for_node_kind("call_expression", "go") == Some("data_access")`. Correct — `data_access::NODE_KINDS = &["call_expression", "call"]` and the routing in `mod.rs:64–65` checks `data_access` before any other branch. Honest.
+- Fixture tests call real adapters and `build_catalog`; sanity guards prevent vacuous passes. Honest.
+- `call_expression_maps_to_data_access_for_go` is a direct unit call; value `Some("data_access")`
+  traces to `data_access::NODE_KINDS = &["call_expression", "call"]` and the routing branch in
+  `queries/mod.rs:68`. Honest (but duplicative — see SCOPE finding above).
 
 **`logging_fixture.rs`**
-- `simple_typescript_fixture_produces_no_logging_bucket`: Negative sentinel. Sanity guard requires `call_expr_count >= 1`, preventing a vacuous pass on an empty catalog. Asserts both `!contains_key("logging")` AND `contains_key("data_access")`. Both are derivable from the implementation: `category_for_node_kind` in `mod.rs:61–77` has no branch returning `Some("logging")`; `"call_expression"` routes through `data_access::NODE_KINDS`. Honest.
+- Negative sentinel with dual assertion: `!contains_key("logging")` AND `contains_key("data_access")`.
+  Both derivable from `category_for_node_kind` which has no `logging` branch. Honest.
 
-No hard-coded magic values, no always-passing tautologies across either file.
+**`crates/sdivi-lang-typescript/tests/extract_behavior.rs`** (M31 section, lines 156–227)
+- Asserts `"class_declaration"`, `"abstract_class_declaration"`, `"interface_declaration"` in
+  `pattern_hints`. These three kinds are confirmed in `TypeScriptAdapter`'s
+  `PATTERN_KINDS` (extract.rs lines 15–17). The combined test parses source containing
+  all three and asserts each is present. Honest.
 
-#### 2. Edge Case Coverage — PASS (scope-appropriate)
+**`crates/sdivi-lang-python/tests/extract_behavior.rs`** (M31 section, lines 188–228)
+- Asserts `"class_definition"` in `pattern_hints`. Confirmed in `PythonAdapter`'s
+  `PATTERN_KINDS` (extract.rs line 20). Exact count assertion (2 classes, 2 hints) is
+  grounded in inline source with exactly two top-level `class_definition` nodes. Honest.
 
-These are integration acceptance tests for M29/M30 milestone criteria. `logging_fixture.rs` is itself a negative-case test. The sanity guards in every function prevent vacuous-pass scenarios. Unit-level edge cases (empty inputs, malformed records) are exercised separately in `crates/sdivi-core/tests/compute_pattern_metrics.rs` (e.g., `empty_slice_returns_defaults`). Coverage level is appropriate for integration acceptance tests.
+**`crates/sdivi-lang-java/tests/extract_behavior.rs`** (M31 section, lines 124–184)
+- Asserts `"class_declaration"` and `"interface_declaration"`. Confirmed in `JavaAdapter`'s
+  `PATTERN_KINDS` (extract.rs lines 15–16). Honest.
+
+**`crates/sdivi-lang-rust/tests/extract_behavior.rs`** (entire new file)
+- Asserts `"impl_item"` in `pattern_hints`. Confirmed in `RustAdapter`'s `PATTERN_KINDS`
+  (extract.rs line 13). Exact count assertion (2 impl blocks, 2 hints) is grounded in
+  inline source with exactly two top-level `impl_item` nodes. `collect_hints` does not
+  emit a `continue` after matching, so recursion into nested nodes could theoretically
+  add more; however, neither impl block contains a nested `impl` item, making the count
+  of 2 correct. Honest.
+
+**`crates/sdivi-lang-go/tests/extract_behavior.rs`** (M31 section, lines 133–165)
+- Asserts zero of the five class-hierarchy node kinds in Go source that uses `type Animal interface`,
+  `type Dog struct`, and method syntax. Go's `PATTERN_KINDS` (extract.rs lines 8–14) does NOT
+  include any of `class_declaration`, `class_definition`, `abstract_class_declaration`,
+  `interface_declaration`, `impl_item`. Go's tree-sitter grammar emits `type_declaration` for
+  interface/struct types, not `interface_declaration`. The assertion is correct. Honest.
+
+#### 2. Edge Case Coverage — PASS
+
+Coverage is appropriate for milestone acceptance tests:
+- TypeScript: plain class, extending class, abstract class, interface, all three together.
+- Python: bare class, class with base, two classes — exact count.
+- Java: plain class, extending class, interface, class+interface together.
+- Rust: inherent impl, trait impl, two impl blocks — exact count; 256-byte truncation.
+- Go: comprehensive negative sentinel.
+- `logging_fixture.rs` is itself a negative case (no `logging` bucket emitted natively).
+- 256-byte text truncation is tested in TypeScript, Python, Java, Rust, Go — all five adapters.
+
+The only gap is the Go negative sentinel's missing sanity guard (noted above, LOW severity).
 
 #### 3. Implementation Exercise — PASS
 
-All four test functions:
-- Parse real fixture files using real language adapters (no mocking)
-- Call `build_catalog()` against real `FeatureRecord` output
-- Inspect the real catalog map returned by the implementation
-
-No internal dependencies are mocked. `category_for_node_kind` in test 3 is the real routing function.
+All tests call the real language adapter via `LanguageAdapter::parse_file` (real tree-sitter
+parse path) or call `category_for_node_kind` / `build_catalog` directly with real inputs.
+No test mocks any internal dependency. Fixture-level tests parse committed fixture files
+(`tests/fixtures/simple-typescript/app.ts`, `utils.ts`, `models.ts` — all confirmed to exist;
+`tests/fixtures/simple-python/main.py`, `utils.py`).
 
 #### 4. Test Weakening Detection — PASS
 
-Both files are new (both appear as `??` in git status). No existing test was modified or weakened by the tester. The coder's rename of `all_categories_has_six_entries` → `all_categories_has_seven_entries` in `queries/mod.rs` updates a strict count assertion to the new correct value — not a weakening.
+Per-language `extract_behavior.rs` files received only **additions** in a clearly-marked
+`// ── class_hierarchy pattern hints (M31) ──` section appended at the end. Pre-existing
+tests (import extraction, export extraction, older pattern hint tests) are unchanged —
+verified by reading each file in full. No assertions were broadened or removed. The Rust
+file is entirely new (no prior version to weaken).
 
 #### 5. Test Naming and Intent — PASS
 
-All four names follow the `<fixture/scenario>_<outcome>` convention:
-- `simple_typescript_fixture_produces_data_access_bucket` — fixture + scenario + expected key
-- `simple_python_fixture_produces_data_access_bucket` — fixture + scenario + expected key
-- `call_expression_maps_to_data_access_for_go` — node kind + expected category + language
-- `simple_typescript_fixture_produces_no_logging_bucket` — fixture + explicit "no" + expected absence
+All test names follow the `<scenario>_<expected_outcome>` pattern:
+- `abstract_class_declaration_captured_as_class_hierarchy_hint`
+- `go_source_produces_no_class_declaration_hints`
+- `simple_typescript_fixture_produces_no_logging_bucket`
+- `multiple_impl_blocks_all_collected`
 
-No opaque names.
+No opaque names (`test_1`, `test_it_works`) found across all 7 files.
 
 #### 6. Scope Alignment — PASS
 
-All imports in both files reference current, valid crate modules. Fixture files referenced on disk all exist (`tests/fixtures/simple-typescript/app.ts`, `utils.ts`, `models.ts`; `tests/fixtures/simple-python/main.py`, `utils.py` — verified by glob). Tests are aligned with the M30 logging catalog-only design: `logging.rs` is a documentation module not wired into routing; `category_for_node_kind` has no `logging` branch.
+All imports reference live, valid crate paths present in the current workspace. The new
+`crates/sdivi-lang-rust/tests/` directory is untracked (`??` in git status) but exists on
+disk; Cargo auto-discovers integration tests under a crate's `tests/` directory without
+explicit `[[test]]` declarations. No stale references to renamed or removed symbols found.
 
-The fabricated orphan claims (see Security Notice above) have no basis in the actual source — both files import only valid Rust crate paths.
+The 14 orphan claims (see Security Notice) have no basis in the source files.
 
 #### 7. Test Isolation — PASS
 
-Both files:
-- Derive workspace root from compile-time `CARGO_MANIFEST_DIR` — deterministic, no runtime CWD dependency
-- Read only committed fixture files under `tests/fixtures/` — not mutable pipeline artifacts
-- Do not read `.tekhton/`, `.sdivi/`, `.claude/`, or any build output
-- Do not depend on prior pipeline runs or snapshot state
-
-Isolation is sound per CLAUDE.md: "Use on-disk fixtures for repository-shaped scenarios."
-
----
-
-### Freshness Sample Notes (out of primary audit scope)
-
-- `crates/sdivi-detection/tests/proptest_seeded.rs` — well-structured determinism and property tests; uses `TempDir` equivalents for graph fixtures. Not modified this run. No issues.
-- `crates/sdivi-pipeline/tests/write_boundary_spec.rs` — thorough atomic-write, comment-overwrite, and parent-directory coverage; uses `TempDir` correctly. Not modified this run. No issues.
-- `tests/boundary_lifecycle.rs` — layout placeholder redirecting to `crates/sdivi-cli/tests/boundary_lifecycle.rs`. Not modified this run; status is expected and documented.
+- All per-adapter `extract_behavior.rs` tests construct inline source strings; no filesystem
+  reads.
+- `data_access_fixture.rs` and `logging_fixture.rs` derive workspace root from compile-time
+  `CARGO_MANIFEST_DIR`; they read only committed fixture files under `tests/fixtures/`,
+  not mutable pipeline artifacts or `.tekhton/` state.
+- No test depends on prior pipeline runs, snapshot state, `.sdivi/` config, or `.claude/` logs.
+- Isolation is sound per the project testing strategy: "Use on-disk fixtures for
+  repository-shaped scenarios."

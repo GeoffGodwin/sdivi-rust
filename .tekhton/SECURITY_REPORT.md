@@ -1,5 +1,5 @@
 ## Summary
-This change adds the `logging` pattern category as a catalog-only entry across `sdivi-patterns`, `sdivi-core`, WASM bindings tests, and documentation. All modifications are additive static string constants (`NODE_KINDS`, `ALL_CATEGORIES`, `CATALOG_ENTRIES`) with no logic changes, no I/O, no user-input handling, no cryptographic operations, no authentication paths, and no network calls. The surface area is minimal and entirely within the deterministic, pure-compute layer.
+This change adds a new `class_hierarchy` pattern category consisting entirely of compile-time static string constants (`NODE_KINDS`, `CATALOG_ENTRIES` entries, `CATEGORIES` index references, and `PATTERN_KINDS` additions in five language extractors). No user input is processed, no I/O is performed, no network calls are made, no authentication or authorization logic is touched, and no cryptographic material is involved. The new `impl_item` node kind added to the Rust extractor's `PATTERN_KINDS` passes through the existing 256-byte truncation guard in `collect_hints`, providing the same memory-pressure protection as all other pattern kinds. No new attack surface is introduced.
 
 ## Findings
 None

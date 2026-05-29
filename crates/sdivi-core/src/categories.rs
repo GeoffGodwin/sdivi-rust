@@ -21,6 +21,14 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         e.g., `.await` expressions on `Future` values and `async fn` definitions.",
     ),
     (
+        "class_hierarchy",
+        "Code constructs that establish inheritance, interface implementation, or trait \
+        conformance relationships — e.g. classes with `extends`/`implements` clauses, \
+        Python classes with base classes, and Rust `impl Trait for Type` blocks. All \
+        declaration kinds are classified here regardless of whether they carry a \
+        heritage clause; heritage-aware narrowing is the embedder's responsibility.",
+    ),
+    (
         "data_access",
         "Code constructs that perform I/O against data stores or external resources — \
         e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), \
@@ -76,7 +84,7 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"error_handling"));
 /// assert!(CATEGORIES.contains(&"data_access"));
 /// assert!(CATEGORIES.contains(&"logging"));
-/// assert_eq!(CATEGORIES.len(), 7);
+/// assert_eq!(CATEGORIES.len(), 8);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -86,6 +94,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[4].0,
     CATALOG_ENTRIES[5].0,
     CATALOG_ENTRIES[6].0,
+    CATALOG_ENTRIES[7].0,
 ];
 
 /// Metadata for a single canonical pattern category.

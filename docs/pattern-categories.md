@@ -18,6 +18,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | Category | Description |
 |---|---|
 | async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. |
+| class_hierarchy | Code constructs that establish inheritance, interface implementation, or trait conformance relationships — e.g. classes with `extends`/`implements` clauses, Python classes with base classes, and Rust `impl Trait for Type` blocks. All declaration kinds are classified here regardless of whether they carry a heritage clause; heritage-aware narrowing is the embedder's responsibility. |
 | data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), file reads (`open`, `read`), and ORM method calls. All `call_expression` / `call` nodes are classified here; callee-name narrowing is the embedder's responsibility. |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
 | logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Catalog-only in sdivi-rust v0** — see Embedder responsibilities. |
@@ -34,6 +35,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await_expression` | None |
+| class_hierarchy | `impl_item` | All `impl` blocks, including inherent `impl Type {…}` (no trait) and trait conformance `impl Trait for Type {…}`. Inherent-only narrowing is the embedder's responsibility. |
 | data_access | (none in v0) | — |
 | error_handling | `try_expression`, `match_expression` | None (both `?` and `match` are counted; callers may apply finer-grained filters in their own extractors) |
 | logging | (consumer extractor responsibility — `macro_invocation` overlaps with `resource_management` at the AST level) | — |
@@ -46,6 +48,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await` | None |
+| class_hierarchy | `class_definition` | All `class` definitions, including those with no base classes (which are effectively `class Foo(object)` and contribute low entropy). |
 | data_access | `call` | None (all Python function calls; callee-name narrowing is the embedder's responsibility) |
 | error_handling | `try_statement` | None |
 | logging | (consumer extractor responsibility — `call` overlaps with `data_access` at the AST level) | — |
@@ -58,6 +61,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | async_patterns | `await_expression` | None |
+| class_hierarchy | `class_declaration`, `abstract_class_declaration`, `interface_declaration` | Abstract classes and interfaces always count. Concrete classes count regardless of `extends` / `implements`; entropy survives the broader collection because heritage-free classes have similar structure and contribute low entropy. (JavaScript: only `class_declaration` is emitted; `interface_declaration` and `abstract_class_declaration` are TS-only AST shapes.) |
 | data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
 | error_handling | `try_statement` | None |
 | logging | (consumer extractor responsibility — `call_expression` overlaps with `data_access` at the AST level) | — |
@@ -71,6 +75,7 @@ These languages share the Rust classifier in v0 except for `data_access`, which 
 
 | Category | Node kinds | Structural constraint |
 |---|---|---|
+| class_hierarchy | Java: `class_declaration`, `interface_declaration`. Go: (none in v0 — Go has no class/interface AST shape; the duck-typed interface model does not surface as a `class_hierarchy` declaration. The category exists in the catalog so cross-language reporting is uniform, but it produces zero Go hits.) | Java: same broader-collection caveat as other languages — all declaration kinds are classified regardless of heritage. |
 | data_access | `call_expression` | None (all call expressions; callee-name narrowing is the embedder's responsibility) |
 | logging | (consumer extractor responsibility — `call_expression` overlaps with `data_access` at the AST level) | — |
 
@@ -99,6 +104,7 @@ An embedder that supplies `PatternInstanceInput` values must:
 4. The fingerprint must be a 64-character lowercase hex string as returned by `normalize_and_hash`.
 5. **`data_access` covers all call nodes at the sdivi-rust layer.** The `data_access` category classifies every `call_expression` node (TypeScript, JavaScript, Go) and every `call` node (Python) — no callee-name filtering is applied at the sdivi-rust layer. Embedders that want callee-name precision (e.g. filtering to only `fetch`, `query`, or `cursor.*` calls) must filter `PatternInstanceInput` records themselves before calling `compute_pattern_metrics`.
 6. **The `logging` category in `snapshot_version "1.0"` is catalog-only.** `sdivi_patterns::queries::category_for_node_kind` never returns `Some("logging")`. Embedders that wish to emit logging instances MUST apply callee-text filtering on their side (typical patterns: `console.*`, `logger.*`, `log.*`, `tracing::*!`, `log::*!`, `logging.*`, `print`, `fmt.Print*`) and pass `PatternInstanceInput { category: "logging", … }` directly into `compute_pattern_metrics`. The category exists in `list_categories()` so embedder output round-trips through `compute_delta` without being treated as an unknown category. This is a deliberate v0 deferral — see M30 for the design discussion.
+7. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 
