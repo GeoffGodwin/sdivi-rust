@@ -22,12 +22,14 @@
 pub mod catalog;
 pub mod entropy;
 pub mod fingerprint;
+pub mod hint_input;
 pub mod normalize;
 pub mod queries;
 
 pub use catalog::{PatternCatalog, PatternLocation, PatternStats};
 pub use entropy::compute_entropy;
 pub use fingerprint::{fingerprint_node_kind, PatternFingerprint, FINGERPRINT_KEY};
+pub use hint_input::PatternHintInput;
 pub use normalize::{normalize_and_hash, NormalizeNode};
 
 #[cfg(feature = "pipeline-records")]

@@ -1,8 +1,11 @@
 //! Per-category node-kind classification rules.
 //!
 //! Each sub-module declares the tree-sitter node kinds that map to a built-in
-//! pattern category. Classification is performed by [`category_for_node_kind`],
-//! which returns the category name or `None` if the node kind is unrecognised.
+//! pattern category. Two classifiers are provided:
+//!
+//! - [`category_for_node_kind`] — node-kind-only, fast, does not inspect source text.
+//! - [`classify_hint`] — node-kind + callee-text, uses per-language regex tables.
+//!   Prefer this for foreign extractors that have full [`PatternHintInput`] access.
 //!
 //! Category names are stable from Milestone 6 forward. Renaming any name is a
 //! breaking change requiring a `MIGRATION_NOTES.md` entry.
@@ -15,6 +18,8 @@ pub mod logging;
 pub mod resource_management;
 pub mod state_management;
 pub mod type_assertions;
+
+use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
@@ -51,6 +56,12 @@ pub const ALL_CATEGORIES: &[&str] = &[
 /// Returns `None` if the node kind does not belong to any category.
 /// The `_language` parameter is reserved for future per-language overrides.
 ///
+/// This function is **node-kind-only**. It is kept as a convenience for callers
+/// that have a node kind but no source text. Foreign extractors with full
+/// [`PatternHintInput`] access should prefer [`classify_hint`] for higher
+/// precision — in particular, `category_for_node_kind` never returns
+/// `Some("logging")` (that category requires callee-text inspection).
+///
 /// # Examples
 ///
 /// ```rust
@@ -60,6 +71,12 @@ pub const ALL_CATEGORIES: &[&str] = &[
 /// assert_eq!(category_for_node_kind("await_expression", "rust"), Some("async_patterns"));
 /// assert_eq!(category_for_node_kind("unknown_node", "rust"), None);
 /// ```
+///
+/// # See also
+///
+/// [`classify_hint`] — callee-text-aware classifier that returns `["logging"]` for
+/// matching callees and disambiguates Rust `macro_invocation` into `logging` vs
+/// `resource_management`.
 pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'static str> {
     if async_patterns::NODE_KINDS.contains(&node_kind) {
         Some("async_patterns")
@@ -77,6 +94,75 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
         Some("type_assertions")
     } else {
         None
+    }
+}
+
+/// Classify a [`PatternHintInput`] using both node kind and callee-text inspection.
+///
+/// Returns a `Vec` of category name(s) the hint belongs to. In v0 the return is
+/// always 0 or 1 entries — the regex tables are designed to be disjoint per language.
+/// The `Vec` return is forward-looking: a future category that legitimately co-occurs
+/// with another (e.g. `console.error(err)` as both `logging` and `error_handling`)
+/// can be added without an API break.
+///
+/// ## Dispatch order for `call_expression` / `call`
+///
+/// Priority: `async_patterns` > `logging` > `data_access`. The first match wins.
+/// The order is load-bearing only if the disjoint-regex invariant is ever relaxed.
+///
+/// ## `macro_invocation`
+///
+/// Defaults to `resource_management`. Rust logging macros (`tracing::*!`,
+/// `log::*!`, `println!`, `eprintln!`, `print!`, `eprint!`, `dbg!`) are
+/// reclassified as `logging` via [`resource_management::excludes_callee`].
+///
+/// ## Other node kinds
+///
+/// Falls through to [`category_for_node_kind`] — the existing node-kind-only table.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_patterns::queries::classify_hint;
+/// use sdivi_patterns::PatternHintInput;
+///
+/// let hint = PatternHintInput {
+///     node_kind: "call_expression".to_string(),
+///     text: "console.log(\"x\")".to_string(),
+/// };
+/// assert_eq!(classify_hint(&hint, "typescript"), vec!["logging"]);
+///
+/// let mac = PatternHintInput {
+///     node_kind: "macro_invocation".to_string(),
+///     text: "vec![1, 2, 3]".to_string(),
+/// };
+/// assert_eq!(classify_hint(&mac, "rust"), vec!["resource_management"]);
+/// ```
+pub fn classify_hint(hint: &PatternHintInput, language: &str) -> Vec<&'static str> {
+    match hint.node_kind.as_str() {
+        "call_expression" | "call" => {
+            if async_patterns::matches_callee(&hint.text, language) {
+                return vec!["async_patterns"];
+            }
+            if logging::matches_callee(&hint.text, language) {
+                return vec!["logging"];
+            }
+            if data_access::matches_callee(&hint.text, language) {
+                return vec!["data_access"];
+            }
+            vec![]
+        }
+        "macro_invocation" => {
+            if resource_management::excludes_callee(&hint.text, language)
+                && logging::matches_callee(&hint.text, language)
+            {
+                return vec!["logging"];
+            }
+            vec!["resource_management"]
+        }
+        other => category_for_node_kind(other, language)
+            .map(|c| vec![c])
+            .unwrap_or_default(),
     }
 }
 
@@ -179,16 +265,18 @@ mod tests {
 
     #[test]
     fn category_for_node_kind_never_returns_logging() {
-        // logging is a catalog-only category for v0 — foreign extractors emit
-        // it directly. Document the contract here so a future change that adds
-        // a native routing must update this test deliberately, not by accident.
+        // `category_for_node_kind` is the node-kind-only classifier; it never
+        // returns logging because logging requires callee-text inspection.
+        // `classify_hint` IS the precision-aware classifier — it does return
+        // "logging" for matching callees. This test documents that the OLD API
+        // is unchanged even after M32 added `classify_hint`.
         for kind in ["call_expression", "call", "macro_invocation"] {
             for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
                 assert_ne!(
                     category_for_node_kind(kind, lang),
                     Some("logging"),
-                    "logging is catalog-only in v0; routing for ({kind}, {lang}) \
-                     would steal from data_access/resource_management"
+                    "logging is catalog-only in v0 for category_for_node_kind; \
+                     routing for ({kind}, {lang}) would steal from data_access/resource_management"
                 );
             }
         }

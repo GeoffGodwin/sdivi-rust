@@ -150,7 +150,13 @@ fn go_source_produces_no_class_declaration_hints() {
         "func main() { fmt.Println(\"Go\") }\n",
     );
     let record = parse(source);
-    let class_hierarchy_kinds = ["class_declaration", "class_definition", "abstract_class_declaration", "interface_declaration", "impl_item"];
+    let class_hierarchy_kinds = [
+        "class_declaration",
+        "class_definition",
+        "abstract_class_declaration",
+        "interface_declaration",
+        "impl_item",
+    ];
     let found: Vec<&str> = record
         .pattern_hints
         .iter()

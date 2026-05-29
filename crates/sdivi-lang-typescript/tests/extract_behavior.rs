@@ -160,7 +160,10 @@ fn plain_class_declaration_captured_as_class_hierarchy_hint() {
         .pattern_hints
         .iter()
         .any(|h| h.node_kind == "class_declaration");
-    assert!(has_class, "class_declaration must appear in pattern_hints for a plain class");
+    assert!(
+        has_class,
+        "class_declaration must appear in pattern_hints for a plain class"
+    );
 }
 
 #[test]
@@ -196,7 +199,10 @@ fn interface_declaration_captured_as_class_hierarchy_hint() {
         .pattern_hints
         .iter()
         .any(|h| h.node_kind == "interface_declaration");
-    assert!(has_iface, "interface_declaration must appear in pattern_hints");
+    assert!(
+        has_iface,
+        "interface_declaration must appear in pattern_hints"
+    );
 }
 
 #[test]

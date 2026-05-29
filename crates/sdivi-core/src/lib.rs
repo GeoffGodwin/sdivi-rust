@@ -118,6 +118,26 @@ pub use sdivi_patterns::catalog::{PatternCatalog, PatternStats};
 /// Pattern fingerprint type — re-exported from `sdivi-patterns` for WASM embedders.
 pub use sdivi_patterns::fingerprint::PatternFingerprint;
 
+/// Input struct for [`classify_hint`] — re-exported from `sdivi-patterns` for WASM embedders.
+///
+/// Contains only the two fields that `classify_hint` inspects: `node_kind` and `text`.
+/// Foreign extractors construct this directly; the native pipeline uses
+/// `sdivi_parsing::feature_record::PatternHint` and M33 will wire the conversion.
+pub use sdivi_patterns::hint_input::PatternHintInput;
+
+/// Callee-text-aware classification — re-exported from `sdivi-patterns::queries`.
+///
+/// Returns a `Vec` of category names (0 or 1 in v0) for a [`PatternHintInput`].
+/// Provides higher precision than [`category_for_node_kind`] by inspecting
+/// `hint.text` against per-language regex tables.
+///
+/// **The native pipeline (`Pipeline::snapshot`) still uses `category_for_node_kind`
+/// in M32** — M33 switches the pipeline. Foreign extractors can adopt `classify_hint`
+/// immediately.
+///
+/// [`category_for_node_kind`]: sdivi_patterns::queries::category_for_node_kind
+pub use sdivi_patterns::queries::classify_hint;
+
 /// Commonly-imported items from sdivi-core.
 pub mod prelude {
     pub use crate::input::{DependencyGraphInput, PatternInstanceInput, ThresholdsInput};

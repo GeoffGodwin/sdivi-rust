@@ -85,6 +85,85 @@ These languages share the Rust classifier in v0 except for `data_access`, which 
 > is the authoritative drift detector for the category *set*; per-language node-kind
 > accuracy relies on manual review.
 
+## Callee-text classification (`classify_hint`)
+
+As of M32, `sdivi_core::classify_hint(hint, language) -> Vec<String>` provides a
+higher-precision classifier that inspects both the `node_kind` and `hint.text` (the
+truncated source text of the node). Foreign extractors should prefer `classify_hint`
+over hand-rolled callee filters — the regex tables below are part of the canonical
+contract and are versioned with `snapshot_version "1.0"`.
+
+The native `Pipeline::snapshot` continues to use `category_for_node_kind` in M32
+(see M33 for the pipeline switchover). Snapshot output is bit-identical before and
+after M32.
+
+### `data_access::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched |
+|---|---|---|
+| TypeScript / JavaScript / Go | `^(fetch\|axios)\b` | `fetch("/api")`, `axios.get(url)` |
+| TypeScript / JavaScript / Go | `\b(query\|read\|write\|get\|post\|put\|delete\|patch)\(` | `db.query(sql)`, `get(url)` |
+| TypeScript / JavaScript / Go | `\b(db\|sql)\.` | `db.execute(sql)`, `sql.Open(dsn)` |
+| TypeScript / JavaScript / Go | `\.(query\|read\|write\|fetch)\(` | `client.read(buf)`, `.fetch(url)` |
+| Python | `^(open\(\|requests\.\|httpx\.\|cursor\.\|session\.\|conn\.)` | `open(path)`, `cursor.execute(q)` |
+| Rust, Java | (none in v0) | — |
+
+**Worked example (TypeScript):** `fetch("/api/users")` → `["data_access"]`
+
+### `logging::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched |
+|---|---|---|
+| TypeScript / JavaScript | `^(console\|logger\|log)\.` | `console.log(x)`, `logger.info(x)` |
+| Python | `^(logging\.\|print\b)` | `logging.info(x)`, `print(x)` |
+| Go | `^fmt\.(Print\|Println\|Printf\|Errorf\|Fprint\|Sprint)` | `fmt.Println(x)`, `fmt.Printf(f, x)` |
+| Rust | `^(tracing\|log)::\|^(println\|eprintln\|print\|eprint\|dbg)!` | `tracing::info!(x)`, `println!(x)` |
+| Java | `^(System\.(out\|err)\.\|logger\.\|Log\.\|LOG\.)` | `System.out.println(x)`, `LOG.info(x)` |
+
+**Worked example (Rust):** `tracing::info!("request")` → `["logging"]`
+
+### `async_patterns::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched |
+|---|---|---|
+| TypeScript / JavaScript | `\.(then\|catch\|finally)\(` | `p.then(r)`, `fetch().catch(e => {})` |
+| All others | (none) | — |
+
+**Worked example (TypeScript):** `promise.then(resolve)` → `["async_patterns"]`
+
+### `resource_management::excludes_callee(text, language)`
+
+This function is **inverted**: returns `true` when a `macro_invocation` should fall
+through to `logging` instead of staying in `resource_management`.
+
+| Language | Pattern | Examples excluded |
+|---|---|---|
+| Rust | `^(tracing\|log)::\|^(println\|eprintln\|print\|eprint\|dbg)!` | `tracing::info!`, `println!` |
+| All others | (none) | — |
+
+**Worked example (Rust):** `vec![1, 2, 3]` macro invocation → `["resource_management"]`;
+`tracing::info!("x")` macro invocation → `["logging"]`.
+
+### Dispatch order in `classify_hint`
+
+For `call_expression` / `call` node kinds:
+1. `async_patterns` (highest priority) — `.then`, `.catch`, `.finally`
+2. `logging` — `console.*`, `logger.*`, `tracing::*!`, etc.
+3. `data_access` — `fetch`, `query`, `cursor.*`, etc.
+4. `[]` empty — unrecognised callee, hint is dropped
+
+For `macro_invocation`:
+- Logging macros (Rust only) → `["logging"]`
+- All others → `["resource_management"]`
+
+All other node kinds fall through to `category_for_node_kind`.
+
+### Regex change log
+
+First defined in M32 for `snapshot_version "1.0"`. Changing or narrowing a regex
+is a behavioural break requiring a `MIGRATION_NOTES.md` entry. Broadening (adding
+new shapes) is additive.
+
 ## Normalization rules
 
 Pattern fingerprints are computed by `sdivi_core::normalize_and_hash`. The algorithm is:
@@ -103,7 +182,7 @@ An embedder that supplies `PatternInstanceInput` values must:
 3. When calling `normalize_and_hash`, pass the tree-sitter `node_kind` string and, if available, the ordered child subtree. For v0 language adapters, children is always empty — leaf-level fingerprints only.
 4. The fingerprint must be a 64-character lowercase hex string as returned by `normalize_and_hash`.
 5. **`data_access` covers all call nodes at the sdivi-rust layer.** The `data_access` category classifies every `call_expression` node (TypeScript, JavaScript, Go) and every `call` node (Python) — no callee-name filtering is applied at the sdivi-rust layer. Embedders that want callee-name precision (e.g. filtering to only `fetch`, `query`, or `cursor.*` calls) must filter `PatternInstanceInput` records themselves before calling `compute_pattern_metrics`.
-6. **The `logging` category in `snapshot_version "1.0"` is catalog-only.** `sdivi_patterns::queries::category_for_node_kind` never returns `Some("logging")`. Embedders that wish to emit logging instances MUST apply callee-text filtering on their side (typical patterns: `console.*`, `logger.*`, `log.*`, `tracing::*!`, `log::*!`, `logging.*`, `print`, `fmt.Print*`) and pass `PatternInstanceInput { category: "logging", … }` directly into `compute_pattern_metrics`. The category exists in `list_categories()` so embedder output round-trips through `compute_delta` without being treated as an unknown category. This is a deliberate v0 deferral — see M30 for the design discussion.
+6. **The `logging` category in `snapshot_version "1.0"` is catalog-only for `category_for_node_kind`.** `sdivi_patterns::queries::category_for_node_kind` never returns `Some("logging")`. **Updated in M32:** `classify_hint` *does* return `["logging"]` for matching callees — see the "Callee-text classification" section above. Embedders using `classify_hint` get canonical callee filtering for free. Embedders that do not use `classify_hint` MUST apply callee-text filtering on their side and pass `PatternInstanceInput { category: "logging", … }` directly into `compute_pattern_metrics`.
 7. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.

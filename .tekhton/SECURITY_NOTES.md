@@ -1,6 +1,6 @@
 # Security Notes
 
-Generated: 2026-05-07 22:35:00
+Generated: 2026-05-29 14:07:23
 
 ## Non-Blocking Findings (MEDIUM/LOW)
-- [LOW] [category:A03] [bindings/sdivi-wasm/src/weight_keys.rs:25-34] fixable:yes — `parse_wasm_edge_weights` rejects `NaN` and negative values but does not call `weight.is_infinite()`. `f64::INFINITY` passes both guards and propagates into the Leiden algorithm. The documented contract in the function-level rustdoc and in `types.rs:55` explicitly states "finite", so this is an implementation gap. Fix: add `if weight.is_infinite() { return Err(format!("edge weight for key \"{key}\" is infinite; all weights must be finite")); }` after the NaN check (line 25). A matching unit test `rejects_infinite_weight` should be added to the `#[cfg(test)] mod tests` block.
+- [LOW] [category:A03] [bindings/sdivi-wasm/src/exports.rs:186] fixable:yes — The `classify_hint` WASM export accepts a caller-supplied `hint.text` field with no enforcement of the documented 256-byte truncation. The `PatternHintInput` docstring states "truncated to 256 bytes upstream (per the PatternHint contract)" but the WASM API is the upstream for JS callers — there is no upstream enforcer. A malicious caller can pass an arbitrarily long string. All current regex patterns carry O(n) guarantees from the `regex` crate (no backreferences, no catastrophic backtracking), so this is proportional overhead only, not a ReDoS vulnerability. Fix: enforce the cap at the WASM boundary — truncate `hint.text` to 256 bytes (nearest char boundary) in `exports.rs:classify_hint` before constructing `PatternHintInput`.

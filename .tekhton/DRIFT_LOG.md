@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 5
+- Runs since audit: 6
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-29 | "unknown"] `crates/sdivi-patterns/Cargo.toml`: `regex` is an unconditional dependency (not gated by `pipeline-records`). This is intentional (regex is needed in both the pipeline and WASM paths), but the only documentation of this decision is the `# ââ pattern classification ââ` comment in the workspace `Cargo.toml`. A note near the `pipeline-records` feature definition in `sdivi-patterns/Cargo.toml` explaining why `regex` is unconditional would prevent a future contributor from mistakenly gating it.
+- [2026-05-29 | "unknown"] `crates/sdivi-patterns/src/queries/resource_management.rs:20â22` and `crates/sdivi-patterns/src/queries/logging.rs:57â60` â `RUST_LOGGING_RE` and `logging::RUST_RE` contain identical regex literals. Both are `LazyLock<Regex>` and compile independently. In v0 the duplication is harmless, but if one is updated and the other is not, Rust macros will be silently mis-classified. A cross-reference comment at the `resource_management::RUST_LOGGING_RE` definition pointing to `logging::matches_callee` (which owns the canonical pattern) would surface the invariant.
+- [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` const remains in the hand-indexed `CATALOG_ENTRIES[N].0` form noted in prior reviews (M29, M30, M31). The indices are correct at 8 entries but the index-shift hazard accumulates as new categories are added. Seeds Forward cleanup remains open.
 - [2026-05-29 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `category_for_node_kind` is a linear `if/else if` chain with no `logging` branch (intentionally absent â catalog-only). With eight categories the omission is only visible to someone who knows to look. The existing `category_for_node_kind_never_returns_logging` test is the only guard; a brief inline comment noting the intentional absence of a `logging` branch would prevent future confusion when a ninth category is added.
 - [2026-05-29 | "unknown"] `crates/sdivi-core/src/categories.rs:89â98` â `CATEGORIES` const is still the hand-indexed `CATALOG_ENTRIES[N].0` form. The indices are correct post-M31 (0â7 inclusive), but this is the third consecutive milestone where the index-shift hazard has appeared as a Watch For. The Seeds Forward cleanup (`const fn` or `LazyLock` derivation from `CATALOG_ENTRIES`) remains open.
 - [2026-05-29 | "unknown"] `docs/pattern-categories.md:74` â Go/Java section claims "these languages share the Rust classifier except for `data_access`" but the table only shows three rows. The other five categories are absent without explanation. Pre-existing; M31 correctly added the `class_hierarchy` row within the existing pattern, but the table is still incomplete for a new reader.
