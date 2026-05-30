@@ -136,7 +136,10 @@ fn go_db_query_routes_to_data_access_in_catalog() {
         catalog.entries.keys().collect::<Vec<_>>()
     );
 
-    let da_total: u32 = catalog.entries["data_access"].values().map(|s| s.count).sum();
+    let da_total: u32 = catalog.entries["data_access"]
+        .values()
+        .map(|s| s.count)
+        .sum();
     assert_eq!(
         da_total, 1,
         "data_access bucket must contain exactly 1 instance for db.query, got {da_total}"
@@ -250,7 +253,10 @@ fn go_mixed_calls_route_correctly_by_callee_in_catalog() {
     );
 
     let log_total: u32 = catalog.entries["logging"].values().map(|s| s.count).sum();
-    let da_total: u32 = catalog.entries["data_access"].values().map(|s| s.count).sum();
+    let da_total: u32 = catalog.entries["data_access"]
+        .values()
+        .map(|s| s.count)
+        .sum();
 
     // 2 fmt.Print* calls → 2 logging instances
     assert_eq!(
@@ -284,7 +290,11 @@ fn go_mixed_calls_route_correctly_by_callee_in_catalog() {
 fn go_fmt_errorf_routes_to_logging_not_data_access() {
     let records = vec![go_record(
         "err.go",
-        vec![go_hint("call_expression", "fmt.Errorf(\"bad: %w\", err)", 5)],
+        vec![go_hint(
+            "call_expression",
+            "fmt.Errorf(\"bad: %w\", err)",
+            5,
+        )],
     )];
 
     let catalog = build_catalog(&records, &catalog_config_min1());
