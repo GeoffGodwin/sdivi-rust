@@ -35,7 +35,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.package]
-version = "0.2.18"
+version = "0.2.23"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Geoff Godwin <geoff.godwin@gmail.com>"]
@@ -120,6 +120,9 @@ tree-sitter-java       = "0.21"
 # ── hashing / fingerprinting ──────────────────────────────────────────────────
 blake3     = "1"
 twox-hash  = "1"         # xxh3 cache keys
+
+# ── pattern classification ────────────────────────────────────────────────────
+regex      = "1"
 
 # ── randomness ───────────────────────────────────────────────────────────────
 rand = "0.8"

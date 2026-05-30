@@ -1,3 +1,4 @@
+#[cfg(any(feature = "loader", test))]
 use crate::ConfigError;
 
 /// Validates that `expires_str` is a well-formed `"YYYY-MM-DD"` date string.
@@ -49,6 +50,7 @@ pub fn validate_date_format(expires_str: &str) -> bool {
 /// `today` is the current date as a `"YYYY-MM-DD"` string for comparison.
 /// `table` is the fully-merged `toml::Table` before deserialization into
 /// [`Config`].
+#[cfg(any(feature = "loader", test))]
 pub(crate) fn validate_and_prune_overrides(
     table: &mut toml::Table,
     today: &str,

@@ -41,6 +41,7 @@ id_rsa
 .claude/indexer-venv/
 .claude/index/
 .claude/serena/
+.serena/
 .claude/dry_run_cache/
 .claude/migration-backups/
 .claude/watchtower_inbox/

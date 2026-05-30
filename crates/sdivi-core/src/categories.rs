@@ -21,10 +21,37 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         e.g., `.await` expressions on `Future` values and `async fn` definitions.",
     ),
     (
+        "class_hierarchy",
+        "Code constructs that establish inheritance, interface implementation, or trait \
+        conformance relationships — e.g. classes with `extends`/`implements` clauses, \
+        Python classes with base classes, and Rust `impl Trait for Type` blocks. All \
+        declaration kinds are classified here regardless of whether they carry a \
+        heritage clause; heritage-aware narrowing is the embedder's responsibility.",
+    ),
+    (
+        "data_access",
+        "Code constructs that perform I/O against data stores or external resources — \
+        e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), \
+        file reads (`open`, `read`), and ORM method calls. All `call_expression` / \
+        `call` nodes are classified here; callee-name narrowing is the embedder's \
+        responsibility.",
+    ),
+    (
         "error_handling",
         "Code constructs that propagate, transform, or handle error conditions — \
         e.g., the `?` operator (`try_expression`) and `match` arms that dispatch \
         on `Result` or `Option` variants.",
+    ),
+    (
+        "logging",
+        "Code constructs that produce diagnostic or observability output — \
+        e.g., `console.*` calls, structured logger invocations (`logger.info`), \
+        `print` statements, and logging macros (`tracing::info!`, `log::debug!`). \
+        Classification at the sdivi-rust layer is catalog-only: native code does \
+        not auto-classify by node kind alone (the relevant kinds — `call_expression`, \
+        `call`, `macro_invocation` — are already claimed by `data_access` and \
+        `resource_management`). Foreign extractors apply callee-name filtering \
+        and emit `PatternInstanceInput { category: \"logging\", … }` directly.",
     ),
     (
         "resource_management",
@@ -55,7 +82,9 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// use sdivi_core::CATEGORIES;
 ///
 /// assert!(CATEGORIES.contains(&"error_handling"));
-/// assert_eq!(CATEGORIES.len(), 5);
+/// assert!(CATEGORIES.contains(&"data_access"));
+/// assert!(CATEGORIES.contains(&"logging"));
+/// assert_eq!(CATEGORIES.len(), 8);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -63,6 +92,9 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[2].0,
     CATALOG_ENTRIES[3].0,
     CATALOG_ENTRIES[4].0,
+    CATALOG_ENTRIES[5].0,
+    CATALOG_ENTRIES[6].0,
+    CATALOG_ENTRIES[7].0,
 ];
 
 /// Metadata for a single canonical pattern category.

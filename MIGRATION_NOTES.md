@@ -8,6 +8,81 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M33 — Native pipeline switchover to `classify_hint` (per-category instance counts shift)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys. Existing `[thresholds.overrides.<category>]` blocks
+remain the escape hatch — set `expires` to a date within your migration window to defer
+recalibration.
+
+**What changed.** `crates/sdivi-patterns/src/catalog.rs` now calls `classify_hint`
+(callee-text-aware) instead of `category_for_node_kind` (node-kind-only). The result:
+
+1. **`data_access` shrinks.** Pre-M33 every `call_expression`/`call` was a `data_access`
+   instance. Post-M33 only callees matching the per-language regex are. On a typical
+   TS/JS codebase this drops `data_access` instance count substantially.
+2. **`logging` becomes non-zero.** Was catalog-only (zero natively) since M30. Now natively
+   populated. `console.log`, `tracing::info!`, `fmt.Println` etc. flow here.
+3. **`async_patterns` grows on TS/JS.** Promise chains (`.then()/.catch()/.finally()`) are
+   now classified as `async_patterns` instead of being dropped or going to `data_access`.
+4. **`resource_management` shrinks on Rust.** Logging macros leave the bucket; only
+   non-logging macros (`vec!`, `assert!`, `format!`, etc.) remain.
+5. **Threshold gates may trip.** The M20 epsilon for cross-architecture float drift is far
+   smaller than the M33 instance-count shifts — adopters should not expect the epsilon to
+   absorb the change.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.data_access]
+pattern_entropy_rate = 5.0
+expires = "2026-09-30"
+reason = "M33 upgrade: data_access count dropped; recalibrating baseline"
+
+[thresholds.overrides.logging]
+pattern_entropy_rate = 5.0
+expires = "2026-09-30"
+reason = "M33 upgrade: logging bucket newly populated; setting initial tolerance"
+```
+
+**Worked example — `simple-typescript` fixture, pre-M33 vs post-M33.**
+
+Pre-M33 `pattern_metrics` (all `call_expression` → `data_access`):
+
+```json
+{
+  "pattern_metrics": {
+    "data_access": { "entropy": 0.0, "instance_count": 2, "convention_drift": 0.0 },
+    "async_patterns": { "entropy": 0.0, "instance_count": 1, "convention_drift": 0.0 }
+  }
+}
+```
+
+Post-M33 `pattern_metrics` (after extending fixture with `console.log` and `fetch`):
+
+```json
+{
+  "pattern_metrics": {
+    "logging":      { "entropy": 0.0, "instance_count": 1, "convention_drift": 0.0 },
+    "data_access":  { "entropy": 0.0, "instance_count": 1, "convention_drift": 0.0 },
+    "async_patterns": { "entropy": 0.0, "instance_count": 1, "convention_drift": 0.0 }
+  }
+}
+```
+
+Key differences visible in a `compute_delta` between pre- and post-M33 snapshots:
+- `data_access.instance_count` drops (was counting `helper(...)`, `path.replace(...)`;
+  now only `fetch(...)` matches).
+- `logging` key appears for the first time.
+- `async_patterns` key may appear or grow (`.then()`/`.catch()` Promise chains).
+
+**Foreign extractors are unaffected.** Embedders that supply `PatternInstanceInput`
+directly bypass `build_catalog` entirely — their inputs determine their outputs.
+If you have already migrated to `classify_hint` in M32, you are now aligned with the
+native pipeline. If not, your hand-rolled filter continues to work unchanged.
+
 ## M28 — Leiden performance (modularity values may shift slightly)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `LeidenPartition` JSON shape is unchanged. `BoundarySpec` YAML untouched.

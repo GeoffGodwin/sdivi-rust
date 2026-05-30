@@ -15,6 +15,7 @@ use crate::category_types::*;
 use crate::threshold_types::*;
 use crate::types::*;
 use crate::weight_keys::parse_wasm_edge_weights;
+use sdivi_core::PatternHintInput;
 
 // ── Conversion helpers ────────────────────────────────────────────────────────
 
@@ -171,6 +172,26 @@ pub fn normalize_and_hash(
 #[wasm_bindgen]
 pub fn list_categories() -> Result<WasmCategoryCatalog, JsError> {
     from_core(sdivi_core::list_categories())
+}
+
+// ── classify_hint ─────────────────────────────────────────────────────────────
+
+/// Classify a pattern hint using callee-text inspection.
+///
+/// Returns a `string[]` of category names (0 or 1 entries in v0). Inspects
+/// `hint.node_kind` and `hint.text` against per-language regex tables — returns
+/// `["logging"]` for `console.log(...)` and disambiguates Rust macro invocations
+/// between `logging` and `resource_management`. M33 switches the native pipeline.
+#[wasm_bindgen]
+pub fn classify_hint(hint: WasmPatternHintInput, language: &str) -> Vec<String> {
+    let h = PatternHintInput {
+        node_kind: hint.node_kind,
+        text: hint.text,
+    };
+    sdivi_core::classify_hint(&h, language)
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 // ── assemble_snapshot ────────────────────────────────────────────────────────

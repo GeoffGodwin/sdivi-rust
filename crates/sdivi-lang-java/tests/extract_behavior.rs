@@ -119,3 +119,66 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
         assert!(hint.text.is_char_boundary(hint.text.len()));
     }
 }
+
+// ── class_hierarchy pattern hints (M31) ──────────────────────────────────────
+
+#[test]
+fn plain_class_declaration_captured_as_class_hierarchy_hint() {
+    let record = parse("public class Greeter { public void hello() {} }\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_declaration");
+    assert!(
+        has_class,
+        "class_declaration must appear in pattern_hints for a plain Java class"
+    );
+}
+
+#[test]
+fn class_with_extends_captured_as_class_hierarchy_hint() {
+    let record = parse("public class Child extends Parent { }\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_declaration");
+    assert!(
+        has_class,
+        "class_declaration must appear in pattern_hints for a class with extends clause"
+    );
+}
+
+#[test]
+fn interface_declaration_captured_as_class_hierarchy_hint() {
+    let record = parse("public interface Printable { void print(); }\n");
+    let has_iface = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "interface_declaration");
+    assert!(
+        has_iface,
+        "interface_declaration must appear in pattern_hints"
+    );
+}
+
+#[test]
+fn class_and_interface_both_collected_in_one_file() {
+    let source = concat!(
+        "public interface Shape { double area(); }\n",
+        "public class Circle implements Shape { public double area() { return 3.14; } }\n",
+    );
+    let record = parse(source);
+    let kinds: Vec<&str> = record
+        .pattern_hints
+        .iter()
+        .map(|h| h.node_kind.as_str())
+        .collect();
+    assert!(
+        kinds.contains(&"interface_declaration"),
+        "interface_declaration must appear in pattern_hints, got: {kinds:?}"
+    );
+    assert!(
+        kinds.contains(&"class_declaration"),
+        "class_declaration must appear in pattern_hints, got: {kinds:?}"
+    );
+}

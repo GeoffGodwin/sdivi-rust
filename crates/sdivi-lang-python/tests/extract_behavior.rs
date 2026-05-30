@@ -182,3 +182,47 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
         assert!(hint.text.is_char_boundary(hint.text.len()));
     }
 }
+
+// ── class_hierarchy pattern hints (M31) ──────────────────────────────────────
+
+#[test]
+fn bare_class_definition_captured_as_class_hierarchy_hint() {
+    let record = parse("class Foo:\n    pass\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_definition");
+    assert!(
+        has_class,
+        "class_definition must appear in pattern_hints for a bare class (no base)"
+    );
+}
+
+#[test]
+fn class_with_base_captured_as_class_hierarchy_hint() {
+    let record = parse("class Bar(Foo):\n    pass\n");
+    let has_class = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "class_definition");
+    assert!(
+        has_class,
+        "class_definition must appear in pattern_hints for a class with a base class"
+    );
+}
+
+#[test]
+fn both_class_kinds_collected_in_one_file() {
+    let source = "class Base:\n    pass\n\nclass Derived(Base):\n    pass\n";
+    let record = parse(source);
+    let class_hints: Vec<_> = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "class_definition")
+        .collect();
+    assert_eq!(
+        class_hints.len(),
+        2,
+        "both class definitions must appear as class_definition hints, got: {class_hints:?}"
+    );
+}

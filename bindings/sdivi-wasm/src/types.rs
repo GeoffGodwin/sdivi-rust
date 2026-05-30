@@ -238,6 +238,19 @@ pub struct WasmTrendResult {
     pub community_count_slope: Option<f64>,
 }
 
+/// Input to [`crate::classify_hint`] — mirrors `sdivi_core::PatternHintInput`.
+///
+/// Contains the two fields that `classify_hint` inspects: the tree-sitter
+/// `node_kind` and the source `text` of the node (truncated to 256 bytes upstream).
+#[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmPatternHintInput {
+    /// Tree-sitter node kind (e.g. `"call_expression"`, `"macro_invocation"`).
+    pub node_kind: String,
+    /// Source text of the node, truncated to 256 bytes if the original is longer.
+    pub text: String,
+}
+
 // ── assemble_snapshot input (moved to assemble_types.rs) ─────────────────────
 pub use crate::assemble_types::{
     WasmAssembleSnapshotInput, WasmChangeCouplingInput, WasmCoChangePairInput,

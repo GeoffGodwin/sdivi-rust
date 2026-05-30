@@ -3,11 +3,16 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+#[cfg(feature = "pipeline-records")]
 use globset::{Glob, GlobSet, GlobSetBuilder};
+#[cfg(feature = "pipeline-records")]
 use sdivi_config::PatternsConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::fingerprint::{fingerprint_node_kind, PatternFingerprint};
+#[cfg(feature = "pipeline-records")]
+use crate::fingerprint::fingerprint_node_kind;
+use crate::fingerprint::PatternFingerprint;
+#[cfg(feature = "pipeline-records")]
 use crate::queries;
 
 /// The file path and source position of a single pattern instance.
@@ -99,23 +104,36 @@ pub fn build_catalog(
             continue;
         }
         for hint in &record.pattern_hints {
-            let Some(category) = queries::category_for_node_kind(&hint.node_kind, &record.language)
-            else {
-                continue;
+            // M33: use classify_hint (node-kind + callee-text) instead of
+            // category_for_node_kind (node-kind only). Returns [] for unrecognised
+            // callees; those hints are silently dropped, matching the prior None path.
+            let hint_input = crate::hint_input::PatternHintInput {
+                node_kind: hint.node_kind.clone(),
+                text: hint.text.clone(),
             };
+            let categories = queries::classify_hint(&hint_input, &record.language);
+            if categories.is_empty() {
+                continue;
+            }
             let fp = fingerprint_node_kind(&hint.node_kind);
             let location = PatternLocation {
                 file: record.path.clone(),
                 start_row: hint.start_row,
                 start_col: hint.start_col,
             };
-            let cat_map = entries.entry(category.to_string()).or_default();
-            let stats = cat_map.entry(fp).or_insert(PatternStats {
-                count: 0,
-                locations: vec![],
-            });
-            stats.count += 1;
-            stats.locations.push(location);
+            for category in categories {
+                let cat_map = entries.entry(category.to_string()).or_default();
+                let stats = cat_map.entry(fp).or_insert(PatternStats {
+                    count: 0,
+                    locations: vec![],
+                });
+                stats.count += 1;
+                // clone() per category per hint: v0 regex tables are disjoint so
+                // the inner loop runs at most once. clone() is the cold path today
+                // and avoids an early optimization that would need undoing the
+                // moment a co-occurring category is added.
+                stats.locations.push(location.clone());
+            }
         }
     }
 

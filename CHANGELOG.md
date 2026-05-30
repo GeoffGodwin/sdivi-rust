@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.23] - 2026-05-29
+
+### Changed
+
+- The native pattern-catalog pipeline now classifies hints via `classify_hint`
+  (M32) instead of `category_for_node_kind`. Per-category instance counts and
+  entropy values shift on the next snapshot post-upgrade — `data_access`
+  typically narrows (non-data calls are dropped), `logging` becomes non-empty
+  on languages with logging regex tables, `async_patterns` grows on TS/JS
+  (`.then()/.catch()` Promise chains), and Rust `macro_invocation` calls to
+  `tracing::*!`/`log::*!`/`println!`-family macros land in `logging` instead
+  of `resource_management`. Threshold gates configured against pre-M33
+  baseline numbers may trip; use `[thresholds.overrides.<category>]` with
+  an `expires` date to defer recalibration during migration. `snapshot_version`
+  stays `"1.0"` — the contract has not broken; only the per-category instance
+  distribution has shifted. Note: the M20 epsilon for cross-architecture
+  threshold comparisons is far smaller than the M33 instance-count shifts —
+  adopters should not expect the epsilon to absorb the change.
+
+### Added
+
+- `sdivi_core::classify_hint(hint, language) -> Vec<&'static str>` — callee-text-aware classification API. Inspects `PatternHintInput.text` against per-language regex tables for `call_expression`, `call`, and `macro_invocation` node kinds. Returns `["logging"]` for `console.log(...)` in TypeScript/JavaScript, `tracing::info!(...)` in Rust, etc. Disambiguates Rust `macro_invocation` between `logging` and `resource_management`. **The native pipeline (`Pipeline::snapshot`) continues to use `category_for_node_kind` in M32 — M33 will switch the pipeline over.** Catalog-only `logging` (M30) is now natively classifiable via this API. Available as a WASM export `classify_hint(hint: PatternHintInput, language: string): string[]` in `@geoffgodwin/sdivi-wasm`.
+- `sdivi_core::PatternHintInput` — WASM-safe input struct for `classify_hint` with `node_kind: String` and `text: String` fields. Re-exported from `sdivi-patterns::hint_input`.
+- `sdivi_patterns::queries::data_access::matches_callee(text, language) -> bool` — per-language data-access callee regex tables.
+- `sdivi_patterns::queries::logging::matches_callee(text, language) -> bool` — per-language logging callee regex tables.
+- `sdivi_patterns::queries::async_patterns::matches_callee(text, language) -> bool` — TypeScript/JavaScript Promise-chain callee regex.
+- `sdivi_patterns::queries::resource_management::excludes_callee(text, language) -> bool` — inverted: returns `true` when a `macro_invocation` is a logging macro and should not be classified as resource management.
+- New pattern category `class_hierarchy` covering class, interface, and impl declarations across TypeScript, JavaScript, Python, Rust, and Java. Go is skipped (no class/interface AST shape). Adds `class_declaration` / `class_definition` / `abstract_class_declaration` / `interface_declaration` / `impl_item` to the relevant language adapters' `PATTERN_KINDS`. `list_categories()` now returns 8 entries. **Migration note:** adopters will see a new `class_hierarchy` bucket appear in snapshots post-upgrade; a `compute_delta` between a pre-upgrade snapshot (no `class_hierarchy` key) and a post-upgrade snapshot is a one-time recalibration event. Use `[thresholds.overrides.class_hierarchy]` with an `expires` date to defer recalibration if needed.
+- New pattern category `logging` (catalog-only for `category_for_node_kind` — `classify_hint` now returns `["logging"]` for matching callees). `list_categories()` now returns 7 entries.
+- New pattern category `data_access` covering call expressions across all supported languages. `call_expression` nodes in TypeScript, JavaScript, and Go are now bucketed under `data_access` in the pattern catalog (these were already collected as `PatternHint`s but previously classified as `None`). Adds `"call"` to the Python adapter's collected node kinds, so all Python function calls now emit a `PatternHint` and are bucketed under `data_access`. **Migration note:** a `compute_delta` between a pre-upgrade snapshot (no `data_access` key) and a post-upgrade snapshot (new `data_access` key) is a one-time recalibration event — the new top-level key should not be read as a sudden drift spike.
+
+### Fixed
+
+- Release-hygiene regressions left by the M29–M33 batch: the WASM `pkg-template/package.json` version was stranded at `0.2.18`, `Cargo.lock` still pinned the workspace crates at `0.2.22`, and a new pattern-test fixture was not rustfmt-clean. All three are resolved; `cargo test --workspace`, `cargo fmt --check`, and `cargo clippy --workspace -- -D warnings` are green.
+
 ## [0.2.18] - 2026-05-08
 
 ### Performance

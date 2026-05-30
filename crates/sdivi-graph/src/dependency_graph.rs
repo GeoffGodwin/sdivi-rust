@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 use thiserror::Error;
+#[cfg(feature = "pipeline-records")]
 use tracing::debug;
 
 /// Errors that can occur during graph construction.
