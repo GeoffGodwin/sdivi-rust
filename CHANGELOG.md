@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.23] - 2026-05-29
+
 ### Changed
 
 - The native pattern-catalog pipeline now classifies hints via `classify_hint`
@@ -35,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New pattern category `class_hierarchy` covering class, interface, and impl declarations across TypeScript, JavaScript, Python, Rust, and Java. Go is skipped (no class/interface AST shape). Adds `class_declaration` / `class_definition` / `abstract_class_declaration` / `interface_declaration` / `impl_item` to the relevant language adapters' `PATTERN_KINDS`. `list_categories()` now returns 8 entries. **Migration note:** adopters will see a new `class_hierarchy` bucket appear in snapshots post-upgrade; a `compute_delta` between a pre-upgrade snapshot (no `class_hierarchy` key) and a post-upgrade snapshot is a one-time recalibration event. Use `[thresholds.overrides.class_hierarchy]` with an `expires` date to defer recalibration if needed.
 - New pattern category `logging` (catalog-only for `category_for_node_kind` — `classify_hint` now returns `["logging"]` for matching callees). `list_categories()` now returns 7 entries.
 - New pattern category `data_access` covering call expressions across all supported languages. `call_expression` nodes in TypeScript, JavaScript, and Go are now bucketed under `data_access` in the pattern catalog (these were already collected as `PatternHint`s but previously classified as `None`). Adds `"call"` to the Python adapter's collected node kinds, so all Python function calls now emit a `PatternHint` and are bucketed under `data_access`. **Migration note:** a `compute_delta` between a pre-upgrade snapshot (no `data_access` key) and a post-upgrade snapshot (new `data_access` key) is a one-time recalibration event — the new top-level key should not be read as a sudden drift spike.
+
+### Fixed
+
+- Release-hygiene regressions left by the M29–M33 batch: the WASM `pkg-template/package.json` version was stranded at `0.2.18`, `Cargo.lock` still pinned the workspace crates at `0.2.22`, and a new pattern-test fixture was not rustfmt-clean. All three are resolved; `cargo test --workspace`, `cargo fmt --check`, and `cargo clippy --workspace -- -D warnings` are green.
 
 ## [0.2.18] - 2026-05-08
 
