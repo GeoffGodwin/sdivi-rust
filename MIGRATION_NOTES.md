@@ -83,6 +83,48 @@ directly bypass `build_catalog` entirely — their inputs determine their output
 If you have already migrated to `classify_hint` in M32, you are now aligned with the
 native pipeline. If not, your hand-rolled filter continues to work unchanged.
 
+## M36.2 — `decorators` category extended to Python (`decorated_definition` added)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`.
+
+**What changed.** `decorated_definition` (tree-sitter-python's wrapper node for
+`@`-decorated function and class definitions) is now included in
+`decorators::NODE_KINDS`. The Python adapter already emitted `decorated_definition`
+hints; they were previously uncollected by any category. After upgrade, Python
+repositories that use `@dataclass`, `@property`, `@app.route(...)`,
+`@pytest.fixture`, `@app.task`, `@cached_property`, etc. gain a non-zero
+`decorators` bucket on the next snapshot.
+
+**Count semantics (Python vs. TypeScript/JavaScript).**
+
+- TypeScript/JavaScript (M36.1): one instance **per decorator** (`decorator` node).
+  Three stacked `@`-lines on one class = three instances.
+- Python (M36.2): one instance **per decorated function or class**
+  (`decorated_definition` wrapper). Three stacked `@`-lines on one function =
+  **one** instance.
+
+This cross-language asymmetry is an intentional v0 simplification documented in
+`docs/pattern-categories.md`. Cross-language comparison of raw `decorators` counts
+must account for this difference. Aligning granularity (making Python also emit
+per-decorator counts) is deferred until a concrete cross-language comparison
+consumer needs symmetric counts.
+
+**`list_categories()` count:** unchanged (10). No new category; Python repos gain
+counts in the existing `decorators` bucket.
+
+**Escape hatch.** Use a threshold override to defer recalibration:
+
+```toml
+[thresholds.overrides.decorators]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "M36.2 upgrade: decorators bucket now includes Python decorated_definition; recalibrating baseline"
+```
+
+**Trend continuity.** `snapshot_version` stays `"1.0"`. The `decorators` bucket
+was already present since M36.1 — the bucket grows on the first post-M36.2 snapshot
+for Python repos; `compute_delta` reports a count-introduction delta.
+
 ## M36.1 — `decorators` category introduction (TS/JS decorator count appears)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`.

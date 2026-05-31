@@ -3,91 +3,79 @@
 
 ## What Was Implemented
 
-### M36.1: `decorators` pattern category (TS/JS)
+### M36.2: `decorators` pattern category extended to Python
 
-**`crates/sdivi-lang-typescript/src/extract.rs`**
-- Added `"decorator"` to `PATTERN_KINDS` — the parsing stage now emits `decorator` nodes
-  as `PatternHint` values (previously uncollected).
+**`crates/sdivi-patterns/src/queries/decorators.rs`**
+- Added `"decorated_definition"` to `NODE_KINDS` (now 2 entries: `["decorator", "decorated_definition"]`).
+- Updated module doc comment to explain Python support and the wrapper-granularity count semantics.
+- Updated `NODE_KINDS` doc comment to document both node kinds.
+- Updated inline unit test: `node_kinds_has_exactly_one_entry` → `node_kinds_has_two_entries`.
+- Added `node_kinds_contains_decorated_definition` test.
 
-**`crates/sdivi-lang-javascript/src/extract.rs`**
-- Added `"decorator"` to `PATTERN_KINDS` — same change for JS (Stage-3 decorators).
-
-**`crates/sdivi-patterns/src/queries/decorators.rs`** (NEW)
-- `NODE_KINDS: &[&str] = &["decorator"]` — node-kind-only detection, no `matches_callee`.
-- Doc comment with `# Examples` block (doc test runs in CI).
-- Inline unit tests: `node_kinds_contains_decorator`, `node_kinds_has_exactly_one_entry`.
+**`crates/sdivi-patterns/src/queries/tests.rs`** (NEW — extracted from mod.rs)
+- Extracted the entire `#[cfg(test)] mod tests { ... }` block from `mod.rs` into a
+  separate `tests.rs` file. Required because applying `cargo fmt` to the pre-existing
+  long-line assertions in `mod.rs` pushed it from 299 → 311 lines, and extracting the
+  tests block brings `mod.rs` back to 172 lines. No test logic was changed.
 
 **`crates/sdivi-patterns/src/queries/mod.rs`**
-- Added `pub mod decorators;` (alphabetical).
-- Added `"decorators"` to `ALL_CATEGORIES` (between `"data_access"` and `"error_handling"`).
-- Added `decorators::NODE_KINDS.contains(&node_kind) → Some("decorators")` branch to
-  `category_for_node_kind` (after `data_access`, before `error_handling`).
-- Updated doc example: count 9 → 10, added `decorators` assertion.
-- Updated inline test: renamed to `all_categories_has_ten_entries`, added `decorators` assert.
-- Added `decorator_is_decorators` test (acceptance criterion: returns `Some("decorators")`).
-- Shortened `Note:` paragraph and `# See also` section to stay at 299 lines.
+- Applied `cargo fmt` to resolve pre-existing long-line formatting violations (M36.1
+  introduced assertions that exceeded rustfmt's line length).
+- Replaced the inline `mod tests { ... }` block with `#[cfg(test)] mod tests;` (pointing
+  to the new `tests.rs` file).
 
-**`crates/sdivi-core/src/categories.rs`**
-- Added `"decorators"` entry to `CATALOG_ENTRIES` (index 3, alphabetical).
-- Added `CATALOG_ENTRIES[9].0` to `CATEGORIES` const (now 10 entries).
-- Updated doc example: count 9 → 10, changed assertions to reference `"decorators"`.
+**`crates/sdivi-lang-python/tests/extract_behavior.rs`**
+- Added `decorated_definition_captured_as_decorator_hint` — unit test for `@dataclass` class.
+- Added `fastapi_and_pytest_fixture_produce_decorated_definition_hints` — integration test:
+  `@app.get` + `@pytest.fixture` → 2 `decorated_definition` hints (acceptance criterion).
+- Added `stacked_decorators_count_as_one_decorated_definition` — documents wrapper-granularity.
+- Added `file_with_no_decorators_produces_no_decorated_definition_hints` — negative case.
 
 **`crates/sdivi-core/tests/category_contract.rs`**
-- Renamed `list_categories_returns_exactly_nine_categories` → `..._ten_categories`, count 9 → 10.
-- Added `list_categories_includes_decorators` test.
-
-**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`**
-- Added a CORPUS entry documenting that `@Injectable()` routed as `call_expression`
-  produces `""` — decorators are node-kind-only and bypass `CALL_DISPATCH`.
-
-**`bindings/sdivi-wasm/tests/wasm_smoke.rs`**
-- Updated count 9 → 10, added `names.contains(&"decorators")` assertion.
+- Added `decorated_definition_python_is_decorators` test (acceptance criterion:
+  `category_for_node_kind("decorated_definition", "python") == Some("decorators")`).
 
 **`docs/pattern-categories.md`**
-- Added `decorators` row to canonical category list table.
-- Added `decorator` row to TypeScript/JavaScript node-kind mapping table.
-- Updated dispatch order note to clarify `decorators` is node-kind-only (not in `CALL_DISPATCH`).
-- Updated KNOWN_OVERLAPS section header: "at M34" → "at M35".
-- Added embedder responsibility item #8 for `decorators`.
+- Canonical category list: updated `decorators` row to describe Python support and count semantics.
+- Python table: added `decorators` row with `decorated_definition` and wrapper-granularity note.
+- Line 185 fix (M36.1 reviewer note): "P10 (`decorators`) is node-kind-only…" →
+  "The `decorators` category is node-kind-only…"; milestone marker updated to M36.2.
+- Embedder responsibility #8: extended to describe Python M36.2 support and count asymmetry.
 
 **`MIGRATION_NOTES.md`**
-- Added M36.1 section: count-introduction event, parsing-layer change note, escape hatch,
-  trend continuity.
+- Added M36.2 section before M36.1 section: count-introduction event, wrapper-granularity
+  semantics, cross-language asymmetry note, escape hatch, trend continuity.
 
 **`CHANGELOG.md`**
-- Added `decorators` entry under `[Unreleased] ### Added`.
+- Added M36.2 entry under `[Unreleased] ### Added`.
 
 ## Root Cause (bugs only)
 N/A — additive feature work.
 
 ## Files Modified
-- `crates/sdivi-lang-typescript/src/extract.rs` — added `"decorator"` to `PATTERN_KINDS`
-- `crates/sdivi-lang-javascript/src/extract.rs` — added `"decorator"` to `PATTERN_KINDS`
-- `crates/sdivi-patterns/src/queries/decorators.rs` (NEW) — 39 lines
-- `crates/sdivi-patterns/src/queries/mod.rs` — 299 lines
-- `crates/sdivi-core/src/categories.rs` — 188 lines
-- `crates/sdivi-core/tests/category_contract.rs` — 235 lines
-- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — 206 lines
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — 253 lines
-- `docs/pattern-categories.md` — canonical list, TS/JS table, dispatch note, embedder #8
-- `MIGRATION_NOTES.md` — M36.1 section added
-- `CHANGELOG.md` — `decorators` entry added
+- `crates/sdivi-patterns/src/queries/decorators.rs` — added `decorated_definition`, updated docs/tests (58 lines)
+- `crates/sdivi-patterns/src/queries/tests.rs` (NEW) — extracted from mod.rs inline tests block (138 lines)
+- `crates/sdivi-patterns/src/queries/mod.rs` — applied fmt, replaced inline tests with `mod tests;` (172 lines)
+- `crates/sdivi-lang-python/tests/extract_behavior.rs` — added 4 decorator hint tests (298 lines)
+- `crates/sdivi-core/tests/category_contract.rs` — added `decorated_definition_python_is_decorators` test (247 lines)
+- `docs/pattern-categories.md` — Python table, canonical list, P10 label fix, embedder #8 (270 lines)
+- `MIGRATION_NOTES.md` — M36.2 section added (353 lines — doc file, not subject to code ceiling)
+- `CHANGELOG.md` — M36.2 entry added (720 lines — doc file, not subject to code ceiling)
 
 ## Human Notes Status
-No Human Notes section present in this milestone.
+Non-Blocking Notes from M36.1 reviewer:
+- "P10 (`decorators`)" label in docs/pattern-categories.md — COMPLETED: fixed to "The `decorators` category"
+- `dispatch_disjointness.rs:26` stale comment — NOT_ADDRESSED: out of scope for M36.2 (decorators still adds no CALL_DISPATCH entry)
+- Double-counting risk note — NOT_ADDRESSED: pre-existing observation, no action required
+- Pre-existing stale assertion message at mod.rs:282 — NOT_ADDRESSED: message content unchanged (comment is still accurate)
+- Pre-existing WASM package.json version — NOT_ADDRESSED: pre-existing from before M36.1
 
 ## Docs Updated
-- `docs/pattern-categories.md` — `decorators` added to canonical category list table,
-  TS/JS node-kind table, dispatch order note updated, embedder responsibilities updated.
-- `MIGRATION_NOTES.md` — M36.1 section added (count-introduction event, parsing-layer change).
-- `CHANGELOG.md` — Added entry under `[Unreleased]`.
+- `docs/pattern-categories.md` — Python node-kind table row, canonical list updated, P10 label fixed, embedder #8 extended.
+- `MIGRATION_NOTES.md` — M36.2 section added (wrapper-granularity semantics, count asymmetry, escape hatch).
+- `CHANGELOG.md` — M36.2 entry added under `[Unreleased]`.
 
 ## Observed Issues (out of scope)
-- Pre-existing: `wasm_package_json_version_matches_workspace` test failure — `package.json`
-  stranded at `0.2.23`, workspace at `0.2.26`. Not introduced by M36.1.
-- Pre-existing: stale assertion message at `crates/sdivi-patterns/src/queries/mod.rs:282`
-  ("logging is catalog-only in v0 for category_for_node_kind") — previously flagged in M23
-  and M34 reviewer reports.
-- `docs/pattern-categories.md` KNOWN_OVERLAPS section header previously read
-  "at M34 (P1/P8/P9 active)" — updated to "at M35" as part of this milestone's doc work
-  (this was the pre-existing cosmetic note from the M35 reviewer).
+- Pre-existing: `wasm_package_json_version_matches_workspace` test failure — `package.json` stranded at `0.2.23`, workspace at `0.2.27`. Not introduced by M36.2.
+- Pre-existing: `dispatch_disjointness.rs:26` comment "At M35, P1/P6/P8/P9 are active" is stale (now M36.2); flagged by M36.1 reviewer.
+- Pre-existing: `docs/pattern-categories.md` Go corpus — `fmt.Errorf` classified as `logging` (constructs an error value, not output); inherited from M33.

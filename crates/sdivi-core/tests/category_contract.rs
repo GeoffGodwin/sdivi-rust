@@ -204,6 +204,18 @@ fn no_category_string_in_patterns_src_missing_from_list_categories() {
     }
 }
 
+// ── M36.2: Python decorated_definition → decorators ──────────────────────────
+
+#[test]
+fn decorated_definition_python_is_decorators() {
+    use sdivi_patterns::queries::category_for_node_kind;
+    assert_eq!(
+        category_for_node_kind("decorated_definition", "python"),
+        Some("decorators"),
+        "decorated_definition must map to decorators (M36.2 acceptance criterion)"
+    );
+}
+
 // ── Doc/runtime parity ────────────────────────────────────────────────────────
 
 #[test]

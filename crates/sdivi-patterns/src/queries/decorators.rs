@@ -1,18 +1,31 @@
 //! Node kinds classified as decorator usage.
 //!
 //! Detects TypeScript and JavaScript decorator syntax (`@Injectable()`,
-//! `@Component({...})`, `@Get('/')`, `@IsString()`, etc.). Detection is
-//! node-kind only — any `decorator` node counts, giving broad collection
-//! in the spirit of `class_hierarchy`. Decorator-shape entropy is the signal;
-//! no callee allowlist is applied.
+//! `@Component({...})`, `@Get('/')`, `@IsString()`, etc.) via the `decorator`
+//! node kind, and Python decorator syntax (`@dataclass`, `@app.get(...)`,
+//! `@pytest.fixture`) via the `decorated_definition` node kind. Detection is
+//! node-kind only — no callee allowlist is applied.
+//!
+//! ## Count semantics
+//!
+//! TypeScript/JavaScript: one instance **per decorator** (`decorator` node) —
+//! three stacked `@`-lines on one class = three instances.
+//!
+//! Python: one instance **per decorated function or class**
+//! (`decorated_definition` wrapper node) — three stacked `@`-lines on one
+//! function = **one** instance. This v0 simplification is intentional; see
+//! `docs/pattern-categories.md` for the rationale and future-alignment note.
 
 /// Tree-sitter node kinds for decorator usage.
 ///
-/// The `decorator` kind is emitted by tree-sitter-typescript (and tree-sitter-
-/// javascript for Stage-3 proposals). Every decorator node is classified here
-/// regardless of its name or arguments — NestJS `@Injectable()`, Angular
-/// `@Component({…})`, TypeORM `@Entity()`, class-validator `@IsString()`, and
-/// custom user decorators all produce instances.
+/// Two node kinds are classified here:
+///
+/// - `decorator` — TypeScript/JavaScript `@`-syntax (tree-sitter-typescript
+///   and tree-sitter-javascript Stage-3 proposals). One instance per decorator
+///   line.
+/// - `decorated_definition` — Python `@`-decorated function or class wrapper
+///   (tree-sitter-python). One instance per decorated function/class definition,
+///   regardless of how many `@`-lines are stacked above it.
 ///
 /// # Examples
 ///
@@ -20,8 +33,9 @@
 /// use sdivi_patterns::queries::decorators::NODE_KINDS;
 ///
 /// assert!(NODE_KINDS.contains(&"decorator"));
+/// assert!(NODE_KINDS.contains(&"decorated_definition"));
 /// ```
-pub const NODE_KINDS: &[&str] = &["decorator"];
+pub const NODE_KINDS: &[&str] = &["decorator", "decorated_definition"];
 
 #[cfg(test)]
 mod tests {
@@ -33,7 +47,12 @@ mod tests {
     }
 
     #[test]
-    fn node_kinds_has_exactly_one_entry() {
-        assert_eq!(NODE_KINDS.len(), 1);
+    fn node_kinds_contains_decorated_definition() {
+        assert!(NODE_KINDS.contains(&"decorated_definition"));
+    }
+
+    #[test]
+    fn node_kinds_has_two_entries() {
+        assert_eq!(NODE_KINDS.len(), 2);
     }
 }

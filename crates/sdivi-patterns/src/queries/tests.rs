@@ -1,0 +1,138 @@
+use super::*;
+
+#[test]
+fn try_expression_is_error_handling() {
+    assert_eq!(
+        category_for_node_kind("try_expression", "rust"),
+        Some("error_handling")
+    );
+}
+
+#[test]
+fn await_expression_is_async_patterns() {
+    assert_eq!(
+        category_for_node_kind("await_expression", "rust"),
+        Some("async_patterns")
+    );
+}
+
+#[test]
+fn closure_expression_is_state_management() {
+    assert_eq!(
+        category_for_node_kind("closure_expression", "rust"),
+        Some("state_management")
+    );
+}
+
+#[test]
+fn macro_invocation_is_resource_management() {
+    assert_eq!(
+        category_for_node_kind("macro_invocation", "rust"),
+        Some("resource_management")
+    );
+}
+
+#[test]
+fn unknown_node_kind_returns_none() {
+    assert_eq!(category_for_node_kind("unknown_xyz", "rust"), None);
+}
+
+#[test]
+fn all_categories_has_ten_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 10);
+    assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
+    assert!(ALL_CATEGORIES.contains(&"decorators"));
+}
+
+#[test]
+fn logging_is_in_all_categories() {
+    assert!(ALL_CATEGORIES.contains(&"logging"));
+}
+
+#[test]
+fn class_hierarchy_is_in_all_categories() {
+    assert!(ALL_CATEGORIES.contains(&"class_hierarchy"));
+}
+
+#[test]
+fn class_declaration_is_class_hierarchy() {
+    assert_eq!(
+        category_for_node_kind("class_declaration", "typescript"),
+        Some("class_hierarchy")
+    );
+}
+
+#[test]
+fn class_definition_is_class_hierarchy() {
+    assert_eq!(
+        category_for_node_kind("class_definition", "python"),
+        Some("class_hierarchy")
+    );
+}
+
+#[test]
+fn impl_item_is_class_hierarchy() {
+    assert_eq!(
+        category_for_node_kind("impl_item", "rust"),
+        Some("class_hierarchy")
+    );
+}
+
+#[test]
+fn interface_declaration_is_class_hierarchy() {
+    assert_eq!(
+        category_for_node_kind("interface_declaration", "java"),
+        Some("class_hierarchy")
+    );
+}
+
+#[test]
+fn abstract_class_declaration_is_class_hierarchy() {
+    assert_eq!(
+        category_for_node_kind("abstract_class_declaration", "typescript"),
+        Some("class_hierarchy")
+    );
+}
+
+// M30 sentinel: tests `category_for_node_kind` (node-kind-only, unchanged).
+// M33 promoted `logging` via `classify_hint`; `category_for_node_kind` is
+// intentionally unchanged. See `tests/m33_sentinels.rs` for the M33 counterpart.
+#[test]
+fn category_for_node_kind_never_returns_logging() {
+    // `category_for_node_kind` never returns logging — that requires callee-text
+    // inspection (see `classify_hint`). This is unchanged through M32 and M33.
+    for kind in ["call_expression", "call", "macro_invocation"] {
+        for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
+            assert_ne!(
+                category_for_node_kind(kind, lang),
+                Some("logging"),
+                "logging is catalog-only in v0 for category_for_node_kind; \
+                 routing for ({kind}, {lang}) would steal from data_access/resource_management"
+            );
+        }
+    }
+}
+
+#[test]
+fn call_expression_is_data_access() {
+    assert_eq!(
+        category_for_node_kind("call_expression", "typescript"),
+        Some("data_access")
+    );
+    assert_eq!(
+        category_for_node_kind("call", "python"),
+        Some("data_access")
+    );
+}
+
+#[test]
+fn decorator_is_decorators() {
+    assert_eq!(
+        category_for_node_kind("decorator", "typescript"),
+        Some("decorators")
+    );
+    assert_eq!(
+        category_for_node_kind("decorator", "javascript"),
+        Some("decorators")
+    );
+}

@@ -226,3 +226,73 @@ fn both_class_kinds_collected_in_one_file() {
         "both class definitions must appear as class_definition hints, got: {class_hints:?}"
     );
 }
+
+// ── decorator pattern hints (M36.2) ──────────────────────────────────────────
+
+#[test]
+fn decorated_definition_captured_as_decorator_hint() {
+    let record = parse("@dataclass\nclass Point:\n    x: int\n    y: int\n");
+    let has_decorated = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "decorated_definition");
+    assert!(
+        has_decorated,
+        "decorated_definition must appear in pattern_hints for a @dataclass class"
+    );
+}
+
+#[test]
+fn fastapi_and_pytest_fixture_produce_decorated_definition_hints() {
+    // Two decorated functions → two decorated_definition hints (wrapper-granularity:
+    // one hint per decorated function regardless of how many @-lines are stacked).
+    let source = concat!(
+        "@app.get(\"/users\")\n",
+        "def get_users():\n",
+        "    return []\n",
+        "\n",
+        "@pytest.fixture\n",
+        "def db():\n",
+        "    return {}\n",
+    );
+    let record = parse(source);
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 2,
+        "two decorated functions must produce exactly 2 decorated_definition hints, got: {decorated_count}"
+    );
+}
+
+#[test]
+fn stacked_decorators_count_as_one_decorated_definition() {
+    // Three @-lines on one function = one decorated_definition (wrapper-granularity).
+    let source = "@decorator_a\n@decorator_b\n@decorator_c\ndef fn():\n    pass\n";
+    let record = parse(source);
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 1,
+        "three stacked decorators on one function = one decorated_definition, got: {decorated_count}"
+    );
+}
+
+#[test]
+fn file_with_no_decorators_produces_no_decorated_definition_hints() {
+    let record = parse("def plain():\n    pass\n");
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 0,
+        "a file with no decorators must produce zero decorated_definition hints"
+    );
+}

@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 11
+- Runs since audit: 12
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:117` â dispatch comment stamps M35 milestone but we are at M36.2; will keep drifting unless updated when each milestone completes.
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/tests/dispatch_disjointness.rs:26` â "At M35, P1/P6/P8/P9 are active" comment is stale (noted by M36.1 reviewer, deferred again as out of scope). Accumulating across milestones; a one-line fix would pay down this drift.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md:185` â "P10 (`decorators`)" contradicts the canonical precedence table in the same doc (P10 = `collection_pipelines`). Factual error in doc text introduced by M36.1; correct by dropping the slot label.
 - [2026-05-31 | "unknown"] `dispatch_disjointness.rs:26` â comment "At M35, P1/P6/P8/P9 are active" not updated to reflect M36.1. Since M36.1 adds no `CALL_DISPATCH` entry the omission is technically accurate, but the milestone marker is now stale.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` Go corpus â `fmt.Errorf` is classified as `logging` via the `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)` regex. `fmt.Errorf` constructs an error value; it does not emit output. Pre-existing M33 inheritance; the eventual Go error-handling pass will need to revisit this regex entry.

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `decorators` pattern category extended to Python (M36.2): `decorated_definition` nodes
+  (the tree-sitter-python wrapper for `@`-decorated functions and classes) are now classified
+  as `decorators`. Covers `@dataclass`, `@property`, `@staticmethod`, `@app.route(...)`,
+  `@pytest.fixture`, `@cached_property`, `@app.task`, and any other decorator syntax.
+  The Python adapter already emitted `decorated_definition` hints — they now route to the
+  `decorators` bucket. **Count semantics:** Python counts one instance per decorated definition
+  (wrapper-granularity); TypeScript/JavaScript count one per decorator line. See
+  `docs/pattern-categories.md` for the v0 rationale. `list_categories()` count stays at 10;
+  `snapshot_version` stays `"1.0"`.
+
 - `decorators` pattern category (M36.1): TypeScript and JavaScript `decorator` nodes
   (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.)
   are now natively classified as `decorators`. Node-kind-only — every decorator counts

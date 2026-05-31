@@ -1,5 +1,5 @@
 ## Summary
-M36.1 is a purely additive pattern-category change: it registers `"decorator"` as a new tree-sitter node kind in the TS/JS extraction arrays and wires it into the static classification dispatch table (`category_for_node_kind`). No new code paths touch authentication, cryptography, network, file system I/O, or user-controlled input beyond what the existing extraction pipeline already handles. All new code is confined to compile-time string constants and a routing branch. Decorator node text is captured via the pre-existing `truncate_to_256_bytes` bound, consistent with all other node kinds. The change presents no exploitable surface.
+M36.2 extends the `decorators` pattern category to Python by adding the `"decorated_definition"` node kind to a compile-time constant string slice in `decorators.rs`, extracts an inline test block into a separate `tests.rs` file (no logic change), and adds new test cases in the lang-python and sdivi-core test suites. All changes are purely additive data and test code. There is no new I/O, no user-controlled input processing, no cryptographic code, no authentication surface, and no network interaction introduced by this change.
 
 ## Findings
 None
