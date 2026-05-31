@@ -102,6 +102,24 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         e.g., closures that close over mutable bindings or shared references.",
     ),
     (
+        "state_store",
+        "External state-management library declarations — Redux / RTK \
+        (`createSlice`, `configureStore`, `createStore`, `combineReducers`, \
+        `createAsyncThunk`), React-Redux hooks (`useSelector`, `useDispatch`, \
+        `useStore`), Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`, \
+        `atomFamily`, `selectorFamily`), MobX (`observable`, `action`, `computed`, \
+        `makeObservable`, `makeAutoObservable`, `runInAction`), Signals — Preact/Angular \
+        (`signal`, `computed`, `effect`, `batch`), and Solid (`createSignal`, \
+        `createEffect`, `createMemo`, `createStore`, `createResource`). \
+        Detected via callee-text on `call_expression` at CALL_DISPATCH slot P5 (above \
+        `framework_hooks` P6). All patterns are `^`-anchored at callee start — \
+        member-access calls (`prisma.user.create(...)`, `document.createElement(...)`) \
+        are intentionally not matched. TypeScript and JavaScript only in v0. \
+        `useSelector`, `useDispatch`, and `useStore` match both this category and \
+        `framework_hooks`; `state_store` wins via precedence (P5 < P6). \
+        Added M39.",
+    ),
+    (
         "type_assertions",
         "Code constructs that assert or coerce between types at compile or runtime — \
         e.g., `as` casts (`as_expression`) and language-specific type-cast expressions.",
@@ -124,7 +142,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"logging"));
 /// assert!(CATEGORIES.contains(&"null_safety"));
 /// assert!(CATEGORIES.contains(&"schema_validation"));
-/// assert_eq!(CATEGORIES.len(), 12);
+/// assert!(CATEGORIES.contains(&"state_store"));
+/// assert_eq!(CATEGORIES.len(), 13);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -139,6 +158,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[9].0,
     CATALOG_ENTRIES[10].0,
     CATALOG_ENTRIES[11].0,
+    CATALOG_ENTRIES[12].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -200,6 +220,7 @@ pub struct CategoryCatalog {
 /// assert!(names.contains(&"async_patterns"));
 /// assert!(names.contains(&"null_safety"));
 /// assert!(names.contains(&"schema_validation"));
+/// assert!(names.contains(&"state_store"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {

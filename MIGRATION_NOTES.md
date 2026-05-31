@@ -8,6 +8,58 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M39 — `state_store` pattern category introduced; `useSelector`/`useDispatch`/`useStore` precedence reassignment
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `state_store` is now a native CALL_DISPATCH category (slot P5, above
+`framework_hooks` P6), classified via callee-text inspection in TypeScript and JavaScript:
+
+- **Redux / RTK:** `createSlice`, `configureStore`, `createStore`, `combineReducers`,
+  `createAsyncThunk`, `createReducer`, `createAction`.
+- **React-Redux hooks:** `useSelector`, `useDispatch`, `useStore`.
+- **Zustand:** bare `create(` (anchored at callee start — `prisma.user.create(data)` is excluded).
+- **Jotai / Recoil:** `atom`, `selector`, `atomFamily`, `selectorFamily`.
+- **MobX:** `observable`, `action`, `computed`, `makeObservable`, `makeAutoObservable`, `runInAction`.
+- **Signals (Preact/Angular):** `signal`, `computed`, `effect`, `batch`.
+- **Solid:** `createSignal`, `createEffect`, `createMemo`, `createStore`, `createResource`.
+
+`list_categories()` count grows from 12 → 13.
+
+**Precedence reassignment (the canonical example).** `useSelector`, `useDispatch`, and
+`useStore` previously resolved to `framework_hooks` (P6) via the `^use[A-Z]` regex.
+They now resolve to `state_store` (P5) via the more specific `^use(Selector|Dispatch|Store)\b`
+regex, which wins by CALL_DISPATCH first-match precedence. **Effect:** on the first
+post-M39 snapshot, per-file counts for these three hooks shift from the `framework_hooks`
+bucket to `state_store`. The total hook count across both buckets is unchanged; the
+distribution changes. This is intentional — Redux hook calls are state-management calls,
+not generic component-composition hooks.
+
+**`^`-anchor rationale.** All factory patterns are anchored at callee start. Bare imported
+calls (`create(...)`, `atom(0)`) match; member-access ORM/DOM calls
+(`prisma.user.create(data)`, `document.createElement('div')`) do not.
+
+**Open question (TanStack Query / SWR).** `useQuery`, `useMutation`, `useSWR` blur "state"
+and "data-fetching". Until a follow-up decides their home, they fall through to
+`framework_hooks` unchanged — no count shift for these hooks in M39.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.state_store]
+pattern_entropy_rate = 5.0
+expires = "2027-06-30"
+reason = "M39 upgrade: state_store newly populated; setting initial tolerance"
+```
+
+**Trend continuity.** The first post-M39 snapshot transitions `state_store` from zero to
+non-zero (count-introduction event). `framework_hooks` may see a count reduction if the
+repo uses `useSelector`/`useDispatch`/`useStore`. Subsequent snapshots establish the new
+baseline. The delta for both transitions is not meaningful as a drift signal.
+
 ## M38 — `schema_validation` pattern category introduced (TS/JS/Python count-introduction event)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

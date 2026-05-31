@@ -28,6 +28,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., Rust macro invocations such as `drop!`, `vec!`, `assert!`. As of M33, Rust logging macros (`tracing::*!`, `log::*!`, `println!`/`eprintln!`/`print!`/`eprint!`/`dbg!`) are excluded and classified as `logging` instead. |
 | schema_validation | Runtime schema and validation declarations — Zod (`z.object`, `z.string`, `z.enum`), Yup (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and the Zod-specific `.safeParse(` validated-parse call in TypeScript and JavaScript. Python: Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`). Detected via callee-text at CALL_DISPATCH slot P4. Note: `class Foo(BaseModel)` is a `class_definition` counted under `class_hierarchy`; class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2). TypeScript, JavaScript, and Python only in v0. Added M38. |
 | state_management | Code constructs that capture, transform, or share mutable or shared state — e.g., closures that close over mutable bindings or shared references. |
+| state_store | External state-management library declarations — Redux / RTK (`createSlice`, `configureStore`, `createStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.). Detected via callee-text at CALL_DISPATCH slot P5 (above `framework_hooks` P6). All patterns are `^`-anchored — member-access calls (`prisma.user.create(...)`) are not matched. `useSelector`/`useDispatch`/`useStore` move from `framework_hooks` to `state_store` on upgrade (see `MIGRATION_NOTES.md`). TypeScript and JavaScript only in v0. Added M39. |
 | type_assertions | Code constructs that assert or coerce between types at compile or runtime — e.g., `as` casts (`as_expression`) and language-specific type-cast expressions. |
 
 ## Per-language node-kind mappings
@@ -77,6 +78,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | resource_management | (none in v0) | — |
 | schema_validation | `call_expression` where callee matches `^(z\|yup\|v\|s)\.\w` or `\.safeParse\(` | Namespace-anchored: Zod (`z.`), Yup (`yup.`), Valibot (`v.`), Superstruct (`s.`) + Zod-specific `.safeParse(`. Bare `.string()`/`.object()` on arbitrary receivers are intentionally excluded — no receiver-type info available. `SomeSchema.parse(x)` (no namespace prefix) is a known miss. Natively classified at CALL_DISPATCH slot P4 (M38). |
 | state_management | `arrow_function` | None |
+| state_store | `call_expression` where callee matches Redux/RTK factories, `^use(Selector\|Dispatch\|Store)\b`, `^create\(`, Jotai/Recoil, MobX, Signals, or Solid createX patterns | All patterns `^`-anchored at callee start. `useSelector`/`useDispatch`/`useStore` match both `state_store` (P5) and `framework_hooks` (P6); state_store wins by precedence. `prisma.user.create(...)` and `document.createElement(...)` are excluded because their callee text does not start with `create(`. Natively classified at CALL_DISPATCH slot P5 (M39). |
 | type_assertions | `type_cast_expression`, `as_expression` | None |
 
 ### Go / Java
@@ -159,6 +161,25 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 
 **Pydantic class coverage:** `class Foo(BaseModel)` is a `class_definition` and already counted under `class_hierarchy` (M6). Python coverage here is intentionally partial: only call forms (`Field(...)`, `constr(...)`, `conint(...)`) are classified. class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2).
 
+### `state_store::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Deliberately NOT matched |
+|---|---|---|---|
+| TypeScript / JavaScript | `^(createSlice\|configureStore\|createStore\|combineReducers\|createAsyncThunk\|createReducer\|createAction\|createSignal\|createEffect\|createMemo\|createResource)\(` | `createSlice({})`, `createSignal(0)` | — |
+| TypeScript / JavaScript | `^use(Selector\|Dispatch\|Store)\b` | `useSelector(s => s.x)`, `useDispatch()` | `useAuth()`, `useState()` (fall through to `framework_hooks`) |
+| TypeScript / JavaScript | `^create\(` | `create((set) => ({}))` (Zustand) | `prisma.user.create(data)`, `document.createElement(...)` |
+| TypeScript / JavaScript | `^(atom\|selector\|atomFamily\|selectorFamily)\(` | `atom(0)`, `selector({...})` | — |
+| TypeScript / JavaScript | `^(observable\|action\|computed\|makeObservable\|makeAutoObservable\|runInAction\|signal\|effect\|batch)\(` | `makeAutoObservable(this)`, `signal(0)` | — |
+| All others | (none) | — | — |
+
+**Worked example (TypeScript):** `createSlice({name: 'users', ...})` → `["state_store"]`
+
+**Worked example (TypeScript):** `useSelector(s => s.user)` → `["state_store"]` (P5 beats `framework_hooks` P6)
+
+**`^`-anchor rationale:** State-store factory calls are imported and called bare (`create(...)`, `atom(0)`, `signal(0)`). Anchoring at callee start captures bare calls while excluding member-access calls (`prisma.user.create(data)` starts with `prisma`, not `create`). A residual false positive exists for a local function named `create(x)` or `effect(x)` unrelated to any store — treated as entropy noise at codebase scale.
+
+**Open question (TanStack Query / SWR):** `useQuery`, `useMutation`, `useSWR` blur "state" and "data-fetching". Their home is deferred to a follow-up milestone. Until then they fall through to `framework_hooks`.
+
 ### `framework_hooks::matches_callee(text, language)`
 
 | Language | Pattern | Examples matched |
@@ -205,7 +226,7 @@ is the contract — future milestones insert at their named slot, never append.
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P4, P6, P8, and P9 are active at M38. The `decorators` and `null_safety` categories are
+P1, P4, P5, P6, P8, and P9 are active at M39. The `decorators` and `null_safety` categories are
 node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
 `category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
 reserved placeholders.
@@ -216,14 +237,16 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M38 (P1/P4/P6/P8/P9 active):
+Documented overlaps at M39 (P1/P4/P5/P6/P8/P9 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
 | `fetch(url).catch(err => {})` | javascript | `async_patterns` | `data_access` | Chained-fetch outer node matches both `\.(catch)\(` (P1) and `^fetch\b` (P9); P1 wins by precedence |
+| `useSelector(s => s.user)` | typescript | `state_store` | `framework_hooks` | Matches both `^use(Selector\|Dispatch\|Store)\b` (P5) and `^use[A-Z]` (P6); more specific wins |
+| `useDispatch()` | typescript | `state_store` | `framework_hooks` | Same as above |
+| `useStore()` | javascript | `state_store` | `framework_hooks` | Same as above |
 
-Future overlaps introduced by M39–M44:
-- `useSelector` / `useDispatch` / `useStore` → **state_store** (P5) beats `framework_hooks` (P6). More specific wins. Until M39 lands, these resolve to `framework_hooks` — acceptable.
+Future overlaps introduced by M40–M44:
 - `app.get` / `router.post` → **http_routing** (P7) beats `data_access` (P9). Client fetches (`axios.get`) stay in `data_access` — the http_routing receiver allowlist excludes them.
 - `Promise.all([]).then(cb)` outer node → **async_patterns** (P1) wins; bare inner `Promise.all(…)` resolves to `concurrency` (P11).
 
@@ -264,7 +287,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 8. **As of M36.1, the `decorators` category is natively classified for TypeScript and JavaScript** via the `decorator` tree-sitter node kind. `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, and any other decorator node are counted. On the first post-M36.1 snapshot of a TS/JS repo with decorators, the `decorators` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`. **As of M36.2, Python is also supported** via the `decorated_definition` node kind (`@dataclass`, `@property`, `@app.get(...)`, `@pytest.fixture`, etc.). Count semantics differ: Python counts one instance per decorated definition (wrapper-granularity); TypeScript/JavaScript count one per decorator line; see `MIGRATION_NOTES.md`.
 9. **As of M37, the `null_safety` category is natively classified for TypeScript and JavaScript** via `optional_chain` and `non_null_expression` node kinds. On the first post-M37 snapshot of a TS/JS repo using optional chaining or non-null assertions, the `null_safety` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`. Nullish coalescing (`??`) is deferred — it requires operator-field inspection beyond the v0 node-kind model.
 10. **As of M38, the `schema_validation` category is natively classified for TypeScript, JavaScript, and Python** via callee-text inspection at CALL_DISPATCH slot P4. Zod (`z.*`), Yup (`yup.*`), Valibot (`v.*`), Superstruct (`s.*`), `.safeParse(`, and Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are now counted in `schema_validation`. On the first post-M38 snapshot of a repo using these libraries, the `schema_validation` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
-11. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
+11. **As of M39, the `state_store` category is natively classified for TypeScript and JavaScript** via callee-text inspection at CALL_DISPATCH slot P5. Redux/RTK factories (`createSlice`, `configureStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai/Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.) are now counted in `state_store`. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore` previously resolved to `framework_hooks` (P6); they now resolve to `state_store` (P5). This is a count shift between two new-in-M35/M39 categories — counts move from `framework_hooks` to `state_store`. See `MIGRATION_NOTES.md` for the canonical precedence-reassignment example.
+12. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

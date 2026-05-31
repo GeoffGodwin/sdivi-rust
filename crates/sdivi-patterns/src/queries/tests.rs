@@ -40,12 +40,13 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_twelve_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 12);
+fn all_categories_has_thirteen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 13);
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
     assert!(ALL_CATEGORIES.contains(&"null_safety"));
     assert!(ALL_CATEGORIES.contains(&"schema_validation"));
+    assert!(ALL_CATEGORIES.contains(&"state_store"));
 }
 
 #[test]
@@ -139,6 +140,40 @@ fn decorator_is_decorators() {
         category_for_node_kind("decorator", "javascript"),
         Some("decorators")
     );
+}
+
+// ── M39: state_store ─────────────────────────────────────────────────────────
+
+#[test]
+fn use_selector_is_state_store_not_framework_hooks() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "useSelector(s => s.user)".to_string(),
+    };
+    let result = classify_hint(&hint, "typescript");
+    assert_eq!(
+        result,
+        vec!["state_store"],
+        "useSelector must resolve to state_store (P5 beats framework_hooks P6)"
+    );
+}
+
+#[test]
+fn create_slice_is_state_store() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "createSlice({})".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["state_store"]);
+}
+
+#[test]
+fn use_effect_is_still_framework_hooks() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "useEffect(fn, [])".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["framework_hooks"]);
 }
 
 // ── M38: schema_validation ───────────────────────────────────────────────────

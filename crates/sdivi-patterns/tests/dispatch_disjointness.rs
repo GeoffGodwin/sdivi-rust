@@ -12,6 +12,7 @@
 
 use sdivi_patterns::queries::{
     async_patterns, classify_hint, data_access, framework_hooks, logging, schema_validation,
+    state_store,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -23,8 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M38, P1/P4/P6/P8/P9 are active; future milestones extend this list.
-// TODO(M39): add state_store::matches_callee when P5 lands.
+/// At M39, P1/P4/P5/P6/P8/P9 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
@@ -32,6 +32,9 @@ fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     }
     if schema_validation::matches_callee(text, language) {
         matched.push("schema_validation");
+    }
+    if state_store::matches_callee(text, language) {
+        matched.push("state_store");
     }
     if framework_hooks::matches_callee(text, language) {
         matched.push("framework_hooks");
@@ -65,6 +68,22 @@ const KNOWN_OVERLAPS: &[(&str, &str, &str, &str)] = &[
     // logging wins because P8 < P9 in CALL_DISPATCH order. Caller intent (logger
     // object) dominates over method-name pattern matching.
     ("logger.get(\"x\")", "typescript", "logging", "data_access"),
+    // React-Redux hooks match both state_store (P5) `^use(Selector|Dispatch|Store)\b`
+    // AND framework_hooks (P6) `^use[A-Z]`. state_store wins (P5 < P6) — more
+    // specific wins over the broad hook-ecosystem regex.
+    (
+        "useSelector(s => s.user)",
+        "typescript",
+        "state_store",
+        "framework_hooks",
+    ),
+    (
+        "useDispatch()",
+        "typescript",
+        "state_store",
+        "framework_hooks",
+    ),
+    ("useStore()", "javascript", "state_store", "framework_hooks"),
 ];
 
 // ── Per-category corpus ────────────────────────────────────────────────────────
@@ -103,6 +122,21 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("System.out.println(\"x\")", "java", "logging"),
     ("logger.info(\"x\")", "java", "logging"),
     ("LOG.debug(\"x\")", "java", "logging"),
+    // P5: state_store — ^-anchored factory calls (TS/JS only)
+    ("createSlice({})", "typescript", "state_store"),
+    ("configureStore({})", "typescript", "state_store"),
+    ("createStore(rootReducer)", "javascript", "state_store"),
+    ("atom(0)", "typescript", "state_store"),
+    ("makeAutoObservable(this)", "typescript", "state_store"),
+    ("signal(0)", "typescript", "state_store"),
+    ("createSignal(0)", "typescript", "state_store"),
+    ("create((set) => ({}))", "typescript", "state_store"),
+    // React-Redux hooks: state_store (P5) beats framework_hooks (P6)
+    ("useSelector(s => s.user)", "typescript", "state_store"),
+    ("useDispatch()", "typescript", "state_store"),
+    ("useStore()", "javascript", "state_store"),
+    // Negatives: member-access calls must NOT match state_store
+    ("prisma.user.create(data)", "typescript", ""),
     // P4: schema_validation — namespace-anchored (Zod/Yup/Valibot/Superstruct) + .safeParse(
     ("z.object({})", "typescript", "schema_validation"),
     ("z.string()", "javascript", "schema_validation"),
@@ -212,6 +246,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
         let loser_matches = match loser {
             "async_patterns" => async_patterns::matches_callee(text, lang),
             "schema_validation" => schema_validation::matches_callee(text, lang),
+            "state_store" => state_store::matches_callee(text, lang),
             "framework_hooks" => framework_hooks::matches_callee(text, lang),
             "logging" => logging::matches_callee(text, lang),
             "data_access" => data_access::matches_callee(text, lang),

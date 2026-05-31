@@ -1,4 +1,4 @@
-# Reviewer Report — M38: `schema_validation` pattern category
+# Reviewer Report — M39: `state_store` pattern category
 
 **Review cycle:** 1 of 4
 **Reviewer:** code-review agent
@@ -21,19 +21,17 @@ APPROVED_WITH_NOTES
 ---
 
 ## Non-Blocking Notes
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs:245-254` — `list_categories_returns_schema_version_and_expected_count` explicitly checks 9 of 12 category names; `resource_management`, `state_management`, and `type_assertions` are absent from the name assertions. The `len() == 12` count assertion prevents silent drift, but the asymmetry means three categories lack name-level smoke coverage.
-- Pre-existing (flagged by coder): `crates/sdivi-patterns/src/queries/tests.rs:194` — `null_safety_node_kinds_do_not_match_non_ts_js_languages` test name is semantically inverted; the body asserts `Some("null_safety")` for non-TS/JS languages. Carry-over from M37, not in scope.
-- `crates/sdivi-patterns/src/queries/mod.rs:115-116` — no blank line between the closing `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. The CLAUDE.md placement rule is only violated when the inserted item itself carries `///`; `CALL_DISPATCH` uses `#[allow(…)]` + `//`, so `/// Classify…` attaches correctly. A blank line here would remove any ambiguity for future readers.
+- `crates/sdivi-core/src/categories.rs:55-59` — `framework_hooks` CATALOG_ENTRIES description still lists `useStore` as an example of the "custom-hook ecosystem". Since M39 routes `useStore` to `state_store` (P5 beats P6), the example is now misleading. The `state_store` description correctly notes the precedence reassignment, but `framework_hooks` should cross-reference it or substitute a non-overlapping example hook.
+- `CODER_SUMMARY.md` module placement note says `state_store` is "alphabetical, between `schema_validation` and `state_management`" — actual code correctly places it *after* `state_management` (`state_management` < `state_store` alphabetically). Not a code defect; summary description is inaccurate.
 
 ---
 
 ## Coverage Gaps
-- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` corpus has no explicit Python `schema_validation` entry. The `corpus_resolves_identically_for_call_node_kind` test mirrors the full corpus over both `call` and `call_expression` node kinds, so the two Python entries in `category_contract_m38.rs` (`Field(default=0)`, `constr(min_length=1)`) are indirectly exercised; but a direct corpus row for Python schema_validation would make slot P4 Python coverage self-documenting in the disjointness suite.
-- `wasm_smoke.rs` does not verify `resource_management`, `state_management`, or `type_assertions` by name (pre-existing gap — not introduced by M38).
+- `bindings/sdivi-wasm/tests/wasm_smoke.rs` name assertions now cover 10 of 13 categories; `resource_management`, `state_management`, and `type_assertions` remain absent from the name-level assertions (pre-existing gap, not introduced by M39 — count assertion prevents silent drift).
 
 ---
 
 ## Drift Observations
-- `crates/sdivi-patterns/src/queries/mod.rs:84-106` (`category_for_node_kind`) — the function's doc comment cites `logging` as the only callee-only category. `framework_hooks` and `schema_validation` are now also callee-only (empty `NODE_KINDS`); mentioning them alongside `logging` would prevent future contributors from reading the omissions as oversights.
-- `crates/sdivi-core/src/categories.rs:77-81` — the `null_safety` description references `fn?.()` via `optional_chain`, but the grammar emits `call_expression` for optional calls. Pre-existing from M37; the code is correct and the test suite is accurate — only the description is misleading.
-- Stale comment in `dispatch_disjointness.rs:26` ("At M38, P1/P4/P6/P8/P9 are active") is correctly updated for M38 — previously stale from M35 through M37. Now current.
+- `crates/sdivi-patterns/src/queries/tests.rs:229` — pre-existing (carried forward from M37/M38): test `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name (body asserts `Some("null_safety")` for non-TS/JS languages, i.e. a match, not a non-match). Noted in CODER_SUMMARY.md; cleanup deferred.
+- `crates/sdivi-patterns/src/queries/mod.rs:84-106` (`category_for_node_kind`) — doc comment cites only `logging` as the callee-only category. `framework_hooks`, `schema_validation`, and `state_store` are now also callee-only (all have empty `NODE_KINDS`); the note should enumerate all such categories to avoid future reader confusion. Pre-existing gap grown by M35/M38/M39.
+- `crates/sdivi-patterns/src/queries/mod.rs:119-120` — no blank line between the closing `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. `CALL_DISPATCH` uses `#[allow(…)]` + `//` (not `///`), so the doc comment attaches correctly to `classify_hint`; however, a blank line would make the separation unambiguous for future editors who might insert an item between the two. Pre-existing from prior milestones.

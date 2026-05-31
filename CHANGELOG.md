@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `state_store` pattern category (M39): Redux / RTK (`createSlice`, `configureStore`,
+  `createStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`),
+  Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`), MobX (`observable`,
+  `makeAutoObservable`, etc.), Signals — Preact/Angular (`signal`, `computed`, `effect`),
+  and Solid (`createSignal`, `createStore`, etc.) are now natively classified as
+  `state_store` via callee-text inspection at CALL_DISPATCH slot P5 (above
+  `framework_hooks` P6). All patterns are `^`-anchored at callee start — member-access
+  calls (`prisma.user.create(data)`, `document.createElement(...)`) are intentionally
+  excluded. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore`
+  previously resolved to `framework_hooks`; they now resolve to `state_store` (more
+  specific wins). `list_categories()` count grows from 12 → 13. `snapshot_version`
+  stays `"1.0"`. See `MIGRATION_NOTES.md` for the precedence-reassignment story.
+
 - `schema_validation` pattern category (M38): Zod (`z.object`, `z.string`, `z.enum`), Yup
   (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and
   the Zod-specific `.safeParse(` call in TypeScript and JavaScript are now natively classified
