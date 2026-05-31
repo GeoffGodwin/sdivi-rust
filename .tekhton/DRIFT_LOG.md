@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 7
+- Runs since audit: 8
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,7 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-30 | "unknown"] `crates/sdivi-core/src/categories.rs:90-99` â `CATEGORIES` derives from `CATALOG_ENTRIES` by explicit zero-based index (`CATALOG_ENTRIES[0].0` â¦ `CATALOG_ENTRIES[7].0`). If entries are ever reordered the two arrays must be kept in lockstep manually. The existing `list_categories()` doc-test that asserts length and spot-checks names is a sufficient safety net for now; a comment noting the ordering dependency would help the next maintainer.
 - [2026-05-29 | "unknown"] `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` â The file name and determinism test (`m32_pipeline_output_byte_identical_for_same_params`) are labelled M32 but the file now hosts the M33 positive sentinel (`m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`). The M32 determinism test is still correct and load-bearing. Consider renaming the file to `snapshot_pipeline_regression.rs` in a future cleanup pass to avoid reader confusion.
 - [2026-05-29 | "unknown"] `catalog.rs:110-113` â `crate::hint_input::PatternHintInput` is referenced by its full path inline rather than imported at the top of the file via `use`. The other feature-gated items (`fingerprint_node_kind`, `queries`) are imported normally. Cosmetic inconsistency only.
 - [2026-05-29 | "unknown"] `resource_management::excludes_callee` and `logging::matches_callee` are both tested in the `macro_invocation` arm of `classify_hint` â they use the same regex in v0, so the double check is harmless but redundant. The prior M32 Drift Observation about these two identical `RUST_LOGGING_RE` / `RUST_RE` literals being maintained separately remains open; M33 does not worsen it.

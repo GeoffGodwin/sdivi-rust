@@ -1,4 +1,4 @@
-# Reviewer Report — M33: Native Pipeline Switchover to `classify_hint`
+# Reviewer Report — M23: Pattern Category Contract + WASM `list_categories()`
 Review cycle: 1 of 4
 Reviewed by: reviewer agent
 
@@ -12,15 +12,10 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `queries/mod.rs:24-31` — The `ALL_CATEGORIES` const doc comment still reads "Note: `logging` is a catalog-only category for `snapshot_version "1.0"`" and implies the native pipeline never populates it. M33 makes this framing stale — logging is now natively classified via `classify_hint`. The individual claim that "`category_for_node_kind` never returns `Some("logging")`" remains accurate (the M30 sentinel confirms it), but the "catalog-only" label should be updated to say logging is natively classified since M33.
-- `prop_classify_hint.rs` appears as modified in gitStatus but is absent from CODER_SUMMARY "Files Modified". The file content is correct and valuable — it tests the fall-through consistency invariant for non-special node kinds. The omission is a CODER_SUMMARY accuracy gap only; nothing is wrong with the code.
-- `MIGRATION_NOTES.md` worked example shows pre-M33 `data_access.instance_count: 2`. Milestone spec explicitly requires this be generated from a real fixture run, not estimated. If hand-authored, confirm against an actual pipeline run before tagging the release — the spec warns "an inaccurate example is worse than no example."
+- `crates/sdivi-patterns/src/queries/mod.rs:279` — Test assertion failure message still reads "logging is catalog-only in v0 for category_for_node_kind". The module-level doc block (lines 24–31) was correctly updated to reflect M33 native classification, but this assertion message wasn't touched. The tested behaviour is still correct (`category_for_node_kind` never returns `Some("logging")`); update the string to "category_for_node_kind never returns logging; callee-text routing via classify_hint" in a future cleanup pass.
 
 ## Coverage Gaps
-- No integration test covers the `simple-go` fixture acceptance criterion: "data_access containing only `db.*`/`sql.*`-shape calls and `logging` containing only `fmt.Print*`-shape calls; non-matching calls dropped from both." This is an explicit M33 acceptance criterion not covered by any modified test file.
-- WASM re-baselining: CODER_SUMMARY does not confirm `bindings/sdivi-wasm` integration tests were checked. If no WASM test asserts pattern_metrics distribution shape the criterion is vacuously satisfied — PR description should note this explicitly so reviewers don't assume a check was done.
+- None
 
 ## Drift Observations
-- `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` — The file name and determinism test (`m32_pipeline_output_byte_identical_for_same_params`) are labelled M32 but the file now hosts the M33 positive sentinel (`m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`). The M32 determinism test is still correct and load-bearing. Consider renaming the file to `snapshot_pipeline_regression.rs` in a future cleanup pass to avoid reader confusion.
-- `catalog.rs:110-113` — `crate::hint_input::PatternHintInput` is referenced by its full path inline rather than imported at the top of the file via `use`. The other feature-gated items (`fingerprint_node_kind`, `queries`) are imported normally. Cosmetic inconsistency only.
-- `resource_management::excludes_callee` and `logging::matches_callee` are both tested in the `macro_invocation` arm of `classify_hint` — they use the same regex in v0, so the double check is harmless but redundant. The prior M32 Drift Observation about these two identical `RUST_LOGGING_RE` / `RUST_RE` literals being maintained separately remains open; M33 does not worsen it.
+- `crates/sdivi-core/src/categories.rs:90-99` — `CATEGORIES` derives from `CATALOG_ENTRIES` by explicit zero-based index (`CATALOG_ENTRIES[0].0` … `CATALOG_ENTRIES[7].0`). If entries are ever reordered the two arrays must be kept in lockstep manually. The existing `list_categories()` doc-test that asserts length and spot-checks names is a sufficient safety net for now; a comment noting the ordering dependency would help the next maintainer.

@@ -1,170 +1,101 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 4 files, 42 test functions (including 3 property-test bodies × 500 cases each)
+Tests audited: 2 files, 10 test functions
 Verdict: CONCERNS
 
-Files reviewed:
-- `crates/sdivi-patterns/tests/prop_classify_hint.rs` — 3 property tests
-- `crates/sdivi-patterns/tests/classify_hint.rs` — 21 unit tests
-- `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` — 4 integration tests
-- `crates/sdivi-patterns/tests/simple_go_fixture.rs` — 9 integration tests
+Files read: `crates/sdivi-core/tests/category_contract.rs` (6 tests),
+`bindings/sdivi-wasm/tests/m23_native.rs` (4 tests).
+Implementation files cross-referenced: `crates/sdivi-core/src/categories.rs`,
+`crates/sdivi-patterns/src/queries/mod.rs`, `bindings/sdivi-wasm/src/category_types.rs`,
+`crates/sdivi-snapshot/src/snapshot.rs` (`SNAPSHOT_VERSION = "1.0"` confirmed).
 
 ---
 
 ### Findings
 
-#### INTEGRITY: Pre-verified orphan claims are false positives — do not act on them
-- File: All four audited test files (as named in the audit context orphan list)
-- Issue: The audit context asserts 8 "Shell-Detected Orphans" (listed twice each)
-  claiming every test file "imports deleted module `.tekhton/.commit_decision`".
-  A direct grep of all four files for "commit_decision" and "stage_tester" returns
-  zero matches. The files are valid Rust source; none contain a `use` or `include!`
-  referencing that path. `.tekhton/.commit_decision` is a plain-text Tekhton state
-  file — it has no valid Rust module path and cannot be imported by a Rust test.
-  The detection script appears to be doing raw filesystem-path string matching
-  against something other than Rust `use`/`mod` declarations.
-  Acting on these claims would delete all four test files, eliminating coverage for
-  the entire M33 behavioral change.
+#### SCOPE: Pre-verified orphan claims are false positives — do not act on them
+- File: `crates/sdivi-core/tests/category_contract.rs` (whole file)
+- File: `bindings/sdivi-wasm/tests/m23_native.rs` (whole file)
+- Issue: The audit context reports both files as shell-verified orphans that
+  "import deleted module `.tekhton/.commit_decision`". Direct reading of both
+  files shows no reference to `.tekhton`, `.commit_decision`, or any
+  `.tekhton/*` path anywhere in either file. `category_contract.rs` references
+  only `sdivi_core`, `crates/sdivi-patterns/src/`, and `docs/pattern-categories.md`.
+  `m23_native.rs` references only `sdivi_wasm::category_types` and `sdivi_core`.
+  `.tekhton/.commit_decision` is a plain-text Tekhton state file with no valid
+  Rust module path — it cannot be imported by a Rust test. The detection script
+  appears to be performing string matching against something other than actual Rust
+  `use`/`mod` declarations, or is running against a stale file-tree snapshot.
+  Acting on these claims would cause unnecessary deletion of two valid test files
+  that together cover the entire M23 behavioral contract.
 - Severity: HIGH
-- Action: Discard the pre-verified orphan data. Do not remove any of the four test
-  files. Fix the orphan-detection script to operate on actual Rust module declarations
-  (`use` and `mod` statements), not filesystem path strings.
+- Action: Discard the pre-verified orphan data for both files. Do not remove or
+  modify either test file on the basis of these claims. Fix the orphan-detection
+  script to operate on actual Rust module declarations, not filesystem path strings.
 
-#### COVERAGE: Vacuous test makes zero assertions
-- File: `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs:73-80`
-- Issue: `m32_different_seeds_may_differ` calls `pipeline_json(42)` and
-  `pipeline_json(99)`, then discards both with `let _ = (seed_a, seed_b)`. The body
-  makes zero assertions — it passes regardless of pipeline output as long as no panic
-  occurs. The inline comment explicitly acknowledges this limitation. The test name
-  implies a comparison that never happens. The only value is "does not panic with
-  seed 99", which is already covered by `m32_pipeline_output_byte_identical_for_same_params`
-  (which runs the pipeline twice with seed 42 and would surface a panic there too).
+#### INTEGRITY: Tester "Files Modified" claim contradicts git state
+- File: `.tekhton/TESTER_REPORT.md`
+- Issue: TESTER_REPORT.md lists `crates/sdivi-core/tests/category_contract.rs`
+  and `bindings/sdivi-wasm/tests/m23_native.rs` under "Files Modified". The
+  git working-tree status captured at conversation start shows neither file as
+  modified — only `crates/sdivi-core/src/categories.rs` and
+  `crates/sdivi-patterns/src/queries/mod.rs` carry modifications (both doc-comment
+  updates). The tester ran existing tests, confirmed they pass, and made no code
+  changes to the test files. This is correct behavior for a doc-comment-only
+  implementation change, but the "Files Modified" label in the report implies code
+  changes were made when none occurred.
 - Severity: MEDIUM
-- Action: Either (a) remove the test — the pipeline-infrastructure smoke test is
-  redundant given the existing determinism test — or (b) rename to a truthful name
-  such as `pipeline_does_not_panic_with_alternate_seed` with an explicit comment
-  documenting it as a no-assertion smoke test. Do NOT add an assertion that seeds 42
-  and 99 produce different JSON; the `simple-rust` fixture has no graph edges so
-  Leiden output is seed-independent for this fixture and such an assertion would be
-  fragile.
+- Action: The test report format should distinguish "files verified/executed" from
+  "files changed". No test-code change is needed; the report framing is the issue.
+  Future tester report templates should use separate "Files Executed" and "Files
+  Changed" fields to prevent this ambiguity.
 
-#### NAMING: File and test names retain M32 prefix after M33 rebasing
-- File: `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` (filename and lines 57, 114)
-- Issue: The file retains the name `snapshot_m32_unchanged.rs` and contains tests
-  named `m32_pipeline_output_byte_identical_for_same_params` and
-  `m32_pipeline_snapshot_has_expected_schema_version`, but the file now primarily
-  guards M33 behavior (the `m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`
-  test at line 91 is the most important assertion). The mix of M32 and M33 labels in a
-  single file will confuse future readers about which milestone the suite protects.
-  The behavioral content of the determinism and schema-version tests is correct.
+#### SCOPE: Source scraper matches `Some("…")` inside doc comments
+- File: `crates/sdivi-core/tests/category_contract.rs:54`
+  (`extract_some_strings` function)
+- Issue: `extract_some_strings` searches all `.rs` source text for the literal
+  pattern `Some("`. This matches strings in doc comments as well as runtime code.
+  The doc comment at `crates/sdivi-core/src/categories.rs:51` contains the
+  literal text `Some("logging")` as a quoted example inside a `///` comment. The
+  scraper finds "logging" via this comment, not from runtime code. Currently
+  benign — "logging" is in CATALOG_ENTRIES — but if a future doc comment cites a
+  hypothetical category name (e.g. `Some("profiling")` as an example of a future
+  category) before it is added to the contract, the drift-gate test will produce a
+  false-positive failure.
 - Severity: LOW
-- Action: Rename the file to `snapshot_pipeline_regression.rs` (or similar) and drop
-  the milestone prefix from the two remaining M32-named tests. The behavioral content
-  of those tests does not need to change.
+- Action: Restrict `extract_some_strings` to skip lines where the `Some("` match
+  occurs after `///` or `//` in the trimmed line. The simplest implementation:
+  before calling `extract_some_strings` on a line, skip it if the line's first
+  non-whitespace characters are `//`. No immediate action required; the current
+  suite passes against the real contract.
+
+#### COVERAGE: No external test for `classify_hint` callee routing
+- File: `crates/sdivi-core/tests/category_contract.rs` (suite-level gap)
+- Issue: The drift gate in `category_contract.rs` verifies that category names
+  used in `sdivi-patterns/src/` are registered in `list_categories()`, but the
+  external contract suite does not exercise `classify_hint` end-to-end. The M33
+  behavioral change (routing `console.log` → `logging` and `tracing::info!` →
+  `logging` via callee-text inspection) is tested only in the inline unit tests
+  within `crates/sdivi-patterns/src/queries/mod.rs`. The comment at
+  `queries/mod.rs:286` references a future `tests/m33_sentinels.rs` file that
+  does not yet exist.
+- Severity: LOW
+- Action: Consider adding one `classify_hint` round-trip assertion to the external
+  suite (either in `category_contract.rs` or the referenced `tests/m33_sentinels.rs`)
+  to validate M33 behavior from outside `sdivi-patterns`. Not blocking; the inline
+  unit tests in `queries/mod.rs` cover the callee-routing paths.
 
 ---
 
 ### Point-by-Point Rubric Results
 
-#### 1. Assertion Honesty — PASS (with one exception)
-
-**classify_hint.rs**: All assertions derive from real function outputs against values
-grounded in the implementation's regex patterns. Anchor behavior is explicitly probed
-(e.g. `myconsole.log("x")` verifies the `^` anchor on the TS/JS logging regex;
-`myfmt.Println("x")` verifies Go's `^fmt\.` anchor; `printer(x)` verifies Python's
-`\b` guard). Every positive case has a corresponding negative.
-
-**prop_classify_hint.rs**: Property tests compare `classify_hint` output against
-`category_for_node_kind` at runtime — no hard-coded magic values. The
-`prop_text_does_not_affect_fall_through` property derives equality from two runtime calls
-with different inputs, not a pre-baked constant.
-
-**snapshot_m32_unchanged.rs**: Three of four tests are honest:
-- `m32_pipeline_output_byte_identical_for_same_params` — real determinism assertion.
-- `m33_pipeline_snapshot_has_logging_entry_for_tracing_macros` — real JSON key check.
-- `m32_pipeline_snapshot_has_expected_schema_version` — real version string assertion.
-- `m32_different_seeds_may_differ` — makes no assertion. See COVERAGE finding.
-
-**simple_go_fixture.rs**: All assertions are real: category presence/absence in
-`catalog.entries` and exact instance counts derived from the number of synthetic hints
-provided. The mixed-fixture test (line 215) verifies the exact split (2 logging + 2
-data_access + 2 dropped = 4 classified total).
-
-#### 2. Edge Case Coverage — PASS
-
-**classify_hint.rs**: Covers unrecognized callees (empty Vec), unknown node kinds (empty
-Vec), async_patterns priority over logging/data_access, Rust data_access returning false
-by design (v0 deferral documented in the implementation), disjoint-regex invariant across
-TypeScript, Python, Go, and Rust (both call and macro_invocation paths), and the
-symmetric-agreement invariant between `resource_management::excludes_callee` and
-`logging::matches_callee` for 13 Rust macro samples including non-excluded cases.
-
-**prop_classify_hint.rs**: Covers arbitrary unknown node kinds with arbitrary text,
-text-agnosticity for non-special kinds across all 6 supported languages, and all 11
-known non-special kinds × 6 languages.
-
-**snapshot_m32_unchanged.rs**: Covers determinism across repeated runs, schema version
-guard, and positive M33 logging presence. Only `simple-rust` is exercised, which is
-appropriate for a determinism regression guard.
-
-**simple_go_fixture.rs**: Covers per-callee routing for `fmt.Println`, `fmt.Printf`,
-`fmt.Errorf`, `db.query`, `sql.Open`; non-matching drops for `os.Exit` and
-`strings.Join`; a mixed-fixture test that exercises all three paths simultaneously; and
-the `min_pattern_nodes` filter with a threshold that suppresses a single-instance entry.
-
-#### 3. Implementation Exercise — PASS
-
-All tests call real implementation code with no mocking of functions under test:
-`classify_hint`, `category_for_node_kind`, `data_access::matches_callee`,
-`logging::matches_callee`, `async_patterns::matches_callee`,
-`resource_management::excludes_callee`, `build_catalog`, and
-`Pipeline::snapshot_with_mode`. No test mocks the pipeline, catalog, or regex
-functions.
-
-#### 4. Test Weakening Detection — PASS
-
-The replacement of `m32_pipeline_snapshot_has_no_logging_entry_in_catalog`
-(asserted logging absent) with `m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`
-(asserts logging present) is a correct rebasing, not a weakening. The old assertion
-described behavior that M33 intentionally changes. The new assertion encodes the new
-expected behavior. The tester report documents this with `re-baselined in M33`. The
-remaining two determinism and schema-version tests are unchanged and retain their
-assertion strength.
-
-`simple_go_fixture.rs` and `prop_classify_hint.rs` are new files with no prior
-version to weaken.
-
-#### 5. Test Naming and Intent — PASS (with one exception)
-
-Test names across all four files encode scenario and expected outcome clearly:
-`classify_hint_async_beats_logging`, `go_fmt_errorf_routes_to_logging_not_data_access`,
-`prop_text_does_not_affect_fall_through`, `go_min_pattern_nodes_filter_drops_single_instance_logging`.
-Exception: `m32_different_seeds_may_differ` — see NAMING finding.
-
-#### 6. Scope Alignment — PASS
-
-All imports reference symbols confirmed present in the implementation:
-`sdivi_patterns::queries::{classify_hint, category_for_node_kind, async_patterns,
-data_access, logging, resource_management}`, `sdivi_patterns::PatternHintInput`,
-`sdivi_patterns::build_catalog`, `sdivi_config::PatternsConfig`,
-`sdivi_parsing::feature_record::{FeatureRecord, PatternHint}`,
-`sdivi_pipeline::{Pipeline, WriteMode}`. No stale references to renamed or removed
-symbols were found.
-
-The shell-detected orphan claims have no basis in the actual source files (see INTEGRITY
-finding). These tests are not orphaned.
-
-#### 7. Test Isolation — PASS
-
-`classify_hint.rs` and `prop_classify_hint.rs`: pure in-process function calls, no I/O.
-
-`simple_go_fixture.rs`: constructs `FeatureRecord` and `PatternHint` structs entirely
-in memory, calls `build_catalog` directly, no filesystem access.
-
-`snapshot_m32_unchanged.rs`: reads `tests/fixtures/simple-rust` via compile-time
-`CARGO_MANIFEST_DIR` — a committed, stable fixture tree, not a mutable project state
-file such as `.tekhton/CODER_SUMMARY.md` or pipeline run artifacts. Uses
-`WriteMode::EphemeralForCheck` to prevent writing to `.sdivi/snapshots/`, leaving no
-side effects. No reads from `.tekhton/`, `.sdivi/`, `.claude/logs/`, or any pipeline
-output file. Isolation is sound.
+| # | Rubric Point | Result |
+|---|---|---|
+| 1 | Assertion Honesty | PASS — all assertions derive from live `list_categories()` / serde calls; `len() == 8` is an intentional contract pin matching the 8 entries in `CATALOG_ENTRIES` |
+| 2 | Edge Case Coverage | PASS — error paths covered in `queries/mod.rs` inline suite (unknown node kind → None, `category_for_node_kind` never returns logging); `category_contract.rs` covers schema_version, non-empty, idempotency, drift, and doc parity |
+| 3 | Implementation Exercise | PASS — tests call `sdivi_core::list_categories()`, `sdivi_core::CATEGORIES`, and real serde round-trip on `WasmCategoryCatalog`; no mocking of functions under test |
+| 4 | Test Weakening | PASS — no existing assertions were removed or broadened; tester made no modifications to test files |
+| 5 | Naming and Intent | PASS — all 10 test names encode scenario and expected outcome (e.g. `list_categories_returns_schema_version_1_0`, `wasm_category_catalog_json_field_names_are_schema_version_and_categories`) |
+| 6 | Scope Alignment | FLAG — see HIGH finding; false orphan claims do not reflect actual file content |
+| 7 | Isolation | PASS — `markdown_table_matches_list_categories_output` reads `docs/pattern-categories.md`, a version-controlled source file intentionally checked for doc parity; no `.tekhton/` build artifacts, pipeline logs, or run-state files are read |

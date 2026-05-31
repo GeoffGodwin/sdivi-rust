@@ -47,11 +47,12 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         "Code constructs that produce diagnostic or observability output — \
         e.g., `console.*` calls, structured logger invocations (`logger.info`), \
         `print` statements, and logging macros (`tracing::info!`, `log::debug!`). \
-        Classification at the sdivi-rust layer is catalog-only: native code does \
-        not auto-classify by node kind alone (the relevant kinds — `call_expression`, \
-        `call`, `macro_invocation` — are already claimed by `data_access` and \
-        `resource_management`). Foreign extractors apply callee-name filtering \
-        and emit `PatternInstanceInput { category: \"logging\", … }` directly.",
+        Natively classified since M33 via `classify_hint` callee-text inspection: \
+        `category_for_node_kind` does not return `Some(\"logging\")` (the relevant \
+        node kinds overlap with `data_access` and `resource_management`), but \
+        `classify_hint` routes matching callees to this category. Foreign extractors \
+        may also emit `PatternInstanceInput { category: \"logging\", … }` directly; \
+        those instances merge with natively classified ones.",
     ),
     (
         "resource_management",

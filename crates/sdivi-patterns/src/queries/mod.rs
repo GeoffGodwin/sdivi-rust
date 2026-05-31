@@ -23,11 +23,11 @@ use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
-/// Note: `logging` is a catalog-only category for `snapshot_version "1.0"`.
-/// It is present here so embedders can emit `PatternInstanceInput { category: "logging", … }`
-/// and have those instances round-trip through `compute_pattern_metrics` and
-/// `compute_delta`. [`category_for_node_kind`] never returns `Some("logging")` —
-/// the relevant node kinds overlap with `data_access` and `resource_management`.
+/// Note: `logging` is natively classified by the pipeline since M33 via
+/// [`classify_hint`] callee-text inspection. [`category_for_node_kind`] still
+/// never returns `Some("logging")` — the relevant node kinds overlap with
+/// `data_access` and `resource_management` — but `classify_hint` routes matching
+/// callees (e.g. `console.log`, `tracing::info!`) to `logging` directly.
 ///
 /// # Examples
 ///
