@@ -10,7 +10,9 @@
 //! 3. For any callee that legitimately matches two categories, add a
 //!    `KNOWN_OVERLAPS` entry with the winner named.
 
-use sdivi_patterns::queries::{async_patterns, classify_hint, data_access, logging};
+use sdivi_patterns::queries::{
+    async_patterns, classify_hint, data_access, framework_hooks, logging,
+};
 use sdivi_patterns::PatternHintInput;
 
 fn hint(node_kind: &str, text: &str) -> PatternHintInput {
@@ -21,14 +23,15 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M34 only P1/P8/P9 are in the registry; future milestones extend this list.
-// TODO(M35): extend when adding P2 — add framework_hooks::matches_callee and
-// state_store::matches_callee here so `no_undocumented_overlaps_in_corpus` can
-// detect overlaps between new categories and P1/P8/P9.
+/// At M35, P1/P6/P8/P9 are active; future milestones extend this list.
+// TODO(M39): add state_store::matches_callee when P5 lands.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
         matched.push("async_patterns");
+    }
+    if framework_hooks::matches_callee(text, language) {
+        matched.push("framework_hooks");
     }
     if logging::matches_callee(text, language) {
         matched.push("logging");
@@ -58,12 +61,7 @@ const KNOWN_OVERLAPS: &[(&str, &str, &str, &str)] = &[
     // data_access (P9) regex `\b(get)\(` both match (word boundary before `get(`).
     // logging wins because P8 < P9 in CALL_DISPATCH order. Caller intent (logger
     // object) dominates over method-name pattern matching.
-    (
-        "logger.get(\"x\")",
-        "typescript",
-        "logging",
-        "data_access",
-    ),
+    ("logger.get(\"x\")", "typescript", "logging", "data_access"),
 ];
 
 // ── Per-category corpus ────────────────────────────────────────────────────────
@@ -78,6 +76,15 @@ const CORPUS: &[(&str, &str, &str)] = &[
         "async_patterns",
     ),
     ("p.finally(() => {})", "typescript", "async_patterns"),
+    // P6: framework_hooks — ^use[A-Z] callee regex (TypeScript/JavaScript only)
+    ("useState(0)", "typescript", "framework_hooks"),
+    ("useEffect(fn, [])", "typescript", "framework_hooks"),
+    ("useMemo(() => v, [])", "javascript", "framework_hooks"),
+    ("useCustomHook(opts)", "typescript", "framework_hooks"),
+    ("useAuth()", "javascript", "framework_hooks"),
+    // Negative: lowercase second char or wrong language must NOT match framework_hooks
+    ("user()", "typescript", ""),
+    ("useState(0)", "python", ""),
     // P8: logging — per-language tables
     // P8>P9 overlap: logging callee with a data_access verb method name; logging wins.
     ("logger.get(\"x\")", "typescript", "logging"),
@@ -182,6 +189,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
         // The loser must also match (otherwise it shouldn't be in KNOWN_OVERLAPS).
         let loser_matches = match loser {
             "async_patterns" => async_patterns::matches_callee(text, lang),
+            "framework_hooks" => framework_hooks::matches_callee(text, lang),
             "logging" => logging::matches_callee(text, lang),
             "data_access" => data_access::matches_callee(text, lang),
             other => panic!("KNOWN_OVERLAPS references unknown category {other:?}"),

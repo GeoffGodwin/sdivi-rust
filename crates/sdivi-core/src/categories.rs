@@ -43,6 +43,15 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         on `Result` or `Option` variants.",
     ),
     (
+        "framework_hooks",
+        "Component-composition hook calls in React, Preact, Vue (composables), and \
+        Svelte-style runtimes — any `call_expression` callee matching `^use[A-Z]` in \
+        TypeScript or JavaScript. Covers built-in hooks (`useState`, `useEffect`, \
+        `useMemo`, `useCallback`, `useRef`, `useContext`, `useReducer`, \
+        `useLayoutEffect`) and the full custom-hook ecosystem (`useAuth`, `useStore`, \
+        etc.). Other languages produce no instances.",
+    ),
+    (
         "logging",
         "Code constructs that produce diagnostic or observability output — \
         e.g., `console.*` calls, structured logger invocations (`logger.info`), \
@@ -83,9 +92,9 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// use sdivi_core::CATEGORIES;
 ///
 /// assert!(CATEGORIES.contains(&"error_handling"));
-/// assert!(CATEGORIES.contains(&"data_access"));
+/// assert!(CATEGORIES.contains(&"framework_hooks"));
 /// assert!(CATEGORIES.contains(&"logging"));
-/// assert_eq!(CATEGORIES.len(), 8);
+/// assert_eq!(CATEGORIES.len(), 9);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -96,6 +105,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[5].0,
     CATALOG_ENTRIES[6].0,
     CATALOG_ENTRIES[7].0,
+    CATALOG_ENTRIES[8].0,
 ];
 
 /// Metadata for a single canonical pattern category.

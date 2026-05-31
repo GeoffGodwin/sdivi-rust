@@ -83,6 +83,42 @@ directly bypass `build_catalog` entirely — their inputs determine their output
 If you have already migrated to `classify_hint` in M32, you are now aligned with the
 native pipeline. If not, your hand-rolled filter continues to work unchanged.
 
+## M35 — `framework_hooks` category introduction (TS/JS hook-call count appears)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`.
+
+**What changed.** The `framework_hooks` pattern category is now natively classified
+for TypeScript and JavaScript via `classify_hint` callee-text inspection. Any
+`call_expression` callee matching `^use[A-Z]` (`useState`, `useEffect`, `useMemo`,
+custom hooks like `useAuth`, etc.) is routed to `framework_hooks`.
+
+**Impact on existing snapshots.**
+
+1. **`framework_hooks` transitions from zero to non-zero.** On TS/JS repos, the
+   `framework_hooks` bucket was absent (or zero) in all pre-M35 snapshots. After
+   upgrade, the first snapshot counts all hook calls. `compute_delta` will report
+   a large positive delta on `framework_hooks.instance_count` — expected; not a
+   regression.
+2. **No existing category loses instances.** Hook callees (`useState`, etc.) did
+   not match any prior regex (they were dropped as unrecognised). `data_access`,
+   `logging`, and `async_patterns` are unaffected.
+3. **`list_categories()` count grows from 8 → 9.** Embedders that hard-code the
+   count must update. The recommended pattern is `list_categories().categories.len()`.
+
+**Escape hatch.** Use a threshold override to defer recalibration:
+
+```toml
+[thresholds.overrides.framework_hooks]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "M35 upgrade: framework_hooks bucket newly populated; setting initial tolerance"
+```
+
+**Trend continuity.** `snapshot_version` stays `"1.0"`. The first post-M35 snapshot
+is comparable to prior snapshots — `compute_delta` returns `null` for
+`framework_hooks` when no prior `framework_hooks` value exists, and a numeric delta
+on subsequent comparisons.
+
 ## M28 — Leiden performance (modularity values may shift slightly)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `LeidenPartition` JSON shape is unchanged. `BoundarySpec` YAML untouched.

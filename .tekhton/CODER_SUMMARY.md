@@ -3,67 +3,76 @@
 
 ## What Was Implemented
 
-### M34: Multi-Category Call-Expression Dispatch Framework
+### M35: `framework_hooks` pattern category
 
-Pure refactor of `classify_hint`'s `call_expression`/`call` arm. No behaviour change.
-`snapshot_version` stays `"1.0"`.
+**`crates/sdivi-patterns/src/queries/framework_hooks.rs`** (NEW)
+- `NODE_KINDS: &[&str] = &[]` (callee-only; no node-kind matching)
+- `static TS_JS_RE: LazyLock<Regex>` for `^use[A-Z]`
+- `pub fn matches_callee(text, language) -> bool` — TypeScript/JavaScript only
+- Inline unit tests for built-in hooks, custom hooks, negative cases, wrong languages
 
 **`crates/sdivi-patterns/src/queries/mod.rs`**
-- Added `CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)]` const (with
-  `#[allow(clippy::type_complexity)]` since fn pointer tuple trips the lint).
-  Precedence comment inline: P1=async_patterns > P8=logging > P9=data_access.
-- Replaced the three-`if`-block arm with a single `for &(category, matches) in
-  CALL_DISPATCH` loop. First match returns; falls through to `vec![]` unchanged.
-- Updated dispatch order doc to reference `CALL_DISPATCH` and note P1/P8/P9
-  active at M34.
-- File held at exactly 300 lines.
+- Added `pub mod framework_hooks;`
+- Added `"framework_hooks"` to `ALL_CATEGORIES` (alphabetical position: after `error_handling`)
+- Added `("framework_hooks", framework_hooks::matches_callee)` to `CALL_DISPATCH` at slot P6 (between async_patterns P1 and logging P8)
+- Updated dispatch-order doc: `(P1/P6/P8/P9 active at M35)`
+- Updated `CALL_DISPATCH` inline comment to list P6
+- Updated `ALL_CATEGORIES` doc example: count 8 → 9, swapped assertions for `framework_hooks`
+- Renamed test `all_categories_has_eight_entries` → `all_categories_has_nine_entries`, updated count
+- Removed stale cross-reference comment to keep file at exactly 300 lines
 
-**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`** (NEW)
-- `KNOWN_OVERLAPS` table: one entry documenting that `fetch(url).catch(err => {})`
-  in JavaScript matches both `async_patterns` (P1, `.catch(`) and `data_access`
-  (P9, `^fetch\b`). P1 wins. This was a real overlap discovered during testing,
-  not hypothetical.
-- `CORPUS`: 23 entries covering P1/P8/P9 across TypeScript, JavaScript, Python, Go,
-  Java, plus unrecognised callees that must return empty.
-- Four tests: `corpus_resolves_to_expected_category`,
-  `corpus_resolves_identically_for_call_node_kind`,
-  `no_undocumented_overlaps_in_corpus`,
-  `known_overlaps_winner_matches_dispatch_order`.
+**`crates/sdivi-core/src/categories.rs`**
+- Added `framework_hooks` entry to `CATALOG_ENTRIES` (position 4, alphabetical)
+- Updated `CATEGORIES` const to index `CATALOG_ENTRIES[0..8].0` (9 entries)
+- Updated doc examples: count 8 → 9, `framework_hooks` assertion added
+
+**`crates/sdivi-patterns/tests/framework_hooks.rs`** (NEW)
+- `classify_hint` acceptance criteria: `useState(0)` → `["framework_hooks"]`, etc.
+- `matches_callee` positive: all built-in hooks + custom hooks
+- `matches_callee` negative: lowercase second char, non-`use` prefix, wrong languages
+
+**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`**
+- Added `framework_hooks` to the `use` import
+- Updated `all_matching_categories` to include `framework_hooks::matches_callee` (TODO(M35) fulfilled)
+- Added 7 CORPUS entries: 5 positive (TypeScript/JavaScript hooks), 2 negative
+- Added `"framework_hooks" => framework_hooks::matches_callee(text, lang)` arm to `loser_matches`
+- Updated TODO comment to reference M39 (next slot)
 
 **`docs/pattern-categories.md`**
-- Replaced the simple bullet list in "Dispatch order in `classify_hint`" with a
-  full canonical precedence table (P1–P11 slots, activation milestone, regex hint).
-- Added KNOWN_OVERLAPS policy section with the M34 documented overlap.
-- Documented future overlaps that M35–M44 milestones must add to KNOWN_OVERLAPS.
+- Added `framework_hooks` row to canonical category list table
+- Added `framework_hooks` row to TypeScript/JavaScript node-kind mapping table
+- Added `framework_hooks::matches_callee` regex section with worked example
+- Updated dispatch order note: P6 now active at M35
+- Updated future-overlaps section (M35 overlap with M39 state_store documented)
+- Added embedder-responsibility item #7 for `framework_hooks`
+
+**`MIGRATION_NOTES.md`**
+- Added M35 section: count-introduction event, escape hatch, trend continuity
 
 **`CHANGELOG.md`**
-- Added `### Changed` entry under `[Unreleased]` describing the internal refactor.
+- Added `### Added` entry for `framework_hooks` under `[Unreleased]`
 
 ## Root Cause (bugs only)
-N/A — pure refactor.
+N/A — feature addition
 
 ## Files Modified
-- `crates/sdivi-patterns/src/queries/mod.rs` — CALL_DISPATCH registry + loop
-- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` (NEW)
-- `docs/pattern-categories.md` — formalized precedence table + KNOWN_OVERLAPS policy
-- `CHANGELOG.md` — internal-refactor Changed entry
+- `crates/sdivi-patterns/src/queries/framework_hooks.rs` (NEW) — 119 lines
+- `crates/sdivi-patterns/src/queries/mod.rs` — 300 lines (unchanged ceiling)
+- `crates/sdivi-core/src/categories.rs` — 180 lines
+- `crates/sdivi-patterns/tests/framework_hooks.rs` (NEW) — 167 lines
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — 203 lines
+- `docs/pattern-categories.md`
+- `MIGRATION_NOTES.md`
+- `CHANGELOG.md`
 
 ## Human Notes Status
-- Non-blocking note (reviewer report, line 279 assertion message) — NOT_ADDRESSED;
-  out of scope per task instructions. Logged under Observed Issues.
+No human notes in this task.
 
 ## Docs Updated
-- `docs/pattern-categories.md` — "Dispatch order in `classify_hint`" section
-  replaced with formal precedence table and KNOWN_OVERLAPS policy.
+- `docs/pattern-categories.md` — canonical category list, TS/JS node-kind table, `framework_hooks::matches_callee` regex section, dispatch order updated to P6 active at M35, future-overlaps and embedder-responsibilities updated.
+- `MIGRATION_NOTES.md` — M35 section added (count-introduction event).
+- `CHANGELOG.md` — Added entry under `[Unreleased]`.
 
 ## Observed Issues (out of scope)
-- `crates/sdivi-patterns/src/queries/mod.rs:279` — Test assertion message reads
-  "logging is catalog-only in v0 for category_for_node_kind" (stale phrasing from M30).
-  Tested behaviour is correct. Flagged by the M23 reviewer; deferred cleanup.
-- `crates/sdivi-core/src/categories.rs:90-99` — `CATEGORIES` and `CATALOG_ENTRIES`
-  ordering dependency; a comment would help the next maintainer.
-- `CHANGELOG.md` at 691 lines — exceeds the coder self-check 300-line ceiling, but
-  this is a pre-existing multi-release accumulation. Only 10 lines were added by M34.
-- `wasm_package_json_version_matches_workspace` test failure — pre-existing before
-  this run (wasm package.json stranded at 0.2.23, workspace at 0.2.24). Not
-  introduced by M34.
+- `wasm_package_json_version_matches_workspace` test failure — pre-existing before this run (wasm `package.json` stranded at 0.2.23, workspace at 0.2.24). Not introduced by M35.
+- `crates/sdivi-patterns/src/queries/mod.rs` — stale phrasing in line 279 assertion message ("logging is catalog-only in v0 for category_for_node_kind"). Pre-existing; previously flagged by M23 and M34 reviewers.

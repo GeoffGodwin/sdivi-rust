@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 9
+- Runs since audit: 10
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:103` â `CALL_DISPATCH` is a private `const` with only an inline `//` justification comment and no `///` doc block. `sdivi-patterns` lacks `#![deny(missing_docs)]` so this is not a compile error. Worth a documentation sweep when the registry grows past P9.
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md` Go corpus â `fmt.Errorf` is classified as `logging` via the `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)` regex. `fmt.Errorf` constructs an error value and does not emit output. Pre-existing M33 inheritance; the eventual Go error-handling pass will need to revisit this regex entry.
 - [2026-05-30 | "unknown"] `crates/sdivi-patterns/tests/dispatch_disjointness.rs:168-174` â The `loser_matches` match in `known_overlaps_winner_matches_dispatch_order` is intentionally hardcoded; the `other => panic!` arm forces future milestones to extend it. Valid design, but the intent isn't commented â a new contributor may read it as incomplete code. Low risk.
 - [2026-05-30 | "unknown"] `docs/pattern-categories.md` + Go corpus â `fmt.Errorf("msg")` is classified as `logging` via `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)`. `fmt.Errorf` constructs an error value; it does not emit output. M33 inheritance surfaced by the new corpus. Not M34's to fix, but the eventual Go error-handling pass will need to revisit this regex entry.
 - [2026-05-30 | "unknown"] Pre-existing (not introduced by M34): `wasm_package_json_version_matches_workspace` test failure â wasm `package.json` stranded at 0.2.23 while workspace is at 0.2.24.

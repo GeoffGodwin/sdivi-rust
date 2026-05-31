@@ -1,5 +1,5 @@
 ## Summary
-M34 is a pure internal refactor: the three-if-block `call_expression`/`call` arm inside `classify_hint` was replaced with a `const CALL_DISPATCH` function-pointer table and a single loop. No authentication, cryptography, network communication, user-facing input validation, or I/O paths were touched. The four changed files are `crates/sdivi-patterns/src/queries/mod.rs`, a new test file `crates/sdivi-patterns/tests/dispatch_disjointness.rs`, `docs/pattern-categories.md`, and `CHANGELOG.md`. The change carries no exploitable surface and introduces no new trust boundaries.
+M35 adds the `framework_hooks` pattern category: a new module (`framework_hooks.rs`) with a single `LazyLock<Regex>` and a `matches_callee` dispatcher, wired into `CALL_DISPATCH` in `mod.rs` and registered in `categories.rs`. The change introduces no I/O, no network calls, no authentication, no cryptography, no shell execution, and no external user-controlled input paths. The regex `^use[A-Z]` is a compile-time constant anchored at the start, with no quantifiers that could trigger catastrophic backtracking. The overall security posture of the change is sound.
 
 ## Findings
 None

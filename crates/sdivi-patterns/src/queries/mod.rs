@@ -14,6 +14,7 @@ pub mod async_patterns;
 pub mod class_hierarchy;
 pub mod data_access;
 pub mod error_handling;
+pub mod framework_hooks;
 pub mod logging;
 pub mod resource_management;
 pub mod state_management;
@@ -35,16 +36,16 @@ use crate::hint_input::PatternHintInput;
 /// use sdivi_patterns::queries::ALL_CATEGORIES;
 ///
 /// assert!(ALL_CATEGORIES.contains(&"error_handling"));
-/// assert!(ALL_CATEGORIES.contains(&"async_patterns"));
-/// assert!(ALL_CATEGORIES.contains(&"data_access"));
+/// assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
 /// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert_eq!(ALL_CATEGORIES.len(), 8);
+/// assert_eq!(ALL_CATEGORIES.len(), 9);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "class_hierarchy",
     "data_access",
     "error_handling",
+    "framework_hooks",
     "logging",
     "resource_management",
     "state_management",
@@ -98,9 +99,10 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
-#[allow(clippy::type_complexity)] // P1=async_patterns > P8=logging > P9=data_access; future milestones insert at their slot
+#[allow(clippy::type_complexity)] // P1 > P6=framework_hooks > P8=logging > P9=data_access; future milestones insert at their slot
 const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("async_patterns", async_patterns::matches_callee),
+    ("framework_hooks", framework_hooks::matches_callee),
     ("logging", logging::matches_callee),
     ("data_access", data_access::matches_callee),
 ];
@@ -114,7 +116,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P8/P9 active at M34).
+/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P6/P8/P9 active at M35).
 ///
 /// ## `macro_invocation`
 ///
@@ -210,9 +212,9 @@ mod tests {
     }
 
     #[test]
-    fn all_categories_has_eight_entries() {
-        assert_eq!(ALL_CATEGORIES.len(), 8);
-        assert!(ALL_CATEGORIES.contains(&"data_access"));
+    fn all_categories_has_nine_entries() {
+        assert_eq!(ALL_CATEGORIES.len(), 9);
+        assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     }
 
     #[test]
@@ -283,8 +285,6 @@ mod tests {
             }
         }
     }
-
-    // M33 positive sentinels live in `tests/m33_sentinels.rs` (file ceiling).
 
     #[test]
     fn call_expression_is_data_access() {

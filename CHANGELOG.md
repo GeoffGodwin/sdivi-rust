@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `framework_hooks` pattern category (M35): TypeScript and JavaScript `call_expression`
+  callees matching `^use[A-Z]` are now natively classified as `framework_hooks`. Covers
+  built-in React/Vue/Svelte hooks (`useState`, `useEffect`, `useMemo`, etc.) and the
+  full custom-hook ecosystem (`useAuth`, `useStore`, etc.). On the first post-upgrade
+  snapshot of a TS/JS repo, `framework_hooks` transitions from zero to non-zero —
+  a count-introduction event; see `MIGRATION_NOTES.md` for details.
+  `list_categories()` count grows from 8 → 9. `snapshot_version` stays `"1.0"`.
+
 ### Changed
 
 - (Internal) `classify_hint`'s `call_expression`/`call` arm now iterates a `const
