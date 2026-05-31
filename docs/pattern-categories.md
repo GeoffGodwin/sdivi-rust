@@ -147,11 +147,46 @@ through to `logging` instead of staying in `resource_management`.
 
 ### Dispatch order in `classify_hint`
 
-For `call_expression` / `call` node kinds:
-1. `async_patterns` (highest priority) — `.then`, `.catch`, `.finally`
-2. `logging` — `console.*`, `logger.*`, `tracing::*!`, etc.
-3. `data_access` — `fetch`, `query`, `cursor.*`, etc.
-4. `[]` empty — unrecognised callee, hint is dropped
+`classify_hint`'s `call_expression`/`call` arm iterates the `CALL_DISPATCH` registry
+(`crates/sdivi-patterns/src/queries/mod.rs`). **First match wins.** The order below
+is the contract — future milestones insert at their named slot, never append.
+
+#### Canonical precedence table
+
+| Slot | Category | Active | Representative regex / pattern |
+|---|---|---|---|
+| P1 | `async_patterns` | M34 | `\.(then\|catch\|finally)\(` |
+| P2 | `testing` | M42 | `^(describe\|it\|test\|expect)\(`, `^jest\.` |
+| P3 | `serialization` | M43 | `^JSON\.(parse\|stringify)\(`, `^json\.(Marshal\|Unmarshal)\(` |
+| P4 | `schema_validation` | M38 | `^(z\|yup\|v\|s)\.\w`, `\.safeParse\(`, `\bBaseModel\b` |
+| P5 | `state_store` | M39 | redux/zustand/jotai factories; `^use(Selector\|Dispatch\|Store)\b` |
+| P6 | `framework_hooks` | M35 | `^use[A-Z]` |
+| P7 | `http_routing` | M41 | `^(app\|router\|fastify\|server\|srv)\.(get\|post\|…)\(` |
+| P8 | `logging` | M34 | `^(console\|logger\|log)\.`, `^fmt\.Print`, `^(tracing\|log)::` |
+| P9 | `data_access` | M34 | `^(fetch\|axios)\b`, `\b(db\|sql)\.`, `cursor\.`, `requests\.` |
+| P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach)\(` |
+| P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
+
+Only P1, P8, and P9 are active at M34. All other slots are reserved placeholders.
+
+#### KNOWN_OVERLAPS policy
+
+When a callee string legitimately matches two categories' regexes, the first-match
+winner is correct by construction. The overlap must be documented in the
+`KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
+
+Documented overlaps at M34 (P1/P8/P9 active):
+
+| Callee | Language | Winner | Loser | Rationale |
+|---|---|---|---|---|
+| `fetch(url).catch(err => {})` | javascript | `async_patterns` | `data_access` | Chained-fetch outer node matches both `\.(catch)\(` (P1) and `^fetch\b` (P9); P1 wins by precedence |
+
+Future overlaps introduced by M35–M44:
+- `useSelector` / `useDispatch` / `useStore` → **state_store** (P5) beats `framework_hooks` (P6). More specific wins.
+- `app.get` / `router.post` → **http_routing** (P7) beats `data_access` (P9). Client fetches (`axios.get`) stay in `data_access` — the http_routing receiver allowlist excludes them.
+- `Promise.all([]).then(cb)` outer node → **async_patterns** (P1) wins; bare inner `Promise.all(…)` resolves to `concurrency` (P11).
+
+#### `macro_invocation` arm
 
 For `macro_invocation`:
 - Logging macros (Rust only) → `["logging"]`

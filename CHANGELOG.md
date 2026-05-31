@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- (Internal) `classify_hint`'s `call_expression`/`call` arm now iterates a `const
+  CALL_DISPATCH` registry instead of a hand-ordered if-chain. Behaviour is
+  identical — P1/P8/P9 (`async_patterns` > `logging` > `data_access`) resolve as
+  before. The registry makes precedence a first-class, tested contract for the
+  M35–M44 category expansion. No snapshot output change; `snapshot_version` stays
+  `"1.0"`. See `docs/pattern-categories.md` ("Canonical precedence table") for the
+  full P1–P11 slot specification.
+
 ## [0.2.23] - 2026-05-29
 
 ### Changed

@@ -1,13 +1,11 @@
 ## Planned Tests
-- [x] `crates/sdivi-core/tests/category_contract.rs` — existing M23 drift-gate tests verified passing (6 tests)
-- [x] `bindings/sdivi-wasm/tests/m23_native.rs` — existing M23 WASM contract tests verified passing (4 tests)
+- [x] `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — Add TODO comment to `all_matching_categories` + document and test the P8>P9 (logging beats data_access) precedence overlap
 
 ## Test Run Results
-Passed: 10  Failed: 0
+Passed: 4  Failed: 0
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-core/tests/category_contract.rs`
-- [x] `bindings/sdivi-wasm/tests/m23_native.rs`
+- [x] `crates/sdivi-patterns/tests/dispatch_disjointness.rs`

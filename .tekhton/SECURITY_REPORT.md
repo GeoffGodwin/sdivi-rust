@@ -1,5 +1,5 @@
 ## Summary
-This change consists entirely of doc comment and description string updates in two files: the `ALL_CATEGORIES` rustdoc comment in `sdivi-patterns/src/queries/mod.rs` and the `logging` entry string literal in the `CATALOG_ENTRIES` array in `sdivi-core/src/categories.rs`. No logic, control flow, I/O, authentication, cryptography, network communication, or user input handling was modified. The description string in `CATALOG_ENTRIES` is returned verbatim via `list_categories()` as a read-only `String` field — it is never interpreted as code, a path, or a command. Security posture is unchanged from the pre-M33 baseline.
+M34 is a pure internal refactor: the three-if-block `call_expression`/`call` arm inside `classify_hint` was replaced with a `const CALL_DISPATCH` function-pointer table and a single loop. No authentication, cryptography, network communication, user-facing input validation, or I/O paths were touched. The four changed files are `crates/sdivi-patterns/src/queries/mod.rs`, a new test file `crates/sdivi-patterns/tests/dispatch_disjointness.rs`, `docs/pattern-categories.md`, and `CHANGELOG.md`. The change carries no exploitable surface and introduces no new trust boundaries.
 
 ## Findings
 None

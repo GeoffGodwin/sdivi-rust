@@ -3,48 +3,67 @@
 
 ## What Was Implemented
 
-### M23: Pattern Category Contract + WASM `list_categories()`
+### M34: Multi-Category Call-Expression Dispatch Framework
 
-M23 was already fully implemented. This run performed verification and addressed
-the one non-blocking doc-comment staleness note from the M33 reviewer:
+Pure refactor of `classify_hint`'s `call_expression`/`call` arm. No behaviour change.
+`snapshot_version` stays `"1.0"`.
 
-- **`crates/sdivi-patterns/src/queries/mod.rs`** — Updated `ALL_CATEGORIES` doc
-  comment (lines 24-31). The "catalog-only" label was stale after M33: logging
-  is now natively classified via `classify_hint`. Updated the note to accurately
-  state that `category_for_node_kind` still never returns `Some("logging")` but
-  `classify_hint` routes matching callees there. (Non-blocking note from M33 review.)
+**`crates/sdivi-patterns/src/queries/mod.rs`**
+- Added `CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)]` const (with
+  `#[allow(clippy::type_complexity)]` since fn pointer tuple trips the lint).
+  Precedence comment inline: P1=async_patterns > P8=logging > P9=data_access.
+- Replaced the three-`if`-block arm with a single `for &(category, matches) in
+  CALL_DISPATCH` loop. First match returns; falls through to `vec![]` unchanged.
+- Updated dispatch order doc to reference `CALL_DISPATCH` and note P1/P8/P9
+  active at M34.
+- File held at exactly 300 lines.
 
-- **`crates/sdivi-core/src/categories.rs`** — Updated the `logging` entry in
-  `CATALOG_ENTRIES`. The prior description said "Classification at the sdivi-rust
-  layer is catalog-only: native code does not auto-classify by node kind alone".
-  After M33, `classify_hint` natively routes logging callees to this category.
-  Description now accurately reflects M33 behavior.
+**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`** (NEW)
+- `KNOWN_OVERLAPS` table: one entry documenting that `fetch(url).catch(err => {})`
+  in JavaScript matches both `async_patterns` (P1, `.catch(`) and `data_access`
+  (P9, `^fetch\b`). P1 wins. This was a real overlap discovered during testing,
+  not hypothetical.
+- `CORPUS`: 23 entries covering P1/P8/P9 across TypeScript, JavaScript, Python, Go,
+  Java, plus unrecognised callees that must return empty.
+- Four tests: `corpus_resolves_to_expected_category`,
+  `corpus_resolves_identically_for_call_node_kind`,
+  `no_undocumented_overlaps_in_corpus`,
+  `known_overlaps_winner_matches_dispatch_order`.
 
-All M23 acceptance criteria were already met:
-- `cargo test -p sdivi-core` passes (6 category_contract tests + 36 doc tests)
-- `cargo build -p sdivi-core --target wasm32-unknown-unknown --no-default-features` — verified passing in CI
-- `bindings/sdivi-wasm/tests/m23_native.rs` — 4 tests pass
-- `docs/pattern-categories.md` markdown table matches `list_categories()` runtime output
-- `cargo doc -p sdivi-core --no-deps` and `cargo doc -p sdivi-patterns --no-deps` pass clean
-- `cargo clippy --workspace -- -D warnings` passes
-- `cargo fmt --check` passes
+**`docs/pattern-categories.md`**
+- Replaced the simple bullet list in "Dispatch order in `classify_hint`" with a
+  full canonical precedence table (P1–P11 slots, activation milestone, regex hint).
+- Added KNOWN_OVERLAPS policy section with the M34 documented overlap.
+- Documented future overlaps that M35–M44 milestones must add to KNOWN_OVERLAPS.
+
+**`CHANGELOG.md`**
+- Added `### Changed` entry under `[Unreleased]` describing the internal refactor.
 
 ## Root Cause (bugs only)
-N/A — verification + doc fix run
+N/A — pure refactor.
 
 ## Files Modified
-- `crates/sdivi-patterns/src/queries/mod.rs` — Updated `ALL_CATEGORIES` doc comment to reflect M33 native classification
-- `crates/sdivi-core/src/categories.rs` — Updated `logging` CATALOG_ENTRIES description to reflect M33 behavior
+- `crates/sdivi-patterns/src/queries/mod.rs` — CALL_DISPATCH registry + loop
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` (NEW)
+- `docs/pattern-categories.md` — formalized precedence table + KNOWN_OVERLAPS policy
+- `CHANGELOG.md` — internal-refactor Changed entry
 
 ## Human Notes Status
-No human notes provided in this task.
+- Non-blocking note (reviewer report, line 279 assertion message) — NOT_ADDRESSED;
+  out of scope per task instructions. Logged under Observed Issues.
 
 ## Docs Updated
-- `crates/sdivi-core/src/categories.rs` — logging description updated; this is an
-  internal source-of-truth doc comment rendered by `list_categories()` rustdoc.
+- `docs/pattern-categories.md` — "Dispatch order in `classify_hint`" section
+  replaced with formal precedence table and KNOWN_OVERLAPS policy.
 
 ## Observed Issues (out of scope)
-- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` fails on `sdivi-wasm` due to
-  unresolved intra-doc links (e.g. `compute_thresholds_check`, `infer_boundaries`). Pre-existing
-  before this run; not introduced by M23 or M33 changes. `sdivi-core` and `sdivi-patterns` doc
-  cleanly in isolation.
+- `crates/sdivi-patterns/src/queries/mod.rs:279` — Test assertion message reads
+  "logging is catalog-only in v0 for category_for_node_kind" (stale phrasing from M30).
+  Tested behaviour is correct. Flagged by the M23 reviewer; deferred cleanup.
+- `crates/sdivi-core/src/categories.rs:90-99` — `CATEGORIES` and `CATALOG_ENTRIES`
+  ordering dependency; a comment would help the next maintainer.
+- `CHANGELOG.md` at 691 lines — exceeds the coder self-check 300-line ceiling, but
+  this is a pre-existing multi-release accumulation. Only 10 lines were added by M34.
+- `wasm_package_json_version_matches_workspace` test failure — pre-existing before
+  this run (wasm package.json stranded at 0.2.23, workspace at 0.2.24). Not
+  introduced by M34.

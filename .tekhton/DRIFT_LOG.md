@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 8
+- Runs since audit: 9
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-30 | "unknown"] `crates/sdivi-patterns/tests/dispatch_disjointness.rs:168-174` â The `loser_matches` match in `known_overlaps_winner_matches_dispatch_order` is intentionally hardcoded; the `other => panic!` arm forces future milestones to extend it. Valid design, but the intent isn't commented â a new contributor may read it as incomplete code. Low risk.
+- [2026-05-30 | "unknown"] `docs/pattern-categories.md` + Go corpus â `fmt.Errorf("msg")` is classified as `logging` via `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)`. `fmt.Errorf` constructs an error value; it does not emit output. M33 inheritance surfaced by the new corpus. Not M34's to fix, but the eventual Go error-handling pass will need to revisit this regex entry.
+- [2026-05-30 | "unknown"] Pre-existing (not introduced by M34): `wasm_package_json_version_matches_workspace` test failure â wasm `package.json` stranded at 0.2.23 while workspace is at 0.2.24.
 - [2026-05-30 | "unknown"] `crates/sdivi-core/src/categories.rs:90-99` â `CATEGORIES` derives from `CATALOG_ENTRIES` by explicit zero-based index (`CATALOG_ENTRIES[0].0` â¦ `CATALOG_ENTRIES[7].0`). If entries are ever reordered the two arrays must be kept in lockstep manually. The existing `list_categories()` doc-test that asserts length and spot-checks names is a sufficient safety net for now; a comment noting the ordering dependency would help the next maintainer.
 - [2026-05-29 | "unknown"] `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` â The file name and determinism test (`m32_pipeline_output_byte_identical_for_same_params`) are labelled M32 but the file now hosts the M33 positive sentinel (`m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`). The M32 determinism test is still correct and load-bearing. Consider renaming the file to `snapshot_pipeline_regression.rs` in a future cleanup pass to avoid reader confusion.
 - [2026-05-29 | "unknown"] `catalog.rs:110-113` â `crate::hint_input::PatternHintInput` is referenced by its full path inline rather than imported at the top of the file via `use`. The other feature-gated items (`fingerprint_node_kind`, `queries`) are imported normally. Cosmetic inconsistency only.

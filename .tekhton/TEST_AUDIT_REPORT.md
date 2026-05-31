@@ -1,101 +1,57 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 10 test functions
-Verdict: CONCERNS
-
-Files read: `crates/sdivi-core/tests/category_contract.rs` (6 tests),
-`bindings/sdivi-wasm/tests/m23_native.rs` (4 tests).
-Implementation files cross-referenced: `crates/sdivi-core/src/categories.rs`,
-`crates/sdivi-patterns/src/queries/mod.rs`, `bindings/sdivi-wasm/src/category_types.rs`,
-`crates/sdivi-snapshot/src/snapshot.rs` (`SNAPSHOT_VERSION = "1.0"` confirmed).
+Tests audited: 1 file, 4 test functions
+(`crates/sdivi-patterns/tests/dispatch_disjointness.rs`)
+Verdict: PASS
 
 ---
 
 ### Findings
 
-#### SCOPE: Pre-verified orphan claims are false positives — do not act on them
-- File: `crates/sdivi-core/tests/category_contract.rs` (whole file)
-- File: `bindings/sdivi-wasm/tests/m23_native.rs` (whole file)
-- Issue: The audit context reports both files as shell-verified orphans that
-  "import deleted module `.tekhton/.commit_decision`". Direct reading of both
-  files shows no reference to `.tekhton`, `.commit_decision`, or any
-  `.tekhton/*` path anywhere in either file. `category_contract.rs` references
-  only `sdivi_core`, `crates/sdivi-patterns/src/`, and `docs/pattern-categories.md`.
-  `m23_native.rs` references only `sdivi_wasm::category_types` and `sdivi_core`.
-  `.tekhton/.commit_decision` is a plain-text Tekhton state file with no valid
-  Rust module path — it cannot be imported by a Rust test. The detection script
-  appears to be performing string matching against something other than actual Rust
-  `use`/`mod` declarations, or is running against a stale file-tree snapshot.
-  Acting on these claims would cause unnecessary deletion of two valid test files
-  that together cover the entire M23 behavioral contract.
-- Severity: HIGH
-- Action: Discard the pre-verified orphan data for both files. Do not remove or
-  modify either test file on the basis of these claims. Fix the orphan-detection
-  script to operate on actual Rust module declarations, not filesystem path strings.
-
-#### INTEGRITY: Tester "Files Modified" claim contradicts git state
-- File: `.tekhton/TESTER_REPORT.md`
-- Issue: TESTER_REPORT.md lists `crates/sdivi-core/tests/category_contract.rs`
-  and `bindings/sdivi-wasm/tests/m23_native.rs` under "Files Modified". The
-  git working-tree status captured at conversation start shows neither file as
-  modified — only `crates/sdivi-core/src/categories.rs` and
-  `crates/sdivi-patterns/src/queries/mod.rs` carry modifications (both doc-comment
-  updates). The tester ran existing tests, confirmed they pass, and made no code
-  changes to the test files. This is correct behavior for a doc-comment-only
-  implementation change, but the "Files Modified" label in the report implies code
-  changes were made when none occurred.
-- Severity: MEDIUM
-- Action: The test report format should distinguish "files verified/executed" from
-  "files changed". No test-code change is needed; the report framing is the issue.
-  Future tester report templates should use separate "Files Executed" and "Files
-  Changed" fields to prevent this ambiguity.
-
-#### SCOPE: Source scraper matches `Some("…")` inside doc comments
-- File: `crates/sdivi-core/tests/category_contract.rs:54`
-  (`extract_some_strings` function)
-- Issue: `extract_some_strings` searches all `.rs` source text for the literal
-  pattern `Some("`. This matches strings in doc comments as well as runtime code.
-  The doc comment at `crates/sdivi-core/src/categories.rs:51` contains the
-  literal text `Some("logging")` as a quoted example inside a `///` comment. The
-  scraper finds "logging" via this comment, not from runtime code. Currently
-  benign — "logging" is in CATALOG_ENTRIES — but if a future doc comment cites a
-  hypothetical category name (e.g. `Some("profiling")` as an example of a future
-  category) before it is added to the contract, the drift-gate test will produce a
-  false-positive failure.
+#### COVERAGE: `corpus_resolves_identically_for_call_node_kind` delegates correctness to the first test without annotation
+- File: `crates/sdivi-patterns/tests/dispatch_disjointness.rs:136`
+- Issue: The test uses `_expected` and only asserts that the `call` and `call_expression` paths agree with each other — it does not independently verify the result is correct. This is intentional delegation to `corpus_resolves_to_expected_category`, but if the first test is ever removed or the corpus shrinks, this test continues passing while providing no correctness signal. The delegation intent is not documented in the test body.
 - Severity: LOW
-- Action: Restrict `extract_some_strings` to skip lines where the `Some("` match
-  occurs after `///` or `//` in the trimmed line. The simplest implementation:
-  before calling `extract_some_strings` on a line, skip it if the line's first
-  non-whitespace characters are `//`. No immediate action required; the current
-  suite passes against the real contract.
+- Action: Add a one-line comment inside the test body: `// Correctness of the result is checked by corpus_resolves_to_expected_category; this test only verifies routing parity.`
 
-#### COVERAGE: No external test for `classify_hint` callee routing
-- File: `crates/sdivi-core/tests/category_contract.rs` (suite-level gap)
-- Issue: The drift gate in `category_contract.rs` verifies that category names
-  used in `sdivi-patterns/src/` are registered in `list_categories()`, but the
-  external contract suite does not exercise `classify_hint` end-to-end. The M33
-  behavioral change (routing `console.log` → `logging` and `tracing::info!` →
-  `logging` via callee-text inspection) is tested only in the inline unit tests
-  within `crates/sdivi-patterns/src/queries/mod.rs`. The comment at
-  `queries/mod.rs:286` references a future `tests/m33_sentinels.rs` file that
-  does not yet exist.
+#### COVERAGE: Java and Rust always-return-false paths in `data_access` are implicitly covered but unlabelled
+- File: `crates/sdivi-patterns/tests/dispatch_disjointness.rs:103`
+- Issue: `data_access::matches_callee` documents that Rust and Java always return `false` in v0. The CORPUS entry `("MyClass.method()", "java", "")` exercises this path but is labelled only as "Unrecognised — classify_hint must return empty Vec". If a future coder adds Java data-access regexes, they will not find an explicit fixture pinning the always-false contract and may not know coverage is expected.
 - Severity: LOW
-- Action: Consider adding one `classify_hint` round-trip assertion to the external
-  suite (either in `category_contract.rs` or the referenced `tests/m33_sentinels.rs`)
-  to validate M33 behavior from outside `sdivi-patterns`. Not blocking; the inline
-  unit tests in `queries/mod.rs` cover the callee-routing paths.
+- Action: Add a brief comment on the relevant corpus entries (or a separate unrecognised-by-design block) noting that Java and Rust return `false` from `data_access::matches_callee` by design in v0. No additional test function needed.
+
+#### COVERAGE: `all_matching_categories` helper hardcodes P1/P8/P9 rather than iterating `CALL_DISPATCH`
+- File: `crates/sdivi-patterns/tests/dispatch_disjointness.rs:28`
+- Issue: If a future milestone inserts a new category into `CALL_DISPATCH` without also updating `all_matching_categories`, the `no_undocumented_overlaps_in_corpus` test will silently miss overlaps between the new category and existing ones. The TODO comment on lines 25–27 acknowledges this and gives correct instructions for M35.
+- Severity: LOW
+- Action: The TODO comment is sufficient mitigation. When P2 lands (M35), the milestone author must follow the TODO instruction before merging. No change required in this audit cycle.
 
 ---
 
-### Point-by-Point Rubric Results
+### Rubric Scorecard
 
-| # | Rubric Point | Result |
-|---|---|---|
-| 1 | Assertion Honesty | PASS — all assertions derive from live `list_categories()` / serde calls; `len() == 8` is an intentional contract pin matching the 8 entries in `CATALOG_ENTRIES` |
-| 2 | Edge Case Coverage | PASS — error paths covered in `queries/mod.rs` inline suite (unknown node kind → None, `category_for_node_kind` never returns logging); `category_contract.rs` covers schema_version, non-empty, idempotency, drift, and doc parity |
-| 3 | Implementation Exercise | PASS — tests call `sdivi_core::list_categories()`, `sdivi_core::CATEGORIES`, and real serde round-trip on `WasmCategoryCatalog`; no mocking of functions under test |
-| 4 | Test Weakening | PASS — no existing assertions were removed or broadened; tester made no modifications to test files |
-| 5 | Naming and Intent | PASS — all 10 test names encode scenario and expected outcome (e.g. `list_categories_returns_schema_version_1_0`, `wasm_category_catalog_json_field_names_are_schema_version_and_categories`) |
-| 6 | Scope Alignment | FLAG — see HIGH finding; false orphan claims do not reflect actual file content |
-| 7 | Isolation | PASS — `markdown_table_matches_list_categories_output` reads `docs/pattern-categories.md`, a version-controlled source file intentionally checked for doc parity; no `.tekhton/` build artifacts, pipeline logs, or run-state files are read |
+| # | Criterion | Verdict | Notes |
+|---|---|---|---|
+| 1 | Assertion Honesty | PASS | All four tests call real functions with corpus-derived inputs; no hard-coded magic values; `vec![]` and `vec![winner]` assertions tie directly to CALL_DISPATCH implementation |
+| 2 | Edge Case Coverage | PASS | Empty-result path covered by 4 CORPUS entries; both winner and loser verified for each KNOWN_OVERLAPS entry; `call`/`call_expression` parity verified across full corpus |
+| 3 | Implementation Exercise | PASS | `classify_hint`, `async_patterns::matches_callee`, `logging::matches_callee`, `data_access::matches_callee` all called on real types with no mocking |
+| 4 | Test Weakening | PASS | Tester added one KNOWN_OVERLAPS entry and one CORPUS row for P8>P9 overlap; no existing assertions were broadened or removed |
+| 5 | Naming and Intent | PASS | All four names encode the scenario and expected outcome |
+| 6 | Scope Alignment | PASS | All imports resolve to current symbols (`classify_hint`, `async_patterns`, `logging`, `data_access`, `PatternHintInput`); no deleted or renamed items referenced |
+| 7 | Test Isolation | PASS | Only const tables and real function calls; no file I/O, no `.tekhton/` reads, no dependency on prior pipeline state or run artifacts |
+
+---
+
+### Tester Claim Verification
+
+**Claim 1 — Added TODO comment to `all_matching_categories`.**
+Confirmed at lines 25–27 of `dispatch_disjointness.rs`. ✓
+
+**Claim 2 — Documented and tested P8>P9 (logging beats data\_access) overlap.**
+Confirmed: second `KNOWN_OVERLAPS` entry at lines 62–67 (`logger.get("x")`, typescript, logging wins over data\_access). CORPUS entry at line 83. Mechanically exercised by both `no_undocumented_overlaps_in_corpus` and `known_overlaps_winner_matches_dispatch_order`.
+
+The P8>P9 overlap claim is factually correct:
+- `logging::matches_callee("logger.get(\"x\")", "typescript")` matches `^(console|logger|log)\.` → `true`.
+- `data_access::matches_callee("logger.get(\"x\")", "typescript")` matches `\b(get)\(` (word boundary before `get` is satisfied by the preceding `.`) → `true`.
+- `classify_hint` returns `vec!["logging"]` because `logging` (P8) precedes `data_access` (P9) in `CALL_DISPATCH`. ✓

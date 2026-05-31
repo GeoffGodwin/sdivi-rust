@@ -98,6 +98,12 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
+#[allow(clippy::type_complexity)] // P1=async_patterns > P8=logging > P9=data_access; future milestones insert at their slot
+const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
+    ("async_patterns", async_patterns::matches_callee),
+    ("logging", logging::matches_callee),
+    ("data_access", data_access::matches_callee),
+];
 /// Classify a [`PatternHintInput`] using both node kind and callee-text inspection.
 ///
 /// Returns a `Vec` of category name(s) the hint belongs to. In v0 the return is
@@ -108,8 +114,7 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Priority: `async_patterns` > `logging` > `data_access`. The first match wins.
-/// The order is load-bearing only if the disjoint-regex invariant is ever relaxed.
+/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P8/P9 active at M34).
 ///
 /// ## `macro_invocation`
 ///
@@ -142,14 +147,10 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
 pub fn classify_hint(hint: &PatternHintInput, language: &str) -> Vec<&'static str> {
     match hint.node_kind.as_str() {
         "call_expression" | "call" => {
-            if async_patterns::matches_callee(&hint.text, language) {
-                return vec!["async_patterns"];
-            }
-            if logging::matches_callee(&hint.text, language) {
-                return vec!["logging"];
-            }
-            if data_access::matches_callee(&hint.text, language) {
-                return vec!["data_access"];
+            for &(category, matches) in CALL_DISPATCH {
+                if matches(&hint.text, language) {
+                    return vec![category];
+                }
             }
             vec![]
         }
