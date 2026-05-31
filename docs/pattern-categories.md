@@ -26,6 +26,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Natively classified since M33** via callee-text inspection in `classify_hint` — see Callee-text classification section. |
 | null_safety | Code constructs that guard against null or undefined values — optional chaining (`a?.b`, `arr?.[0]`, `fn?.()`) and TypeScript non-null assertions (`el!`). TypeScript and JavaScript only; other languages produce no instances in v0. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., Rust macro invocations such as `drop!`, `vec!`, `assert!`. As of M33, Rust logging macros (`tracing::*!`, `log::*!`, `println!`/`eprintln!`/`print!`/`eprint!`/`dbg!`) are excluded and classified as `logging` instead. |
+| schema_validation | Runtime schema and validation declarations — Zod (`z.object`, `z.string`, `z.enum`), Yup (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and the Zod-specific `.safeParse(` validated-parse call in TypeScript and JavaScript. Python: Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`). Detected via callee-text at CALL_DISPATCH slot P4. Note: `class Foo(BaseModel)` is a `class_definition` counted under `class_hierarchy`; class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2). TypeScript, JavaScript, and Python only in v0. Added M38. |
 | state_management | Code constructs that capture, transform, or share mutable or shared state — e.g., closures that close over mutable bindings or shared references. |
 | type_assertions | Code constructs that assert or coerce between types at compile or runtime — e.g., `as` casts (`as_expression`) and language-specific type-cast expressions. |
 
@@ -57,6 +58,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | error_handling | `try_statement` | None |
 | logging | `call` where callee matches `^(logging\.\|print\b)` | Natively classified since M33. Examples: `logging.info(x)`, `print(x)`. |
 | resource_management | (none in v0) | — |
+| schema_validation | `call` where callee matches `\bField\(|\bconstr\(|\bconint\(` | Pydantic field-constraint call forms only. `class Foo(BaseModel)` counts under `class_hierarchy`, not here. Added M38. |
 | state_management | `lambda` | None |
 | type_assertions | (none in v0) | — |
 
@@ -73,6 +75,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | logging | `call_expression` where callee matches `^(console\|logger\|log)\.` | Natively classified since M33. Examples: `console.log(x)`, `logger.info(x)`. |
 | null_safety | `optional_chain`; `non_null_expression` (TS only) | `optional_chain`: one instance per node as emitted by the grammar — a nested chain `a?.b?.c` may produce multiple nodes. `non_null_expression`: TypeScript-only; not emitted by the JS adapter. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | (none in v0) | — |
+| schema_validation | `call_expression` where callee matches `^(z\|yup\|v\|s)\.\w` or `\.safeParse\(` | Namespace-anchored: Zod (`z.`), Yup (`yup.`), Valibot (`v.`), Superstruct (`s.`) + Zod-specific `.safeParse(`. Bare `.string()`/`.object()` on arbitrary receivers are intentionally excluded — no receiver-type info available. `SomeSchema.parse(x)` (no namespace prefix) is a known miss. Natively classified at CALL_DISPATCH slot P4 (M38). |
 | state_management | `arrow_function` | None |
 | type_assertions | `type_cast_expression`, `as_expression` | None |
 
@@ -139,6 +142,23 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 
 **Worked example (TypeScript):** `promise.then(resolve)` → `["async_patterns"]`
 
+### `schema_validation::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Deliberately NOT matched |
+|---|---|---|---|
+| TypeScript / JavaScript | `^(z\|yup\|v\|s)\.\w` | `z.object({})`, `yup.string()`, `v.pipe(...)`, `s.object(...)` | bare `.string()`/`.array()` on arbitrary receivers |
+| TypeScript / JavaScript | `\.safeParse\(` | `UserSchema.safeParse(x)` | bare `.parse(` (collides with date/arg parsers) |
+| Python | `\bField\(` | `Field(default=0)`, `Field(...)` | — |
+| Python | `\bconstr\(` | `constr(min_length=1)` | — |
+| Python | `\bconint\(` | `conint(gt=0)` | — |
+| All others | (none) | — | — |
+
+**Worked example (TypeScript):** `z.object({ name: z.string() })` → `["schema_validation"]`
+
+**Known recall gap:** `SomeSchema.parse(x)` where the receiver name is arbitrary is not captured — receiver-type info is outside the v0 node-kind model. Receiver-type inference would require a separate analysis pass; treat as out of scope, not a regex tweak.
+
+**Pydantic class coverage:** `class Foo(BaseModel)` is a `class_definition` and already counted under `class_hierarchy` (M6). Python coverage here is intentionally partial: only call forms (`Field(...)`, `constr(...)`, `conint(...)`) are classified. class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2).
+
 ### `framework_hooks::matches_callee(text, language)`
 
 | Language | Pattern | Examples matched |
@@ -185,9 +205,10 @@ is the contract — future milestones insert at their named slot, never append.
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P6, P8, and P9 are active at M36.2. The `decorators` category is node-kind-only and does
-not appear in `CALL_DISPATCH` — it is classified via `category_for_node_kind` in the
-`other =>` arm of `classify_hint`. All other slots are reserved placeholders.
+P1, P4, P6, P8, and P9 are active at M38. The `decorators` and `null_safety` categories are
+node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
+`category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
+reserved placeholders.
 
 #### KNOWN_OVERLAPS policy
 
@@ -195,7 +216,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M35 (P1/P6/P8/P9 active):
+Documented overlaps at M38 (P1/P4/P6/P8/P9 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -242,7 +263,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 7. **As of M35, the `framework_hooks` category is natively classified for TypeScript and JavaScript** via `classify_hint` callee-text inspection (`^use[A-Z]` regex). Hook calls that were previously unrecognised (dropped to `[]`) are now counted in the `framework_hooks` bucket. On the first post-M35 snapshot of a TS/JS repo, `framework_hooks` transitions from zero to non-zero. This is a count-introduction event; see `MIGRATION_NOTES.md` for details.
 8. **As of M36.1, the `decorators` category is natively classified for TypeScript and JavaScript** via the `decorator` tree-sitter node kind. `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, and any other decorator node are counted. On the first post-M36.1 snapshot of a TS/JS repo with decorators, the `decorators` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`. **As of M36.2, Python is also supported** via the `decorated_definition` node kind (`@dataclass`, `@property`, `@app.get(...)`, `@pytest.fixture`, etc.). Count semantics differ: Python counts one instance per decorated definition (wrapper-granularity); TypeScript/JavaScript count one per decorator line; see `MIGRATION_NOTES.md`.
 9. **As of M37, the `null_safety` category is natively classified for TypeScript and JavaScript** via `optional_chain` and `non_null_expression` node kinds. On the first post-M37 snapshot of a TS/JS repo using optional chaining or non-null assertions, the `null_safety` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`. Nullish coalescing (`??`) is deferred — it requires operator-field inspection beyond the v0 node-kind model.
-10. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
+10. **As of M38, the `schema_validation` category is natively classified for TypeScript, JavaScript, and Python** via callee-text inspection at CALL_DISPATCH slot P4. Zod (`z.*`), Yup (`yup.*`), Valibot (`v.*`), Superstruct (`s.*`), `.safeParse(`, and Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are now counted in `schema_validation`. On the first post-M38 snapshot of a repo using these libraries, the `schema_validation` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+11. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

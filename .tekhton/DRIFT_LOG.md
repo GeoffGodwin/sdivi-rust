@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 13
+- Runs since audit: 14
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:84-106` (`category_for_node_kind`) â the function's doc comment cites `logging` as the only callee-only category. `framework_hooks` and `schema_validation` are now also callee-only (empty `NODE_KINDS`); mentioning them alongside `logging` would prevent future contributors from reading the omissions as oversights.
+- [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs:77-81` â the `null_safety` description references `fn?.()` via `optional_chain`, but the grammar emits `call_expression` for optional calls. Pre-existing from M37; the code is correct and the test suite is accurate â only the description is misleading.
+- [2026-05-31 | "unknown"] Stale comment in `dispatch_disjointness.rs:26` ("At M38, P1/P4/P6/P8/P9 are active") is correctly updated for M38 â previously stale from M35 through M37. Now current.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:122` â `classify_hint` doc comment reads "(P1/P6/P8/P9 active at M35)"; now at M37. Pre-existing; accumulating across milestones.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/tests/dispatch_disjointness.rs:26` â "At M35, P1/P6/P8/P9 are active" comment is stale (observed across M36.1, M36.2, M37). One-line fix deferred each cycle.
 - [2026-05-31 | "unknown"] `fn?.()` described as `optional_chain` is consistent across `null_safety.rs`, `categories.rs`, `docs/pattern-categories.md`, and `MIGRATION_NOTES.md` â consistent with each other and the milestone spec, but collectively wrong per the grammar. The test is the accurate record; the docs will mislead until corrected.

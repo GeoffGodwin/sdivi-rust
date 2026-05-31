@@ -1,4 +1,4 @@
-# Reviewer Report — M37: `null_safety` pattern category
+# Reviewer Report — M38: `schema_validation` pattern category
 
 **Review cycle:** 1 of 4
 **Reviewer:** code-review agent
@@ -21,17 +21,19 @@ APPROVED_WITH_NOTES
 ---
 
 ## Non-Blocking Notes
-- `null_safety.rs` public constant doc, module doc, `categories.rs` description, `docs/pattern-categories.md` canonical table, and `MIGRATION_NOTES.md` all list `fn?.()` as an `optional_chain` example — but the coder's own test (`optional_chain_member_access_variants_captured`) proves the grammar emits `call_expression` for optional calls, not `optional_chain`. The code is correct; the docs give a misleading example in four public-facing locations. Suggest removing `fn?.()` from all four example lists in a follow-up pass.
-- Test name `null_safety_node_kinds_do_not_match_non_ts_js_languages` (`queries/tests.rs:164`) is semantically inverted: the body asserts `Some("null_safety")` (a match) for `["rust", "python", "go", "java"]`, while the name implies no-match. The assertion is correct and the inline message explains why; only the name misleads.
+- `bindings/sdivi-wasm/tests/wasm_smoke.rs:245-254` — `list_categories_returns_schema_version_and_expected_count` explicitly checks 9 of 12 category names; `resource_management`, `state_management`, and `type_assertions` are absent from the name assertions. The `len() == 12` count assertion prevents silent drift, but the asymmetry means three categories lack name-level smoke coverage.
+- Pre-existing (flagged by coder): `crates/sdivi-patterns/src/queries/tests.rs:194` — `null_safety_node_kinds_do_not_match_non_ts_js_languages` test name is semantically inverted; the body asserts `Some("null_safety")` for non-TS/JS languages. Carry-over from M37, not in scope.
+- `crates/sdivi-patterns/src/queries/mod.rs:115-116` — no blank line between the closing `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. The CLAUDE.md placement rule is only violated when the inserted item itself carries `///`; `CALL_DISPATCH` uses `#[allow(…)]` + `//`, so `/// Classify…` attaches correctly. A blank line here would remove any ambiguity for future readers.
 
 ---
 
 ## Coverage Gaps
-- No test asserts the per-node count for a chained expression (`a?.b?.c`). The module doc and migration notes claim this produces multiple `optional_chain` nodes (each counted independently), but no test constructs such a chain and verifies the expected count. A dedicated assertion would pin the documented counting semantics.
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` corpus has no explicit Python `schema_validation` entry. The `corpus_resolves_identically_for_call_node_kind` test mirrors the full corpus over both `call` and `call_expression` node kinds, so the two Python entries in `category_contract_m38.rs` (`Field(default=0)`, `constr(min_length=1)`) are indirectly exercised; but a direct corpus row for Python schema_validation would make slot P4 Python coverage self-documenting in the disjointness suite.
+- `wasm_smoke.rs` does not verify `resource_management`, `state_management`, or `type_assertions` by name (pre-existing gap — not introduced by M38).
 
 ---
 
 ## Drift Observations
-- `crates/sdivi-patterns/src/queries/mod.rs:122` — `classify_hint` doc comment reads "(P1/P6/P8/P9 active at M35)"; now at M37. Pre-existing; accumulating across milestones.
-- `crates/sdivi-patterns/tests/dispatch_disjointness.rs:26` — "At M35, P1/P6/P8/P9 are active" comment is stale (observed across M36.1, M36.2, M37). One-line fix deferred each cycle.
-- `fn?.()` described as `optional_chain` is consistent across `null_safety.rs`, `categories.rs`, `docs/pattern-categories.md`, and `MIGRATION_NOTES.md` — consistent with each other and the milestone spec, but collectively wrong per the grammar. The test is the accurate record; the docs will mislead until corrected.
+- `crates/sdivi-patterns/src/queries/mod.rs:84-106` (`category_for_node_kind`) — the function's doc comment cites `logging` as the only callee-only category. `framework_hooks` and `schema_validation` are now also callee-only (empty `NODE_KINDS`); mentioning them alongside `logging` would prevent future contributors from reading the omissions as oversights.
+- `crates/sdivi-core/src/categories.rs:77-81` — the `null_safety` description references `fn?.()` via `optional_chain`, but the grammar emits `call_expression` for optional calls. Pre-existing from M37; the code is correct and the test suite is accurate — only the description is misleading.
+- Stale comment in `dispatch_disjointness.rs:26` ("At M38, P1/P4/P6/P8/P9 are active") is correctly updated for M38 — previously stale from M35 through M37. Now current.

@@ -1,3 +1,5 @@
+use crate::hint_input::PatternHintInput;
+
 use super::*;
 
 #[test]
@@ -38,11 +40,12 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_eleven_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 11);
+fn all_categories_has_twelve_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 12);
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
     assert!(ALL_CATEGORIES.contains(&"null_safety"));
+    assert!(ALL_CATEGORIES.contains(&"schema_validation"));
 }
 
 #[test]
@@ -135,6 +138,33 @@ fn decorator_is_decorators() {
     assert_eq!(
         category_for_node_kind("decorator", "javascript"),
         Some("decorators")
+    );
+}
+
+// ── M38: schema_validation ───────────────────────────────────────────────────
+
+#[test]
+fn zod_call_expression_is_schema_validation() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "z.object({})".to_string(),
+    };
+    assert_eq!(
+        classify_hint(&hint, "typescript"),
+        vec!["schema_validation"]
+    );
+}
+
+#[test]
+fn math_max_is_not_schema_validation() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "Math.max(a, b)".to_string(),
+    };
+    let result = classify_hint(&hint, "typescript");
+    assert!(
+        !result.contains(&"schema_validation"),
+        "Math.max must not match schema_validation"
     );
 }
 

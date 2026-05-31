@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `schema_validation` pattern category (M38): Zod (`z.object`, `z.string`, `z.enum`), Yup
+  (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and
+  the Zod-specific `.safeParse(` call in TypeScript and JavaScript are now natively classified
+  as `schema_validation` via callee-text inspection at CALL_DISPATCH slot P4. Python: Pydantic
+  field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are also classified here.
+  Detection is namespace-anchored for TS/JS (`z.`/`yup.`/`v.`/`s.`) — bare method calls on
+  arbitrary receivers are intentionally excluded. `class Foo(BaseModel)` is counted under
+  `class_hierarchy`; class-validator decorators (`@IsString()`) belong to `decorators`.
+  On the first post-upgrade snapshot of a repo using these libraries, `schema_validation`
+  transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+  `list_categories()` count grows from 11 → 12. `snapshot_version` stays `"1.0"`.
+
 - `null_safety` pattern category (M37): TypeScript and JavaScript `optional_chain` nodes
   (`a?.b`, `arr?.[0]`, `fn?.()`) and TypeScript `non_null_expression` nodes (`el!`) are
   now natively classified as `null_safety`. Node-kind-only — all optional chains and

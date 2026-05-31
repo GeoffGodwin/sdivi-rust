@@ -85,6 +85,18 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         e.g., macro invocations such as `drop!`, `vec!`, or standard I/O macros.",
     ),
     (
+        "schema_validation",
+        "Runtime schema and validation declarations — Zod (`z.object`, `z.string`), \
+        Yup (`yup.object().shape(...)`), Valibot (`v.object`), Superstruct (`s.object`), \
+        and the Zod-specific `.safeParse(` call in TypeScript and JavaScript. Python: \
+        Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`). \
+        Detected via callee-text on `call_expression`/`call` at CALL_DISPATCH slot P4. \
+        `class Foo(BaseModel)` is a `class_definition` counted under `class_hierarchy`. \
+        class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2). \
+        TypeScript, JavaScript, and Python only; other languages produce no instances in v0. \
+        Added M38.",
+    ),
+    (
         "state_management",
         "Code constructs that capture, transform, or share mutable or shared state — \
         e.g., closures that close over mutable bindings or shared references.",
@@ -111,7 +123,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"framework_hooks"));
 /// assert!(CATEGORIES.contains(&"logging"));
 /// assert!(CATEGORIES.contains(&"null_safety"));
-/// assert_eq!(CATEGORIES.len(), 11);
+/// assert!(CATEGORIES.contains(&"schema_validation"));
+/// assert_eq!(CATEGORIES.len(), 12);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -125,6 +138,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[8].0,
     CATALOG_ENTRIES[9].0,
     CATALOG_ENTRIES[10].0,
+    CATALOG_ENTRIES[11].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -185,6 +199,7 @@ pub struct CategoryCatalog {
 /// assert!(names.contains(&"error_handling"));
 /// assert!(names.contains(&"async_patterns"));
 /// assert!(names.contains(&"null_safety"));
+/// assert!(names.contains(&"schema_validation"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {

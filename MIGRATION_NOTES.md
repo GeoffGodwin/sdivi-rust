@@ -8,6 +8,51 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M38 — `schema_validation` pattern category introduced (TS/JS/Python count-introduction event)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `schema_validation` is now a native CALL_DISPATCH category (slot P4),
+classified via callee-text inspection in TypeScript, JavaScript, and Python:
+
+- **TypeScript / JavaScript:** Zod (`z.object`, `z.string`, `z.enum`), Yup (`yup.object()`,
+  `yup.string()`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`) — detected via the
+  namespace-anchored regex `^(z|yup|v|s)\.\w`. Additionally `.safeParse(` is matched as a
+  Zod-specific validated-parse call.
+- **Python:** Pydantic field-constraint calls — `Field(...)`, `constr(...)`, `conint(...)` —
+  detected via `\bField\(|\bconstr\(|\bconint\(`. Note: `class Foo(BaseModel)` is a
+  `class_definition` counted under `class_hierarchy`, not here. Python coverage is
+  intentionally partial in v0.
+
+`list_categories()` count grows from 11 → 12.
+
+**Precision over recall.** The TS/JS regex is namespace-anchored (`z.`/`yup.`/`v.`/`s.`),
+not method-name-anchored. `SomeSchema.parse(x)` where the receiver name is arbitrary is a
+known miss — receiver-type info is outside the v0 model. Bare `.string()`/`.object()` on
+arbitrary receivers are intentionally excluded to avoid flooding the bucket.
+
+**Cross-category note.** class-validator decorators (`@IsString()`, `@IsEmail()`) belong to
+`decorators` (M36.1/M36.2), not `schema_validation`. The split is intentional — decorator-shape
+entropy and schema-declaration entropy are independent signals. See `docs/pattern-categories.md`
+for the rationale.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.schema_validation]
+pattern_entropy_rate = 5.0
+expires = "2027-06-30"
+reason = "M38 upgrade: schema_validation bucket newly populated; setting initial tolerance"
+```
+
+**Trend continuity.** The first post-M38 snapshot transitions `schema_validation` from zero to
+non-zero. This is a count-introduction event — the same class as M35 (`framework_hooks`), M36.1
+(`decorators`), and M37 (`null_safety`). The delta for this transition is not meaningful as a
+drift signal; subsequent snapshots establish the baseline.
+
 ## M37 — `null_safety` pattern category introduced (TS/JS count-introduction event)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

@@ -11,7 +11,7 @@
 //!    `KNOWN_OVERLAPS` entry with the winner named.
 
 use sdivi_patterns::queries::{
-    async_patterns, classify_hint, data_access, framework_hooks, logging,
+    async_patterns, classify_hint, data_access, framework_hooks, logging, schema_validation,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -23,12 +23,15 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M35, P1/P6/P8/P9 are active; future milestones extend this list.
+/// At M38, P1/P4/P6/P8/P9 are active; future milestones extend this list.
 // TODO(M39): add state_store::matches_callee when P5 lands.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
         matched.push("async_patterns");
+    }
+    if schema_validation::matches_callee(text, language) {
+        matched.push("schema_validation");
     }
     if framework_hooks::matches_callee(text, language) {
         matched.push("framework_hooks");
@@ -100,6 +103,22 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("System.out.println(\"x\")", "java", "logging"),
     ("logger.info(\"x\")", "java", "logging"),
     ("LOG.debug(\"x\")", "java", "logging"),
+    // P4: schema_validation — namespace-anchored (Zod/Yup/Valibot/Superstruct) + .safeParse(
+    ("z.object({})", "typescript", "schema_validation"),
+    ("z.string()", "javascript", "schema_validation"),
+    ("yup.object().shape({})", "typescript", "schema_validation"),
+    ("v.object({})", "javascript", "schema_validation"),
+    ("s.object({})", "typescript", "schema_validation"),
+    (
+        "UserSchema.safeParse(input)",
+        "typescript",
+        "schema_validation",
+    ),
+    ("Field(default=0)", "python", "schema_validation"),
+    ("constr(min_length=1)", "python", "schema_validation"),
+    ("conint(gt=0)", "python", "schema_validation"),
+    // Negative: bare method calls or non-schema callees must NOT match schema_validation
+    ("SomeClass.parse(x)", "typescript", ""), // no namespace prefix, not .safeParse(
     // M36.1: decorators — node-kind-only via category_for_node_kind, not CALL_DISPATCH.
     // A `decorator` hint routed as `call_expression` should NOT match any dispatch entry.
     ("@Injectable()", "typescript", ""),
@@ -192,6 +211,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
         // The loser must also match (otherwise it shouldn't be in KNOWN_OVERLAPS).
         let loser_matches = match loser {
             "async_patterns" => async_patterns::matches_callee(text, lang),
+            "schema_validation" => schema_validation::matches_callee(text, lang),
             "framework_hooks" => framework_hooks::matches_callee(text, lang),
             "logging" => logging::matches_callee(text, lang),
             "data_access" => data_access::matches_callee(text, lang),
