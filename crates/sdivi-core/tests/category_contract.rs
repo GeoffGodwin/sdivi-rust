@@ -129,12 +129,12 @@ fn list_categories_returns_non_empty_categories() {
 }
 
 #[test]
-fn list_categories_returns_exactly_fifteen_categories() {
+fn list_categories_returns_exactly_sixteen_categories() {
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        15,
-        "list_categories must return exactly 15 categories"
+        16,
+        "list_categories must return exactly 16 categories"
     );
 }
 

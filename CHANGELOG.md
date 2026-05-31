@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `testing` pattern category (M42): test-suite structure and assertion calls are now
+  natively classified as `testing` via callee-text inspection at CALL_DISPATCH slot P2
+  (just below `async_patterns` P1). TypeScript/JavaScript: BDD globals (`describe`, `it`,
+  `test`, `context`), lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`),
+  `expect(…)` assertion roots, and framework-namespaced helpers (`jest.fn`, `jest.mock`,
+  `vi.fn`, `vi.mock`, `vi.spyOn`, etc. — full Jest and Vitest helper set). Go:
+  `testing.T` method calls (`t.Run`, `t.Fatal`, `t.Error`, `t.Errorf`, and the full T
+  method set) via `\bt\.` word-boundary anchor. Python: `unittest.TestCase` assertion
+  methods (`self.assertEqual`, `self.assertTrue`, and the full `self.assert[A-Z]…`
+  family). `list_categories()` count grows from 15 → 16. `snapshot_version` stays
+  `"1.0"`. **`scope_exclude` interaction:** the bucket is non-empty only when test files
+  are in the pattern scope; repos that exclude test paths will see a zero count. See
+  `MIGRATION_NOTES.md` for the count-introduction event and `scope_exclude` guidance.
+
 - `http_routing` pattern category (M41): server-side route/endpoint registration calls are
   now natively classified as `http_routing` via receiver-allowlist-anchored callee-text at
   CALL_DISPATCH slot P7. TypeScript/JavaScript: Express/Koa/Fastify/Hono calls on known

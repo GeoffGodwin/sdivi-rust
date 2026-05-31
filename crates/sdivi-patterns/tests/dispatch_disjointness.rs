@@ -12,7 +12,7 @@
 
 use sdivi_patterns::queries::{
     async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks,
-    http_routing, logging, schema_validation, state_store,
+    http_routing, logging, schema_validation, state_store, testing,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -24,11 +24,14 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M41, P1/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
+/// At M42, P1/P2/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
         matched.push("async_patterns");
+    }
+    if testing::matches_callee(text, language) {
+        matched.push("testing");
     }
     if schema_validation::matches_callee(text, language) {
         matched.push("schema_validation");
@@ -106,27 +109,24 @@ const KNOWN_OVERLAPS: &[(&str, &str, &str, &str)] = &[
 ];
 
 // ── Per-category corpus ────────────────────────────────────────────────────────
-// (callee_text, language, expected_category)
-// expected_category = "" means classify_hint must return an empty Vec.
+// (callee_text, language, expected_category); "" = classify_hint returns empty Vec.
 const CORPUS: &[(&str, &str, &str)] = &[
     // P1: async_patterns — Promise chains (TypeScript/JavaScript only)
     ("promise.then(resolve)", "typescript", "async_patterns"),
+    ("describe('suite', fn)", "typescript", "testing"), // P2 testing
     (
         "fetch(url).catch(err => {})",
         "javascript",
         "async_patterns",
     ),
     ("p.finally(() => {})", "typescript", "async_patterns"),
-    // P6: framework_hooks — ^use[A-Z] callee regex (TypeScript/JavaScript only)
-    ("useState(0)", "typescript", "framework_hooks"),
+    ("useState(0)", "typescript", "framework_hooks"), // P6 framework_hooks
     ("useEffect(fn, [])", "typescript", "framework_hooks"),
     ("useMemo(() => v, [])", "javascript", "framework_hooks"),
     ("useCustomHook(opts)", "typescript", "framework_hooks"),
     ("useAuth()", "javascript", "framework_hooks"),
-    // Negative: lowercase second char or wrong language must NOT match framework_hooks
-    ("user()", "typescript", ""),
-    ("useState(0)", "python", ""),
-    // P8: logging — per-language tables
+    ("user()", "typescript", ""),  // lowercase 2nd char: no match
+    ("useState(0)", "python", ""), // wrong language: no match
     // P8>P9 overlap: logging callee with a data_access verb method name; logging wins.
     ("logger.get(\"x\")", "typescript", "logging"),
     ("console.log(\"x\")", "typescript", "logging"),
@@ -281,6 +281,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
         // The loser must also match (otherwise it shouldn't be in KNOWN_OVERLAPS).
         let loser_matches = match loser {
             "async_patterns" => async_patterns::matches_callee(text, lang),
+            "testing" => testing::matches_callee(text, lang),
             "schema_validation" => schema_validation::matches_callee(text, lang),
             "state_store" => state_store::matches_callee(text, lang),
             "framework_hooks" => framework_hooks::matches_callee(text, lang),

@@ -8,6 +8,63 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M42 — `testing` pattern category introduced
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `testing` is now a native CALL_DISPATCH category (slot P2, just below
+`async_patterns` P1 and above all other categories), classified via callee-text inspection:
+
+- **TypeScript / JavaScript** (Jest/Vitest/Mocha/Jasmine): BDD globals (`describe`, `it`,
+  `test`, `context`), lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`),
+  `expect(…)` assertion roots, focused/excluded variants (`xit`, `xdescribe`, `fit`,
+  `fdescribe`), and framework-namespaced helpers (`jest.fn`, `jest.mock`, `jest.spyOn`,
+  `vi.fn`, `vi.mock`, `vi.spyOn`, `jest.clearAllMocks`, `jest.useFakeTimers`, etc.).
+- **Go:** `testing.T` method calls — `t.Run`, `t.Error`, `t.Errorf`, `t.Fatal`,
+  `t.Fatalf`, `t.Helper`, `t.Skip`, `t.Skipf`, `t.Log`, `t.Logf`, `t.Cleanup`,
+  `t.Parallel`. Matched via `\bt\.` word-boundary anchor on the receiver.
+- **Python:** `unittest.TestCase` assertion methods — `self.assertEqual`,
+  `self.assertTrue`, and the full `self.assert[A-Z]…` family.
+
+`list_categories()` count grows from 15 → 16.
+
+**Count-introduction event.** On the first post-M42 snapshot of a repo whose test files
+are included in the pattern scope, `testing` transitions from zero to non-zero. Prior
+snapshots had no `testing` bucket — trend continuity is broken for this dimension at the
+upgrade boundary. The trend line resumes cleanly from the second post-upgrade snapshot.
+
+**`scope_exclude` interaction.** `patterns.scope_exclude` removes files from the pattern
+catalog only (they stay in the dependency graph). The `testing` bucket is non-empty only
+when test files are included in the pattern scope. If a repo excludes test paths:
+
+```toml
+[patterns]
+scope_exclude = ["**/*.test.ts", "**/*.spec.ts", "**/tests/**", "**/test_*.py"]
+```
+
+the `testing` bucket will be empty on all snapshots — not a bug, but the expected
+behaviour for teams that want to measure production-code patterns only. No auto-detection
+of test paths is performed.
+
+**Known false positives.** `test(args)`, `it(args)`, `context(args)`, and `expect(x)` are
+valid identifiers in business logic. The `^` anchor prevents mid-identifier matching but
+cannot distinguish intent. At codebase scale these are entropy noise; they do not
+materially affect divergence scores in repos where test files dwarf non-test usage.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.testing]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Migrating test suite from Mocha to Vitest; expect churn during migration"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M41 — `http_routing` pattern category introduced; `app.get`/`router.post` reassigned from `data_access`
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

@@ -146,6 +146,22 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         Added M39.",
     ),
     (
+        "testing",
+        "Test-suite structure and assertion calls — BDD suite globals (`describe`, `it`, \
+        `context`), flat `test` globals, lifecycle hooks (`beforeEach`, `afterEach`, \
+        `beforeAll`, `afterAll`), `expect(…)` assertion roots, focused/excluded variants \
+        (`xit`, `xdescribe`, `fit`, `fdescribe`), and framework-namespaced helpers \
+        (`jest.fn`, `jest.mock`, `jest.spyOn`, `vi.fn`, `vi.mock`, `vi.spyOn`, etc.) in \
+        TypeScript and JavaScript (Jest/Vitest/Mocha/Jasmine). Go `testing.T` method calls \
+        (`t.Run`, `t.Fatal`, `t.Error`, `t.Errorf`, and the full T method set). Python \
+        `unittest.TestCase` assertion methods (`self.assertEqual`, `self.assertTrue`, and \
+        the full `self.assert[A-Z]…` family). Detected via callee-text at CALL_DISPATCH \
+        slot P2 (above `schema_validation` P4). **`scope_exclude` interaction:** the \
+        `testing` bucket is non-empty only when test files are in the pattern scope; \
+        repos that exclude test paths via `patterns.scope_exclude` will see a zero \
+        count. Added M42.",
+    ),
+    (
         "type_assertions",
         "Code constructs that assert or coerce between types at compile or runtime — \
         e.g., `as` casts (`as_expression`) and language-specific type-cast expressions.",
@@ -171,7 +187,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"null_safety"));
 /// assert!(CATEGORIES.contains(&"schema_validation"));
 /// assert!(CATEGORIES.contains(&"state_store"));
-/// assert_eq!(CATEGORIES.len(), 15);
+/// assert!(CATEGORIES.contains(&"testing"));
+/// assert_eq!(CATEGORIES.len(), 16);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -189,6 +206,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[12].0,
     CATALOG_ENTRIES[13].0,
     CATALOG_ENTRIES[14].0,
+    CATALOG_ENTRIES[15].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -253,6 +271,7 @@ pub struct CategoryCatalog {
 /// assert!(names.contains(&"null_safety"));
 /// assert!(names.contains(&"schema_validation"));
 /// assert!(names.contains(&"state_store"));
+/// assert!(names.contains(&"testing"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {

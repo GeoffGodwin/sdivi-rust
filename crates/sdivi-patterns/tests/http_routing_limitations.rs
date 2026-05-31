@@ -58,12 +58,18 @@ fn nextjs_app_router_bare_put_is_not_http_routing() {
 
 #[test]
 fn nextjs_app_router_bare_delete_is_not_http_routing() {
-    assert!(!http_routing::matches_callee("DELETE(request)", "typescript"));
+    assert!(!http_routing::matches_callee(
+        "DELETE(request)",
+        "typescript"
+    ));
 }
 
 #[test]
 fn nextjs_app_router_bare_patch_is_not_http_routing() {
-    assert!(!http_routing::matches_callee("PATCH(request)", "typescript"));
+    assert!(!http_routing::matches_callee(
+        "PATCH(request)",
+        "typescript"
+    ));
 }
 
 #[test]
@@ -93,17 +99,26 @@ fn idiosyncratic_api_receiver_is_not_http_routing() {
 #[test]
 fn idiosyncratic_hono_variable_is_not_http_routing() {
     // Hono app named `hono` rather than `app` / `server` / etc.
-    assert!(!http_routing::matches_callee("hono.get('/path', h)", "typescript"));
+    assert!(!http_routing::matches_callee(
+        "hono.get('/path', h)",
+        "typescript"
+    ));
 }
 
 #[test]
 fn idiosyncratic_my_router_variable_is_not_http_routing() {
-    assert!(!http_routing::matches_callee("myRouter.get('/path', h)", "typescript"));
+    assert!(!http_routing::matches_callee(
+        "myRouter.get('/path', h)",
+        "typescript"
+    ));
 }
 
 #[test]
 fn idiosyncratic_app2_variable_is_not_http_routing() {
-    assert!(!http_routing::matches_callee("app2.get('/path', h)", "typescript"));
+    assert!(!http_routing::matches_callee(
+        "app2.get('/path', h)",
+        "typescript"
+    ));
 }
 
 #[test]
@@ -178,7 +193,10 @@ fn go_e_patch_via_classify_hint() {
 #[test]
 fn python_blueprint_add_url_rule_via_classify_hint() {
     assert_eq!(
-        classify_hint(&call_expr("bp.add_url_rule('/users', view_func=h)"), "python"),
+        classify_hint(
+            &call_expr("bp.add_url_rule('/users', view_func=h)"),
+            "python"
+        ),
         vec!["http_routing"]
     );
 }
@@ -186,5 +204,8 @@ fn python_blueprint_add_url_rule_via_classify_hint() {
 #[test]
 fn python_any_receiver_add_url_rule_matches_callee() {
     // Receiver-agnostic: any object calling `.add_url_rule(` matches
-    assert!(http_routing::matches_callee("x.add_url_rule('/p', view_func=h)", "python"));
+    assert!(http_routing::matches_callee(
+        "x.add_url_rule('/p', view_func=h)",
+        "python"
+    ));
 }

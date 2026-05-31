@@ -1,4 +1,4 @@
-# Reviewer Report — M41: `http_routing` pattern category
+# Reviewer Report — M42: `testing` pattern category
 
 **Review cycle:** 1 of 4
 **Reviewer:** code-review agent
@@ -11,28 +11,28 @@ APPROVED_WITH_NOTES
 ---
 
 ## Complex Blockers (senior coder)
-None
+- None
 
 ---
 
 ## Simple Blockers (jr coder)
-None
+- None
 
 ---
 
 ## Non-Blocking Notes
-- `crates/sdivi-patterns/src/queries/mod.rs:127-128` — pre-existing: no blank line between closing `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. Carry-over from M38/M39/M40; accumulating flagging by successive reviewers.
-- `crates/sdivi-patterns/src/queries/mod.rs:33-34` — pre-existing: `category_for_node_kind` doc note says only `logging` is callee-only; `http_routing`, `framework_hooks`, `schema_validation`, `state_store`, and `collection_pipelines` are also callee-only. The list is now five entries stale.
-- `bindings/sdivi-wasm/tests/m23_native.rs:48` — pre-existing: test function name `list_categories_wasm_export_returns_eight_categories` is permanently stale (body asserts 15). Carry-over from M34+; will confuse future readers indefinitely until the test function is renamed.
+- `crates/sdivi-patterns/src/queries/mod.rs:34-35` — The `ALL_CATEGORIES` doc comment still says "Note: `logging` is classified via `classify_hint` callee-text inspection only" without mentioning `testing`. At M42 there are now seven callee-only categories; the single-category callout is significantly stale and will mislead embedders reading the docs. Pre-existing carry-over widened by this milestone.
+- `crates/sdivi-patterns/src/queries/mod.rs:131-132` — No blank line between the closing `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. Pre-existing carry-over from M38+; Rust will silently re-attach the doc to the const rather than the function in certain tooling. Should be fixed in a standalone clean-up commit.
 
 ---
 
 ## Coverage Gaps
-- Next.js App Router route handlers (named exports `GET`, `POST`, `PUT`, etc. from `route.ts` files) are mentioned in the M41 milestone scope but cannot be detected via callee-text on `call_expression` — they use function-export syntax rather than receiver.method patterns. No regex covers them. This is an inherent limitation of the v0 callee-text model; documenting it explicitly in `http_routing.rs` or `docs/pattern-categories.md` would help future readers understand the scope boundary.
+- No fixture-level integration test exercising the in-scope vs. `scope_exclude`-excluded bucket population path. The milestone spec explicitly required: "Integration: a fixture with tests in-scope vs excluded, asserting the bucket populates/empties accordingly." Unit and contract coverage is solid; the integration path is absent. Not a blocker — the tester handles this — but flagged per spec.
 
 ---
 
 ## Drift Observations
-- `crates/sdivi-patterns/src/queries/mod.rs:33` — `category_for_node_kind` doc note listing callee-only categories has been outpaced by five consecutive milestones (M35 `framework_hooks`, M38 `schema_validation`, M39 `state_store`, M40 `collection_pipelines`, M41 `http_routing`). A one-line update would eliminate recurring reviewer notes.
-- `crates/sdivi-patterns/src/queries/tests.rs:292-300` — test `null_safety_node_kinds_do_not_match_non_ts_js_languages` remains semantically inverted (name says "do not match" but body asserts `Some("null_safety")` for non-TS/JS languages). Carry-over from M37; still unresolved at M41.
-- `crates/sdivi-patterns/src/queries/http_routing.rs` — `PYTHON_RE` (`\.add_url_rule\(`) is receiver-agnostic (any object), while TS/JS and Go regexes use receiver allowlists. Asymmetry is documented in the module doc but represents a style inconsistency across the three language branches of `matches_callee`. Acceptable for v0 given Flask/FastAPI usage patterns; note for any future Python routing expansion.
+- `crates/sdivi-patterns/src/queries/tests.rs:292-300` — `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name: the body asserts `Some("null_safety")` (the node kind *does* match for all languages), contradicting "do not match." Carry-over from M37; still unresolved at M42.
+- `crates/sdivi-core/src/categories.rs` / `mod.rs` — `category_for_node_kind` doc comment lists only `logging` as callee-only. Now seven categories (`logging`, `framework_hooks`, `schema_validation`, `state_store`, `collection_pipelines`, `http_routing`, `testing`) are callee-only. The stale note has accumulated across six consecutive milestones without a fix.
+- `crates/sdivi-patterns/src/queries/mod.rs:120` — `CALL_DISPATCH` comment lists `P1 > P2=testing > P4=…`, skipping P3 without explanation. A brief note that P3 is reserved for a future category would prevent confusion when a future contributor tries to insert at P2.5.
+- `bindings/sdivi-wasm/tests/m23_native.rs` — function name `list_categories_wasm_export_returns_eight_categories` (if still present) is permanently stale vs. the current count of 16. Carry-over from prior milestones; worth renaming in a clean-up pass.

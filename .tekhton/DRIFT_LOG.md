@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 17
+- Runs since audit: 18
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,10 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:292-300` â `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name: the body asserts `Some("null_safety")` (the node kind *does* match for all languages), contradicting "do not match." Carry-over from M37; still unresolved at M42.
+- [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` / `mod.rs` â `category_for_node_kind` doc comment lists only `logging` as callee-only. Now seven categories (`logging`, `framework_hooks`, `schema_validation`, `state_store`, `collection_pipelines`, `http_routing`, `testing`) are callee-only. The stale note has accumulated across six consecutive milestones without a fix.
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:120` â `CALL_DISPATCH` comment lists `P1 > P2=testing > P4=â¦`, skipping P3 without explanation. A brief note that P3 is reserved for a future category would prevent confusion when a future contributor tries to insert at P2.5.
+- [2026-05-31 | "unknown"] `bindings/sdivi-wasm/tests/m23_native.rs` â function name `list_categories_wasm_export_returns_eight_categories` (if still present) is permanently stale vs. the current count of 16. Carry-over from prior milestones; worth renaming in a clean-up pass.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:33` â `category_for_node_kind` doc note listing callee-only categories has been outpaced by five consecutive milestones (M35 `framework_hooks`, M38 `schema_validation`, M39 `state_store`, M40 `collection_pipelines`, M41 `http_routing`). A one-line update would eliminate recurring reviewer notes.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:292-300` â test `null_safety_node_kinds_do_not_match_non_ts_js_languages` remains semantically inverted (name says "do not match" but body asserts `Some("null_safety")` for non-TS/JS languages). Carry-over from M37; still unresolved at M41.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/http_routing.rs` â `PYTHON_RE` (`\.add_url_rule\(`) is receiver-agnostic (any object), while TS/JS and Go regexes use receiver allowlists. Asymmetry is documented in the module doc but represents a style inconsistency across the three language branches of `matches_callee`. Acceptable for v0 given Flask/FastAPI usage patterns; note for any future Python routing expansion.
