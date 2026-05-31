@@ -71,6 +71,20 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         etc.). Other languages produce no instances.",
     ),
     (
+        "http_routing",
+        "Server-side HTTP route/endpoint registration calls — Express/Koa/Fastify/Hono \
+        (`app.get`, `router.post`, `fastify.route`, `server.use`, `srv.all`), \
+        Go net/http + Gin/Echo/Gorilla \
+        (`http.HandleFunc`, `r.GET`, `mux.Handle`, `e.POST`, `engine.Group`), and \
+        Flask/FastAPI imperative registration (`app.add_url_rule`). Detection is \
+        receiver-allowlist anchored: only calls whose receiver is a known server/router \
+        handle are matched, so client HTTP calls (`axios.get`, `fetch`) stay in \
+        `data_access`. NestJS and FastAPI decorator routes (`@Get('/')`, \
+        `@app.get(...)`) are `decorator`/`decorated_definition` nodes classified under \
+        `decorators` (M36.1/M36.2). Registered at CALL_DISPATCH slot P7, above \
+        `logging` (P8) and `data_access` (P9). Added M41.",
+    ),
+    (
         "logging",
         "Code constructs that produce diagnostic or observability output — \
         e.g., `console.*` calls, structured logger invocations (`logger.info`), \
@@ -152,11 +166,12 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"collection_pipelines"));
 /// assert!(CATEGORIES.contains(&"decorators"));
 /// assert!(CATEGORIES.contains(&"framework_hooks"));
+/// assert!(CATEGORIES.contains(&"http_routing"));
 /// assert!(CATEGORIES.contains(&"logging"));
 /// assert!(CATEGORIES.contains(&"null_safety"));
 /// assert!(CATEGORIES.contains(&"schema_validation"));
 /// assert!(CATEGORIES.contains(&"state_store"));
-/// assert_eq!(CATEGORIES.len(), 14);
+/// assert_eq!(CATEGORIES.len(), 15);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -173,6 +188,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[11].0,
     CATALOG_ENTRIES[12].0,
     CATALOG_ENTRIES[13].0,
+    CATALOG_ENTRIES[14].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -233,6 +249,7 @@ pub struct CategoryCatalog {
 /// assert!(names.contains(&"collection_pipelines"));
 /// assert!(names.contains(&"error_handling"));
 /// assert!(names.contains(&"async_patterns"));
+/// assert!(names.contains(&"http_routing"));
 /// assert!(names.contains(&"null_safety"));
 /// assert!(names.contains(&"schema_validation"));
 /// assert!(names.contains(&"state_store"));

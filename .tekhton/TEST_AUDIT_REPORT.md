@@ -1,32 +1,57 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 3 files, 39 test functions
+Tests audited: 1 file, 19 test functions (`crates/sdivi-patterns/tests/http_routing_limitations.rs`)
 Verdict: PASS
 
 ### Findings
 
 #### SCOPE: Shell-detected orphans are false positives
-- File: crates/sdivi-core/tests/category_contract_m40.rs, crates/sdivi-patterns/src/queries/tests.rs, crates/sdivi-patterns/tests/dispatch_disjointness.rs
-- Issue: The pre-audit orphan detector reported all three test files as importing the deleted module `.tekhton/.commit_decision`. None of the three files contain any reference to that path — the shell detection script produced false positives. All imports in these files are valid: `sdivi_patterns::queries::classify_hint`, `sdivi_patterns::PatternHintInput`, `sdivi_core::list_categories`, and the dispatch sub-modules. No orphaned tests exist. This is the same false-positive pattern documented in the M39 audit; the detection script's naive filename/path match is the likely cause.
+- File: crates/sdivi-patterns/tests/http_routing_limitations.rs:23
+- Issue: The pre-audit orphan detector reported this file as importing the deleted module
+  `.tekhton/.commit_decision` (the same entry appears twice). Reading the actual file reveals
+  no such import. The `use` statements are:
+  ```
+  use sdivi_patterns::queries::{classify_hint, http_routing};
+  use sdivi_patterns::PatternHintInput;
+  ```
+  `.tekhton/.commit_decision` is a pipeline state file, not a Rust module — the Rust module
+  system cannot import it under any path form. The orphan detector produced spurious output.
+  No orphaned tests exist in this file.
 - Severity: LOW
-- Action: Disregard the orphan warnings. Investigate the detection script's matching logic so it does not false-flag future runs. No test file changes needed.
+- Action: Disregard the orphan warnings. Investigate the detection script's matching logic —
+  this is the same false-positive pattern seen in the M40 audit. No test file changes needed.
 
 ---
 
-#### NAMING: `null_safety_node_kinds_do_not_match_non_ts_js_languages` name contradicts body
-- File: crates/sdivi-patterns/src/queries/tests.rs:259
-- Issue: The test name reads "do_not_match_non_ts_js_languages" (negation), but the assertion body is `assert_eq!(..., Some("null_safety"))` — asserting that the function *does* return `null_safety` for rust/python/go/java. The accompanying comment correctly explains the behavior (`category_for_node_kind` is language-unaware, so `optional_chain` maps to `null_safety` regardless of language). The assertion is correct; only the name is inverted. This is a pre-existing carry-over from M37 noted in CODER_SUMMARY.md; M40 modified this file so the issue is now in the audit scope.
-- Severity: MEDIUM
-- Action: Rename to `optional_chain_maps_to_null_safety_regardless_of_language` (or similar) to match what the body actually asserts. No assertion changes needed.
+#### NAMING: Test name overstates the assertion
+- File: crates/sdivi-patterns/tests/http_routing_limitations.rs:110
+- Issue: `classify_hint_idiosyncratic_receiver_falls_through_to_data_access` asserts only
+  `!result.contains(&"http_routing")`. The name and inline comment claim the dispatch falls
+  through to `data_access` (P9), but no assertion verifies `result.contains(&"data_access")`.
+  The claim is factually correct — `\bget\(` in `data_access`'s `TS_JS_GO_RE` does match
+  `api.get('/path', h)` — but the test does not enforce it. If the `data_access` regex
+  changes to stop matching this input, the test continues to pass silently while the stated
+  behavior breaks.
+- Severity: LOW
+- Action: Either add `assert!(result.contains(&"data_access"), "api.get should fall through to data_access; got {result:?}")`, or rename the test to `classify_hint_idiosyncratic_receiver_is_not_http_routing` to match what is actually asserted.
 
 ---
 
-#### COVERAGE: No integration-level positive tests for `go` and `java` in collection_pipelines
-- File: crates/sdivi-core/tests/category_contract_m40.rs, crates/sdivi-patterns/tests/dispatch_disjointness.rs
-- Issue: `collection_pipelines::matches_callee` explicitly returns `true` for `"go"` and `"java"` (same `TS_JS_RE` path as TypeScript/JavaScript). No test in category_contract_m40.rs or the dispatch corpus exercises `("xs.map(f)", "go")` or `("stream.map(f)", "java")` as positive cases. The inline unit tests in collection_pipelines.rs only verify `"python"` and `"rust"` as returning false, not that `"go"` and `"java"` return true. The language arm for Go/Java in `matches_callee` is untested at the integration level.
+#### COVERAGE: Six assertions lack failure messages
+- File: crates/sdivi-patterns/tests/http_routing_limitations.rs:56,64,96,101,106,189
+- Issue: The following tests use bare `assert!(...)` without a message string:
+  `nextjs_app_router_bare_put_is_not_http_routing` (line 56),
+  `nextjs_app_router_bare_delete_is_not_http_routing` (line 64),
+  `idiosyncratic_hono_variable_is_not_http_routing` (line 96),
+  `idiosyncratic_my_router_variable_is_not_http_routing` (line 101),
+  `idiosyncratic_app2_variable_is_not_http_routing` (line 106),
+  `python_any_receiver_add_url_rule_matches_callee` (line 189).
+  The other 13 tests in the file supply helpful failure messages. The inconsistency makes
+  regressions harder to diagnose without inspecting source.
 - Severity: LOW
-- Action: Add corpus entries to the P10 section of dispatch_disjointness.rs CORPUS: `("xs.map(f)", "go", "collection_pipelines")` and `("list.stream().map(f)", "java", "collection_pipelines")`. Optionally add a `go_and_java_map_is_collection_pipelines` test to category_contract_m40.rs.
+- Action: Add message strings consistent with the rest of the file
+  (e.g., `assert!(..., "hono receiver must not match http_routing")`).
 
 ---
 
@@ -34,13 +59,31 @@ Verdict: PASS
 
 The following rubric points were checked and found clean:
 
-- **Assertion Honesty**: All assertions call real functions (`classify_hint`, `list_categories`, `category_for_node_kind`, `matches_callee`) with meaningful inputs. No hard-coded magic values unrelated to implementation logic. The count 14 is directly derived from `ALL_CATEGORIES.len()` and `CATALOG_ENTRIES.len()`.
-- **Test Weakening**: The only modification to an existing test was renaming `all_categories_has_thirteen_entries` → `all_categories_has_fourteen_entries` and updating the count 13 → 14. This is a correct update, not a weakening — the precision of the assertion is unchanged.
-- **Implementation Exercise**: All three files call real implementation functions with no mocking of classification logic. `corpus_resolves_to_expected_category` exercises all 7 active CALL_DISPATCH entries including the new P10 slot. `list_categories_includes_collection_pipelines` calls the real `sdivi_core::list_categories()`.
-- **Test Isolation**: All tests operate on in-memory inputs. No test reads filesystem state, pipeline logs, `.tekhton/` reports, or other mutable project files. No cross-test ordering dependency.
-- **Scope Alignment**: All imports resolve to modules that exist in the current codebase. The `collection_pipelines` module is present at the expected path. CALL_DISPATCH slot order and KNOWN_OVERLAPS entries are consistent with what the implementation does.
-- **Test Naming (M40 additions)**: All new test names are descriptive and encode both the scenario and the expected outcome (e.g., `data_access_methods_are_not_collection_pipelines`, `known_overlaps_winner_matches_dispatch_order`, `xs_map_f_is_collection_pipelines`).
+- **Assertion Honesty**: Every assertion is derived from a real call to
+  `http_routing::matches_callee` or `classify_hint`. No hard-coded magic values unconnected
+  to implementation logic. Each assertion was cross-checked against the `TS_JS_RE`, `GO_RE`,
+  and `PYTHON_RE` statics: all positive expectations match at least one regex arm; all
+  negative expectations confirm the receiver/method combination falls outside every allowlist.
+- **Edge Case Coverage**: The file covers both documented limitation classes
+  (Next.js App Router bare-export handlers; idiosyncratic receiver names), all Go receiver
+  tokens from the M41 spec not already in `category_contract_m41.rs`, and the Python
+  receiver-agnostic path. Negative cases are the majority, appropriate for a limitations suite.
+- **Implementation Exercise**: Tests call `http_routing::matches_callee` directly and also
+  exercise the full `classify_hint` → `CALL_DISPATCH` (P7) → `http_routing::matches_callee`
+  path. No mocks of any kind.
+- **Test Weakening**: The tester added only new tests. No existing test was modified.
+  No weakening is possible.
+- **Test Naming (other tests)**: All other 18 names encode both the scenario and the expected
+  outcome clearly. One naming issue is called out above (LOW).
+- **Scope Alignment**: All imports resolve to live modules present in the current codebase.
+  No reference to any deleted file. The shell-detected orphan report is a false positive
+  (see finding above).
+- **Test Isolation**: All 19 tests construct inputs from inline string literals. No test
+  reads mutable project files, `.tekhton/` pipeline reports, build artifacts, or config
+  state files. Tests have no ordering dependency on each other or on prior pipeline runs.
 
-### Pre-Existing Issues (out of M40 scope — no action required)
-- `wasm_package_json_version_matches_workspace`: `package.json` stranded at an older version. Pre-existing; not introduced by M40.
-- `null_safety_node_kinds_do_not_match_non_ts_js_languages` name inversion: upgraded to MEDIUM above because M40 modified the enclosing file; the underlying behavior is still correct.
+### Pre-Existing Issues (out of M41 scope — no action required)
+- `wasm_package_json_version_matches_workspace`: `package.json` stranded at an older version.
+  Pre-existing; not introduced by M41.
+- `null_safety_node_kinds_do_not_match_non_ts_js_languages` name inversion (carry-over from
+  M37, noted in M40 audit as MEDIUM): still present. Not introduced by M41.

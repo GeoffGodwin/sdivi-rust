@@ -8,6 +8,69 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M41 — `http_routing` pattern category introduced; `app.get`/`router.post` reassigned from `data_access`
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `http_routing` is now a native CALL_DISPATCH category (slot P7, above
+`logging` P8 and `data_access` P9), classified via receiver-allowlist-anchored callee-text:
+
+- **TypeScript / JavaScript** (Express/Koa/Fastify/Hono): receiver `app`, `router`, `fastify`,
+  `server`, or `srv` + method `get|post|put|delete|patch|head|options|all|use|route`.
+- **Go** (net/http, Gin, Echo, Gorilla Mux): receiver `http`, `mux`, `r`, `e`, `router`,
+  `engine`, `g`, or `rg` + method `HandleFunc|Handle|GET|POST|PUT|DELETE|PATCH|Any|Group`.
+- **Python** (Flask/FastAPI imperative): `*.add_url_rule(` member-call pattern.
+
+`list_categories()` count grows from 14 → 15.
+
+**Headline migration: `app.get` / `router.post` now resolve to `http_routing`.**
+This is the most consequential change for TypeScript/JavaScript backends.
+
+Before (≤M40):
+```
+call_expression "app.get('/users', listUsers)"  →  data_access
+call_expression "router.post('/user', createUser)"  →  data_access
+```
+
+After (M41+):
+```
+call_expression "app.get('/users', listUsers)"  →  http_routing
+call_expression "router.post('/user', createUser)"  →  http_routing
+```
+
+`data_access` counts decrease; `http_routing` counts are a new non-zero bucket.
+On the first post-M41 snapshot, per-file counts for server route registrations shift
+from `data_access` to `http_routing`. Trend continuity is broken for `data_access` at
+the upgrade boundary; the trend line resumes from the second post-upgrade snapshot.
+
+**Client calls are unaffected.** `axios.get(url)`, `fetch(url)`, `client.get(url)`, and
+`cache.get(key)` stay in `data_access` — their receiver (`axios`, `client`, `cache`) is
+outside the `http_routing` allowlist.
+
+**Decorator-style routes are unaffected.** NestJS (`@Get('/')`, `@Post(...)`) and FastAPI
+(`@app.get(...)`) route declarations are `decorator`/`decorated_definition` nodes, already
+classified under `decorators` (M36.1/M36.2). They are counted once — in `decorators` — and
+are not reassigned here.
+
+**Idiosyncrasy gap.** A server variable with an unrecognised name (`const api = express();
+api.get(...)`) will not be classified as `http_routing` — receiver-type inference is outside
+the v0 node-kind model. Such calls continue to resolve via the data_access verb-list regex.
+Document this as a known limitation; no configuration escape hatch is available.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.http_routing]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Migrating imperative app.get routes to router pattern"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M40 — `collection_pipelines` pattern category introduced
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

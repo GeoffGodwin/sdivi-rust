@@ -40,10 +40,11 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_fourteen_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 14);
+fn all_categories_has_fifteen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 15);
     assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
+    assert!(ALL_CATEGORIES.contains(&"http_routing"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
     assert!(ALL_CATEGORIES.contains(&"null_safety"));
     assert!(ALL_CATEGORIES.contains(&"schema_validation"));
@@ -143,6 +144,35 @@ fn decorator_is_decorators() {
     );
 }
 
+// ── M41: http_routing ────────────────────────────────────────────────────────
+
+#[test]
+fn app_get_is_http_routing_not_data_access() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "app.get('/users', handler)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["http_routing"]);
+}
+
+#[test]
+fn axios_get_is_data_access_not_http_routing() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "axios.get(url)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["data_access"]);
+}
+
+#[test]
+fn go_http_handle_func_is_http_routing() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "http.HandleFunc(\"/\", h)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "go"), vec!["http_routing"]);
+}
+
 // ── M40: collection_pipelines ────────────────────────────────────────────────
 
 #[test]
@@ -151,7 +181,10 @@ fn xs_map_is_collection_pipelines() {
         node_kind: "call_expression".to_string(),
         text: "xs.map(f)".to_string(),
     };
-    assert_eq!(classify_hint(&hint, "typescript"), vec!["collection_pipelines"]);
+    assert_eq!(
+        classify_hint(&hint, "typescript"),
+        vec!["collection_pipelines"]
+    );
 }
 
 #[test]

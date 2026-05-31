@@ -46,10 +46,11 @@ fn wasm_category_catalog_json_field_names_are_schema_version_and_categories() {
 
 #[test]
 fn list_categories_wasm_export_returns_eight_categories() {
-    // Call the export function via sdivi_core directly (wasm-bindgen not involved in native builds)
+    // Test name is a historical artifact from M23 (8 categories). Count grows
+    // with each milestone; update the assertion when new categories are added.
     let catalog = sdivi_core::list_categories();
     assert_eq!(catalog.schema_version, "1.0");
-    assert_eq!(catalog.categories.len(), 8);
+    assert_eq!(catalog.categories.len(), 15); // M41: 15 categories
     let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
     assert!(
         names.contains(&"data_access"),
@@ -62,6 +63,10 @@ fn list_categories_wasm_export_returns_eight_categories() {
     assert!(
         names.contains(&"class_hierarchy"),
         "expected category \"class_hierarchy\" in list_categories()"
+    );
+    assert!(
+        names.contains(&"http_routing"),
+        "expected category \"http_routing\" in list_categories()"
     );
 }
 

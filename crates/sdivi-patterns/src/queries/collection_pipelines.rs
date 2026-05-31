@@ -50,10 +50,8 @@ pub const NODE_KINDS: &[&str] = &[];
 //   - data_access:    \.(query|read|write|fetch)\(    — no token overlap
 //   - async_patterns: \.(then|catch|finally)\(        — no token overlap
 static TS_JS_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"\.(map|filter|reduce|flatMap|forEach|find|findIndex|some|every|flat)\(",
-    )
-    .expect("collection_pipelines regex is valid")
+    Regex::new(r"\.(map|filter|reduce|flatMap|forEach|find|findIndex|some|every|flat)\(")
+        .expect("collection_pipelines regex is valid")
 });
 
 /// Return `true` when `text` looks like a collection-pipeline callee for `language`.

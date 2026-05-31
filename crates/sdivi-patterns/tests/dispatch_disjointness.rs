@@ -11,8 +11,8 @@
 //!    `KNOWN_OVERLAPS` entry with the winner named.
 
 use sdivi_patterns::queries::{
-    async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks, logging,
-    schema_validation, state_store,
+    async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks,
+    http_routing, logging, schema_validation, state_store,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -24,7 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M40, P1/P4/P5/P6/P8/P9/P10 are active; future milestones extend this list.
+/// At M41, P1/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
@@ -38,6 +38,9 @@ fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     }
     if framework_hooks::matches_callee(text, language) {
         matched.push("framework_hooks");
+    }
+    if http_routing::matches_callee(text, language) {
+        matched.push("http_routing");
     }
     if logging::matches_callee(text, language) {
         matched.push("logging");
@@ -87,6 +90,19 @@ const KNOWN_OVERLAPS: &[(&str, &str, &str, &str)] = &[
         "framework_hooks",
     ),
     ("useStore()", "javascript", "state_store", "framework_hooks"),
+    // `app.get`/`router.post`: http_routing (P7) AND data_access (P9) `\b(get|post)\(` both match; P7 wins.
+    (
+        "app.get('/u', h)",
+        "typescript",
+        "http_routing",
+        "data_access",
+    ),
+    (
+        "router.post('/user', cb)",
+        "typescript",
+        "http_routing",
+        "data_access",
+    ),
 ];
 
 // ── Per-category corpus ────────────────────────────────────────────────────────
@@ -166,6 +182,10 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("sql.Open(\"postgres\", dsn)", "go", "data_access"),
     ("cursor.execute(sql)", "python", "data_access"),
     ("requests.get(url)", "python", "data_access"),
+    // P7: http_routing — receiver-allowlist anchored
+    ("app.get('/u', h)", "typescript", "http_routing"),
+    ("r.GET(\"/users\", h)", "go", "http_routing"),
+    ("axios.get(url)", "typescript", "data_access"), // client: receiver not in allowlist
     // P10: collection_pipelines — member-call regex (TS/JS and Go/Java)
     ("xs.map(f)", "typescript", "collection_pipelines"),
     ("xs.filter(p)", "javascript", "collection_pipelines"),
@@ -267,6 +287,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
             "logging" => logging::matches_callee(text, lang),
             "data_access" => data_access::matches_callee(text, lang),
             "collection_pipelines" => collection_pipelines::matches_callee(text, lang),
+            "http_routing" => http_routing::matches_callee(text, lang),
             other => panic!("KNOWN_OVERLAPS references unknown category {other:?}"),
         };
         assert!(

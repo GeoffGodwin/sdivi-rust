@@ -24,6 +24,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | decorators | Decorator usage across languages. TypeScript/JavaScript: any `decorator` node (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.) — one instance per decorator line. Python: any `decorated_definition` wrapper node (`@dataclass`, `@property`, `@app.get(...)`, `@pytest.fixture`, `@cached_property`, etc.) — one instance per decorated function or class (wrapper-granularity). Added M36.1 (TS/JS); M36.2 (Python). |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
 | framework_hooks | Component-composition hook calls in React, Preact, Vue (composables), and Svelte-style runtimes — any `call_expression` callee matching `^use[A-Z]` in TypeScript or JavaScript. Covers built-in hooks (`useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`, `useContext`, `useReducer`, `useLayoutEffect`) and the full custom-hook ecosystem. Added M35. |
+| http_routing | Server-side HTTP route/endpoint registration calls — Express/Koa/Fastify (`app.get`, `router.post`, `fastify.route`, `server.use`), Hono, Go net/http + Gin/Echo/Gorilla (`http.HandleFunc`, `r.GET`, `mux.Handle`, `e.POST`), and Flask/FastAPI imperative registration (`app.add_url_rule`). Detection is receiver-allowlist anchored: only calls whose receiver is a known server/router handle are matched, so client HTTP calls (`axios.get`, `fetch`) stay in `data_access`. NestJS and FastAPI decorator routes (`@Get('/')`, `@app.get(...)`) are `decorator`/`decorated_definition` nodes classified under `decorators` (M36.1/M36.2). Registered at CALL_DISPATCH slot P7. Added M41. |
 | logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Natively classified since M33** via callee-text inspection in `classify_hint` — see Callee-text classification section. |
 | null_safety | Code constructs that guard against null or undefined values — optional chaining (`a?.b`, `arr?.[0]`, `fn?.()`) and TypeScript non-null assertions (`el!`). TypeScript and JavaScript only; other languages produce no instances in v0. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., Rust macro invocations such as `drop!`, `vec!`, `assert!`. As of M33, Rust logging macros (`tracing::*!`, `log::*!`, `println!`/`eprintln!`/`print!`/`eprint!`/`dbg!`) are excluded and classified as `logging` instead. |
@@ -75,6 +76,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | decorators | `decorator` | Natively classified since M36.1. Examples: `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`. Node-kind only — all decorators count. |
 | error_handling | `try_statement` | None |
 | framework_hooks | `call_expression` where callee matches `^use[A-Z]` | Natively classified since M35. Examples: `useState(0)`, `useEffect(fn, [])`, `useAuth()`. Second character must be uppercase — `user()` does not match. |
+| http_routing | `call_expression` where callee matches `^(app\|router\|fastify\|server\|srv)\.(get\|post\|put\|delete\|patch\|head\|options\|all\|use\|route)\(` | Receiver-allowlist anchored at P7. Examples: `app.get('/u', h)`, `router.post('/user', cb)`, `fastify.route({...})`, `server.use(mw)`. Client calls (`axios.get`, `fetch`) stay `data_access`. NestJS/FastAPI decorator routes stay `decorators`. Added M41. |
 | logging | `call_expression` where callee matches `^(console\|logger\|log)\.` | Natively classified since M33. Examples: `console.log(x)`, `logger.info(x)`. |
 | null_safety | `optional_chain`; `non_null_expression` (TS only) | `optional_chain`: one instance per node as emitted by the grammar — a nested chain `a?.b?.c` may produce multiple nodes. `non_null_expression`: TypeScript-only; not emitted by the JS adapter. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | (none in v0) | — |
@@ -91,6 +93,7 @@ These languages share the common callee-text filter via `classify_hint`. Go and 
 |---|---|---|
 | class_hierarchy | Java: `class_declaration`, `interface_declaration`. Go: (none in v0 — Go has no class/interface AST shape; the duck-typed interface model does not surface as a `class_hierarchy` declaration. The category exists in the catalog so cross-language reporting is uniform, but it produces zero Go hits.) | Java: same broader-collection caveat as other languages — all declaration kinds are classified regardless of heritage. |
 | data_access | `call_expression` where callee matches the shared TS/JS/Go regex (`^(fetch\|axios)\b\|\b(db\|sql)\.` etc.) | Natively filtered since M33. Examples: `db.query(sql)`, `sql.Open(dsn)`. Java `call_expression` returns `false` in v0 — data-access detection is library-shaped and deferred. |
+| http_routing | Go: `call_expression` where callee matches `^(http\|mux\|r\|e\|router\|engine\|g\|rg)\.(HandleFunc\|Handle\|GET\|POST\|PUT\|DELETE\|PATCH\|Any\|Group)\(` | Receiver-allowlist anchored at P7. Examples: `http.HandleFunc("/", h)`, `r.GET("/users", h)`, `mux.Handle("/", h)`, `e.POST("/user", h)`. Go uppercase verb names avoid overlap with data_access (lowercase `\bget\(`). Java returns `false` in v0. Added M41. |
 | logging | Go: `call_expression` where callee matches `^fmt\.(Print\|Println\|Printf\|Errorf\|Fprint\|Sprint)`. Java: `call_expression` where callee matches `^(System\.(out\|err)\.\|logger\.\|Log\.\|LOG\.)` | Natively classified since M33. Go examples: `fmt.Println(x)`, `fmt.Printf(f, x)`. Java examples: `System.out.println(x)`, `LOG.info(x)`. |
 
 > **Note on per-language node-kind tables:** The v0 tables above are written by hand.
@@ -182,6 +185,23 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 
 **Open question (TanStack Query / SWR):** `useQuery`, `useMutation`, `useSWR` blur "state" and "data-fetching". Their home is deferred to a follow-up milestone. Until then they fall through to `framework_hooks`.
 
+### `http_routing::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Stays `data_access` |
+|---|---|---|---|
+| TypeScript / JavaScript | `^(app\|router\|fastify\|server\|srv)\.(get\|post\|put\|delete\|patch\|head\|options\|all\|use\|route)\(` | `app.get('/u', h)`, `router.post('/user', cb)`, `fastify.route({...})`, `server.use(mw)`, `srv.all('*', h)` | `axios.get(url)`, `fetch(url)`, `client.get(url)`, `cache.get(k)` |
+| Go | `^(http\|mux\|r\|e\|router\|engine\|g\|rg)\.(HandleFunc\|Handle\|GET\|POST\|PUT\|DELETE\|PATCH\|Any\|Group)\(` | `http.HandleFunc("/", h)`, `r.GET("/u", h)`, `mux.Handle("/", h)`, `e.POST("/u", h)`, `engine.Group("/api")` | `db.Query(sql)`, `sql.Open(dsn)` |
+| Python | `\.add_url_rule\(` | `app.add_url_rule('/u', view_func=h)` | — (FastAPI/Flask decorator routes → `decorators`) |
+| All others | (none) | — | — |
+
+**Worked example (TypeScript):** `app.get('/users', handler)` → `["http_routing"]`
+
+**Worked example (TypeScript — client, stays data_access):** `axios.get(url)` → `["data_access"]`
+
+**Receiver-allowlist rationale:** The allowlist (`app`, `router`, `fastify`, `server`, `srv`; Go adds `r`, `e`, `mux`, `engine`, `g`, `rg`) is the precision mechanism. A client GET (`axios.get`, receiver `axios`) is outside every allowlist and correctly remains `data_access`. An idiosyncratically-named server (`const api = express(); api.get(...)`) will be missed — documented limitation.
+
+**NestJS / FastAPI distinction:** Decorator-style routes (`@Get('/')`, `@app.get(...)`) are `decorator` / `decorated_definition` nodes, classified under `decorators` (M36.1/M36.2). They are counted once, in `decorators`, not here.
+
 ### `collection_pipelines::matches_callee(text, language)`
 
 | Language | Pattern | Examples matched | Deliberately NOT matched |
@@ -235,13 +255,13 @@ is the contract — future milestones insert at their named slot, never append.
 | P4 | `schema_validation` | M38 | `^(z\|yup\|v\|s)\.\w`, `\.safeParse\(`, `\bBaseModel\b` |
 | P5 | `state_store` | M39 | redux/zustand/jotai factories; `^use(Selector\|Dispatch\|Store)\b` |
 | P6 | `framework_hooks` | M35 | `^use[A-Z]` |
-| P7 | `http_routing` | M41 | `^(app\|router\|fastify\|server\|srv)\.(get\|post\|…)\(` |
+| P7 | `http_routing` | **M41** | `^(app\|router\|fastify\|server\|srv)\.(get\|post\|…)\(` |
 | P8 | `logging` | M34 | `^(console\|logger\|log)\.`, `^fmt\.Print`, `^(tracing\|log)::` |
 | P9 | `data_access` | M34 | `^(fetch\|axios)\b`, `\b(db\|sql)\.`, `cursor\.`, `requests\.` |
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P4, P5, P6, P8, P9, and P10 are active at M40. The `decorators` and `null_safety` categories are
+P1, P4, P5, P6, P7, P8, P9, and P10 are active at M41. The `decorators` and `null_safety` categories are
 node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
 `category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
 reserved placeholders.
@@ -252,7 +272,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M40 (P1/P4/P5/P6/P8/P9/P10 active):
+Documented overlaps at M41 (P1/P4/P5/P6/P7/P8/P9/P10 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -260,9 +280,10 @@ Documented overlaps at M40 (P1/P4/P5/P6/P8/P9/P10 active):
 | `useSelector(s => s.user)` | typescript | `state_store` | `framework_hooks` | Matches both `^use(Selector\|Dispatch\|Store)\b` (P5) and `^use[A-Z]` (P6); more specific wins |
 | `useDispatch()` | typescript | `state_store` | `framework_hooks` | Same as above |
 | `useStore()` | javascript | `state_store` | `framework_hooks` | Same as above |
+| `app.get('/u', h)` | typescript | `http_routing` | `data_access` | Receiver `app` in allowlist (P7); `\b(get)\(` also matches data_access (P9); P7 wins |
+| `router.post('/user', cb)` | typescript | `http_routing` | `data_access` | Same mechanism — `router` in allowlist (P7); `\b(post)\(` matches data_access (P9) |
 
-Future overlaps introduced by M41–M44:
-- `app.get` / `router.post` → **http_routing** (P7) beats `data_access` (P9). Client fetches (`axios.get`) stay in `data_access` — the http_routing receiver allowlist excludes them.
+Future overlaps introduced by M42–M44:
 - `Promise.all([]).then(cb)` outer node → **async_patterns** (P1) wins; bare inner `Promise.all(…)` resolves to `concurrency` (P11).
 
 #### `macro_invocation` arm
@@ -304,7 +325,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 10. **As of M38, the `schema_validation` category is natively classified for TypeScript, JavaScript, and Python** via callee-text inspection at CALL_DISPATCH slot P4. Zod (`z.*`), Yup (`yup.*`), Valibot (`v.*`), Superstruct (`s.*`), `.safeParse(`, and Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are now counted in `schema_validation`. On the first post-M38 snapshot of a repo using these libraries, the `schema_validation` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
 11. **As of M39, the `state_store` category is natively classified for TypeScript and JavaScript** via callee-text inspection at CALL_DISPATCH slot P5. Redux/RTK factories (`createSlice`, `configureStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai/Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.) are now counted in `state_store`. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore` previously resolved to `framework_hooks` (P6); they now resolve to `state_store` (P5). This is a count shift between two new-in-M35/M39 categories — counts move from `framework_hooks` to `state_store`. See `MIGRATION_NOTES.md` for the canonical precedence-reassignment example.
 12. **As of M40, the `collection_pipelines` category is natively classified** via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — all more-specific categories resolve first). `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any receiver are now counted in `collection_pipelines` for TypeScript and JavaScript (and Go/Java where these method names appear). Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Bare calls without a dot prefix (`map(f)`) are intentionally not matched. On the first post-M40 snapshot of a TS/JS repo using these methods, `collection_pipelines` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
-13. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
+13. **As of M41, the `http_routing` category is natively classified** via receiver-allowlist-anchored callee-text at CALL_DISPATCH slot P7 (above `logging` P8 and `data_access` P9). Express/Koa/Fastify (`app.get`, `router.post`, `fastify.route`, `server.use`), Go net/http + Gin/Echo/Gorilla (`http.HandleFunc`, `r.GET`, `mux.Handle`), and Flask/FastAPI imperative registration (`app.add_url_rule`) are now counted in `http_routing`. **Precedence note:** `app.get(...)` / `router.post(...)` previously matched `data_access` (P9) via the `\b(get|post)\(` verb regex; they now resolve to `http_routing` (P7) — a count shift between an existing and a new category. `axios.get(url)` / `client.get(url)` stay in `data_access` because their receiver is outside the allowlist. NestJS and FastAPI decorator routes (`@Get('/')`, `@app.get(...)`) are `decorator`/`decorated_definition` nodes and remain in `decorators`. See `MIGRATION_NOTES.md` for the worked before/after.
+14. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

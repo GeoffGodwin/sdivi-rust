@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `http_routing` pattern category (M41): server-side route/endpoint registration calls are
+  now natively classified as `http_routing` via receiver-allowlist-anchored callee-text at
+  CALL_DISPATCH slot P7. TypeScript/JavaScript: Express/Koa/Fastify/Hono calls on known
+  server handles (`app`, `router`, `fastify`, `server`, `srv`) with HTTP verbs and middleware
+  methods (`get|post|put|delete|patch|head|options|all|use|route`). Go: net/http + Gin/Echo/Gorilla
+  calls on known router handles (`http`, `mux`, `r`, `e`, `router`, `engine`, `g`, `rg`).
+  Python: Flask/FastAPI `app.add_url_rule(...)` imperative registration. **Precedence note:**
+  `app.get(...)` / `router.post(...)` previously resolved to `data_access`; they now resolve to
+  `http_routing` — a count shift. Client calls (`axios.get`, `fetch`) stay `data_access`.
+  NestJS/FastAPI decorator routes stay `decorators`. `list_categories()` count grows from 14 → 15.
+  `snapshot_version` stays `"1.0"`. See `MIGRATION_NOTES.md` for the worked before/after.
+
 - `collection_pipelines` pattern category (M40): `.map`, `.filter`, `.reduce`,
   `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any
   receiver are now natively classified as `collection_pipelines` via member-call
