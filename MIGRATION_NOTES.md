@@ -8,6 +8,50 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M40 — `collection_pipelines` pattern category introduced
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `collection_pipelines` is now a native CALL_DISPATCH category (slot P10,
+lowest-priority member-call category — all more specific categories resolve first),
+classified via member-call callee-text inspection in TypeScript, JavaScript, Go, and Java:
+
+- `.map(`, `.filter(`, `.reduce(`, `.flatMap(`, `.forEach(`, `.find(`, `.findIndex(`,
+  `.some(`, `.every(`, `.flat(` on any receiver are classified here.
+
+`list_categories()` count grows from 13 → 14.
+
+**Count-introduction event.** On the first post-M40 snapshot of a TypeScript or JavaScript
+repo that uses standard array/iterable pipeline methods, `collection_pipelines` transitions
+from zero to non-zero. Prior snapshots had no `collection_pipelines` bucket — trend
+continuity is broken for this dimension at the upgrade boundary. The trend line resumes
+cleanly from the second post-upgrade snapshot onward.
+
+**Receiver-type noise.** Callee-text cannot distinguish an array `.map` from
+`rxObservable.map(fn)` (RxJS), `new Map().forEach(cb)` (ES6 Map), or
+`domNodeList.forEach(cb)` (DOM NodeList). All match. This is intentional — the signal
+is the functional-iteration population at codebase scale (entropy / convention drift),
+not the receiver type of individual calls. No action required unless you need precise
+receiver-type discrimination (which would require a type-info pass outside the v0 model).
+
+**Disjoint from `data_access` and `async_patterns`.** The method-name sets are
+non-overlapping: `data_access` uses `query/read/write/fetch`; `async_patterns` uses
+`then/catch/finally`; none appear in `collection_pipelines`.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.collection_pipelines]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Migrating imperative loops to functional pipelines"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M39 — `state_store` pattern category introduced; `useSelector`/`useDispatch`/`useStore` precedence reassignment
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

@@ -19,6 +19,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 |---|---|
 | async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. In TypeScript/JavaScript, Promise-chain calls (`.then()`, `.catch()`, `.finally()`) are also classified here via callee-text inspection. |
 | class_hierarchy | Code constructs that establish inheritance, interface implementation, or trait conformance relationships — e.g. classes with `extends`/`implements` clauses, Python classes with base classes, and Rust `impl Trait for Type` blocks. All declaration kinds are classified here regardless of whether they carry a heritage clause; heritage-aware narrowing is the embedder's responsibility. |
+| collection_pipelines | Functional collection-transform method calls — `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat`. Detected via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — more specific categories resolve first). Callee-text cannot distinguish the receiver type: `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match — treated as acceptable noise for an entropy measure. Bare calls without a dot prefix are not matched. TypeScript and JavaScript primary targets; the regex also matches Go/Java where these method names appear. Added M40. |
 | data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`db.query`, `cursor.*`), HTTP fetches (`fetch`, `axios`), file reads (`open`, `requests.*`). As of M33, only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here; unrecognised callees are dropped. |
 | decorators | Decorator usage across languages. TypeScript/JavaScript: any `decorator` node (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.) — one instance per decorator line. Python: any `decorated_definition` wrapper node (`@dataclass`, `@property`, `@app.get(...)`, `@pytest.fixture`, `@cached_property`, etc.) — one instance per decorated function or class (wrapper-granularity). Added M36.1 (TS/JS); M36.2 (Python). |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
@@ -69,6 +70,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 |---|---|---|
 | async_patterns | `await_expression`; `call_expression` where callee matches `\.(then\|catch\|finally)\(` | `await_expression` via node-kind; Promise chains via callee-text. Examples: `future.await`, `p.then(r)`, `fetch().catch(e => {})`. |
 | class_hierarchy | `class_declaration`, `abstract_class_declaration`, `interface_declaration` | Abstract classes and interfaces always count. Concrete classes count regardless of `extends` / `implements`; entropy survives the broader collection because heritage-free classes have similar structure and contribute low entropy. (JavaScript: only `class_declaration` is emitted; `interface_declaration` and `abstract_class_declaration` are TS-only AST shapes.) |
+| collection_pipelines | `call_expression` where callee matches `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` | Member-call pattern — requires a preceding dot. Callee-text cannot distinguish receiver type: `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Natively classified at CALL_DISPATCH slot P10 (M40). |
 | data_access | `call_expression` where callee matches `^(fetch\|axios)\b\|\b(query\|read\|write\|get\|post\|put\|delete\|patch)\(\|\b(db\|sql)\.\|\.(query\|read\|write\|fetch)\(` | Natively filtered since M33. Examples: `fetch(url)`, `db.query(sql)`. Unrecognised calls (e.g. `Math.max(a, b)`) are dropped. |
 | decorators | `decorator` | Natively classified since M36.1. Examples: `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`. Node-kind only — all decorators count. |
 | error_handling | `try_statement` | None |
@@ -180,6 +182,19 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 
 **Open question (TanStack Query / SWR):** `useQuery`, `useMutation`, `useSWR` blur "state" and "data-fetching". Their home is deferred to a follow-up milestone. Until then they fall through to `framework_hooks`.
 
+### `collection_pipelines::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Deliberately NOT matched |
+|---|---|---|---|
+| TypeScript / JavaScript / Go / Java | `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` | `xs.map(f)`, `xs.filter(p).reduce(g, 0)`, `items.forEach(cb)` | bare `map(f)` (no dot), `db.query(sql)` (data_access), `promise.then(r)` (async_patterns) |
+| All others | (none) | — | — |
+
+**Worked example (TypeScript):** `xs.filter(isActive).map(toDto)` → `["collection_pipelines"]`
+
+**Receiver-type noise:** Callee-text cannot distinguish an array `.map` from `rxObservable.map(fn)` (RxJS), `new Map().forEach(cb)` (ES6 Map), or `domNodeList.forEach(cb)` (DOM). This is intentional — the signal is the functional-iteration population at codebase scale, not the receiver type of each call. Receiver-type inference would require a type-info pass outside the v0 model.
+
+**Pipe/compose seeds forward:** `pipe(...)`, `compose(...)`, `flow(...)` from lodash/fp-ts/Ramda are the same idiom family and could extend this regex in a future milestone.
+
 ### `framework_hooks::matches_callee(text, language)`
 
 | Language | Pattern | Examples matched |
@@ -223,10 +238,10 @@ is the contract — future milestones insert at their named slot, never append.
 | P7 | `http_routing` | M41 | `^(app\|router\|fastify\|server\|srv)\.(get\|post\|…)\(` |
 | P8 | `logging` | M34 | `^(console\|logger\|log)\.`, `^fmt\.Print`, `^(tracing\|log)::` |
 | P9 | `data_access` | M34 | `^(fetch\|axios)\b`, `\b(db\|sql)\.`, `cursor\.`, `requests\.` |
-| P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach)\(` |
+| P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P4, P5, P6, P8, and P9 are active at M39. The `decorators` and `null_safety` categories are
+P1, P4, P5, P6, P8, P9, and P10 are active at M40. The `decorators` and `null_safety` categories are
 node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
 `category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
 reserved placeholders.
@@ -237,7 +252,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M39 (P1/P4/P5/P6/P8/P9 active):
+Documented overlaps at M40 (P1/P4/P5/P6/P8/P9/P10 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -246,7 +261,7 @@ Documented overlaps at M39 (P1/P4/P5/P6/P8/P9 active):
 | `useDispatch()` | typescript | `state_store` | `framework_hooks` | Same as above |
 | `useStore()` | javascript | `state_store` | `framework_hooks` | Same as above |
 
-Future overlaps introduced by M40–M44:
+Future overlaps introduced by M41–M44:
 - `app.get` / `router.post` → **http_routing** (P7) beats `data_access` (P9). Client fetches (`axios.get`) stay in `data_access` — the http_routing receiver allowlist excludes them.
 - `Promise.all([]).then(cb)` outer node → **async_patterns** (P1) wins; bare inner `Promise.all(…)` resolves to `concurrency` (P11).
 
@@ -288,7 +303,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 9. **As of M37, the `null_safety` category is natively classified for TypeScript and JavaScript** via `optional_chain` and `non_null_expression` node kinds. On the first post-M37 snapshot of a TS/JS repo using optional chaining or non-null assertions, the `null_safety` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`. Nullish coalescing (`??`) is deferred — it requires operator-field inspection beyond the v0 node-kind model.
 10. **As of M38, the `schema_validation` category is natively classified for TypeScript, JavaScript, and Python** via callee-text inspection at CALL_DISPATCH slot P4. Zod (`z.*`), Yup (`yup.*`), Valibot (`v.*`), Superstruct (`s.*`), `.safeParse(`, and Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are now counted in `schema_validation`. On the first post-M38 snapshot of a repo using these libraries, the `schema_validation` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
 11. **As of M39, the `state_store` category is natively classified for TypeScript and JavaScript** via callee-text inspection at CALL_DISPATCH slot P5. Redux/RTK factories (`createSlice`, `configureStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai/Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.) are now counted in `state_store`. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore` previously resolved to `framework_hooks` (P6); they now resolve to `state_store` (P5). This is a count shift between two new-in-M35/M39 categories — counts move from `framework_hooks` to `state_store`. See `MIGRATION_NOTES.md` for the canonical precedence-reassignment example.
-12. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
+12. **As of M40, the `collection_pipelines` category is natively classified** via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — all more-specific categories resolve first). `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any receiver are now counted in `collection_pipelines` for TypeScript and JavaScript (and Go/Java where these method names appear). Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Bare calls without a dot prefix (`map(f)`) are intentionally not matched. On the first post-M40 snapshot of a TS/JS repo using these methods, `collection_pipelines` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+13. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

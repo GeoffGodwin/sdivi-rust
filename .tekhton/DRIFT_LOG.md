@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 15
+- Runs since audit: 16
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:123-124` â the missing blank line between the `CALL_DISPATCH` array close and the `classify_hint` doc block has been flagged by the M38 and M39 reviewers and remains unresolved. Accumulating drift suggests a dedicated cleanup pass rather than per-milestone carry-through.
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:259-267` â test `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name (body asserts `Some("null_safety")` matches for all languages, i.e. a match, not a non-match). Carry-over from M37; still unresolved.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:229` â pre-existing (carried forward from M37/M38): test `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name (body asserts `Some("null_safety")` for non-TS/JS languages, i.e. a match, not a non-match). Noted in CODER_SUMMARY.md; cleanup deferred.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:84-106` (`category_for_node_kind`) â doc comment cites only `logging` as the callee-only category. `framework_hooks`, `schema_validation`, and `state_store` are now also callee-only (all have empty `NODE_KINDS`); the note should enumerate all such categories to avoid future reader confusion. Pre-existing gap grown by M35/M38/M39.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:119-120` â no blank line between the closing `];` of `CALL_DISPATCH` and the `/// Classifyâ¦` doc block for `classify_hint`. `CALL_DISPATCH` uses `#[allow(â¦)]` + `//` (not `///`), so the doc comment attaches correctly to `classify_hint`; however, a blank line would make the separation unambiguous for future editors who might insert an item between the two. Pre-existing from prior milestones.

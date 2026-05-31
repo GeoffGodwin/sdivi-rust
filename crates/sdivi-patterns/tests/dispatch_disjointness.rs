@@ -11,8 +11,8 @@
 //!    `KNOWN_OVERLAPS` entry with the winner named.
 
 use sdivi_patterns::queries::{
-    async_patterns, classify_hint, data_access, framework_hooks, logging, schema_validation,
-    state_store,
+    async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks, logging,
+    schema_validation, state_store,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -24,7 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M39, P1/P4/P5/P6/P8/P9 are active; future milestones extend this list.
+/// At M40, P1/P4/P5/P6/P8/P9/P10 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
@@ -44,6 +44,9 @@ fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     }
     if data_access::matches_callee(text, language) {
         matched.push("data_access");
+    }
+    if collection_pipelines::matches_callee(text, language) {
+        matched.push("collection_pipelines");
     }
     matched
 }
@@ -163,6 +166,19 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("sql.Open(\"postgres\", dsn)", "go", "data_access"),
     ("cursor.execute(sql)", "python", "data_access"),
     ("requests.get(url)", "python", "data_access"),
+    // P10: collection_pipelines — member-call regex (TS/JS and Go/Java)
+    ("xs.map(f)", "typescript", "collection_pipelines"),
+    ("xs.filter(p)", "javascript", "collection_pipelines"),
+    ("xs.reduce(g, 0)", "typescript", "collection_pipelines"),
+    ("data.flatMap(fn)", "typescript", "collection_pipelines"),
+    ("items.forEach(cb)", "javascript", "collection_pipelines"),
+    ("xs.find(p)", "typescript", "collection_pipelines"),
+    ("xs.findIndex(p)", "javascript", "collection_pipelines"),
+    ("xs.some(p)", "typescript", "collection_pipelines"),
+    ("xs.every(p)", "typescript", "collection_pipelines"),
+    ("xs.flat()", "javascript", "collection_pipelines"),
+    // Negative: data_access methods must not match collection_pipelines
+    ("client.read(buf)", "typescript", "data_access"),
     // Unrecognised — classify_hint must return empty Vec (represented as "")
     ("Math.max(a, b)", "typescript", ""),
     ("len(x)", "python", ""),
@@ -250,6 +266,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
             "framework_hooks" => framework_hooks::matches_callee(text, lang),
             "logging" => logging::matches_callee(text, lang),
             "data_access" => data_access::matches_callee(text, lang),
+            "collection_pipelines" => collection_pipelines::matches_callee(text, lang),
             other => panic!("KNOWN_OVERLAPS references unknown category {other:?}"),
         };
         assert!(

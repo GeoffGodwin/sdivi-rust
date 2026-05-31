@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `collection_pipelines` pattern category (M40): `.map`, `.filter`, `.reduce`,
+  `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any
+  receiver are now natively classified as `collection_pipelines` via member-call
+  callee-text inspection at CALL_DISPATCH slot P10 (broadest member-call category —
+  all more specific categories resolve first). TypeScript and JavaScript are the primary
+  targets; the same regex applies to Go and Java where these method names appear.
+  Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`,
+  `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy
+  noise. `list_categories()` count grows from 13 → 14. `snapshot_version` stays `"1.0"`.
+  See `MIGRATION_NOTES.md` for the count-introduction event and receiver-type noise note.
+
 - `state_store` pattern category (M39): Redux / RTK (`createSlice`, `configureStore`,
   `createStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`),
   Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`), MobX (`observable`,

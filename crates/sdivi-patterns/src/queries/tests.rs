@@ -40,8 +40,9 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_thirteen_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 13);
+fn all_categories_has_fourteen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 14);
+    assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
     assert!(ALL_CATEGORIES.contains(&"null_safety"));
@@ -140,6 +141,35 @@ fn decorator_is_decorators() {
         category_for_node_kind("decorator", "javascript"),
         Some("decorators")
     );
+}
+
+// ── M40: collection_pipelines ────────────────────────────────────────────────
+
+#[test]
+fn xs_map_is_collection_pipelines() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "xs.map(f)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["collection_pipelines"]);
+}
+
+#[test]
+fn db_query_is_data_access_not_collection_pipelines() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "db.query(sql)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["data_access"]);
+}
+
+#[test]
+fn promise_then_is_async_not_collection_pipelines() {
+    let hint = PatternHintInput {
+        node_kind: "call_expression".to_string(),
+        text: "promise.then(resolve)".to_string(),
+    };
+    assert_eq!(classify_hint(&hint, "typescript"), vec!["async_patterns"]);
 }
 
 // ── M39: state_store ─────────────────────────────────────────────────────────

@@ -29,6 +29,18 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         heritage clause; heritage-aware narrowing is the embedder's responsibility.",
     ),
     (
+        "collection_pipelines",
+        "Functional collection-transform method calls — `.map`, `.filter`, `.reduce`, \
+        `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat`. \
+        Detected via member-call callee-text on `call_expression` at CALL_DISPATCH \
+        slot P10 (broadest member-call category — more specific categories resolve \
+        first). Callee-text cannot distinguish the receiver type: `rxObservable.map(fn)`, \
+        `new Map().forEach(cb)`, and `array.map(f)` all match — treated as acceptable \
+        noise for an entropy measure. Bare calls without a dot prefix (`map(f)`) are \
+        intentionally not matched. TypeScript and JavaScript primary targets; the same \
+        regex applies to Go and Java where these method names appear. Added M40.",
+    ),
+    (
         "data_access",
         "Code constructs that perform I/O against data stores or external resources — \
         e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), \
@@ -137,13 +149,14 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// ```rust
 /// use sdivi_core::CATEGORIES;
 ///
+/// assert!(CATEGORIES.contains(&"collection_pipelines"));
 /// assert!(CATEGORIES.contains(&"decorators"));
 /// assert!(CATEGORIES.contains(&"framework_hooks"));
 /// assert!(CATEGORIES.contains(&"logging"));
 /// assert!(CATEGORIES.contains(&"null_safety"));
 /// assert!(CATEGORIES.contains(&"schema_validation"));
 /// assert!(CATEGORIES.contains(&"state_store"));
-/// assert_eq!(CATEGORIES.len(), 13);
+/// assert_eq!(CATEGORIES.len(), 14);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -159,6 +172,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[10].0,
     CATALOG_ENTRIES[11].0,
     CATALOG_ENTRIES[12].0,
+    CATALOG_ENTRIES[13].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -216,6 +230,7 @@ pub struct CategoryCatalog {
 /// assert_eq!(a.schema_version, "1.0");
 ///
 /// let names: Vec<&str> = a.categories.iter().map(|c| c.name.as_str()).collect();
+/// assert!(names.contains(&"collection_pipelines"));
 /// assert!(names.contains(&"error_handling"));
 /// assert!(names.contains(&"async_patterns"));
 /// assert!(names.contains(&"null_safety"));
