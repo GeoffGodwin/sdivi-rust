@@ -83,6 +83,44 @@ directly bypass `build_catalog` entirely — their inputs determine their output
 If you have already migrated to `classify_hint` in M32, you are now aligned with the
 native pipeline. If not, your hand-rolled filter continues to work unchanged.
 
+## M36.1 — `decorators` category introduction (TS/JS decorator count appears)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`.
+
+**What changed.** The `decorators` pattern category is now natively classified for
+TypeScript and JavaScript. The parsing stage (`sdivi-lang-typescript` and
+`sdivi-lang-javascript`) now emits `decorator` nodes as `PatternHint` values —
+previously the `decorator` node kind was not collected at all. `category_for_node_kind`
+routes `"decorator"` to `"decorators"` in the native pipeline.
+
+**Impact on existing snapshots.**
+
+1. **`decorators` transitions from zero to non-zero.** On TS/JS repos using decorator
+   syntax (NestJS, Angular, TypeORM, MikroORM, class-validator, etc.), the `decorators`
+   bucket was absent in all pre-M36.1 snapshots. After upgrade, the first snapshot
+   counts all decorator nodes. `compute_delta` will report a large positive delta on
+   `decorators.instance_count` — expected; not a regression.
+2. **No existing category loses instances.** `decorator` was previously uncollected;
+   no prior category is cannibalised.
+3. **`list_categories()` count grows from 9 → 10.** Embedders that hard-code the
+   count must update. The recommended pattern is `list_categories().categories.len()`.
+4. **Parsing-layer change:** the parsing stage now emits more `PatternHint` values per
+   file on TS/JS repos with decorators. Snapshot `feature_record` hint counts will
+   increase on decorator-heavy files.
+
+**Escape hatch.** Use a threshold override to defer recalibration:
+
+```toml
+[thresholds.overrides.decorators]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "M36.1 upgrade: decorators bucket newly populated; setting initial tolerance"
+```
+
+**Trend continuity.** `snapshot_version` stays `"1.0"`. The first post-M36.1 snapshot
+is comparable to prior snapshots — `compute_delta` returns `null` for `decorators`
+when no prior `decorators` value exists, and a numeric delta on subsequent comparisons.
+
 ## M35 — `framework_hooks` category introduction (TS/JS hook-call count appears)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`.

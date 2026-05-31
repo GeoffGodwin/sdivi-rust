@@ -100,6 +100,9 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("System.out.println(\"x\")", "java", "logging"),
     ("logger.info(\"x\")", "java", "logging"),
     ("LOG.debug(\"x\")", "java", "logging"),
+    // M36.1: decorators — node-kind-only via category_for_node_kind, not CALL_DISPATCH.
+    // A `decorator` hint routed as `call_expression` should NOT match any dispatch entry.
+    ("@Injectable()", "typescript", ""),
     // P9: data_access — per-language tables
     ("fetch(\"/api/users\")", "typescript", "data_access"),
     ("axios.get(\"/api\")", "typescript", "data_access"),

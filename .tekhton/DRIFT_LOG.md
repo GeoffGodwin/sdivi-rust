@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 10
+- Runs since audit: 11
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md:185` â "P10 (`decorators`)" contradicts the canonical precedence table in the same doc (P10 = `collection_pipelines`). Factual error in doc text introduced by M36.1; correct by dropping the slot label.
+- [2026-05-31 | "unknown"] `dispatch_disjointness.rs:26` â comment "At M35, P1/P6/P8/P9 are active" not updated to reflect M36.1. Since M36.1 adds no `CALL_DISPATCH` entry the omission is technically accurate, but the milestone marker is now stale.
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md` Go corpus â `fmt.Errorf` is classified as `logging` via the `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)` regex. `fmt.Errorf` constructs an error value; it does not emit output. Pre-existing M33 inheritance; the eventual Go error-handling pass will need to revisit this regex entry.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:103` â `CALL_DISPATCH` is a private `const` with only an inline `//` justification comment and no `///` doc block. `sdivi-patterns` lacks `#![deny(missing_docs)]` so this is not a compile error. Worth a documentation sweep when the registry grows past P9.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` Go corpus â `fmt.Errorf` is classified as `logging` via the `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)` regex. `fmt.Errorf` constructs an error value and does not emit output. Pre-existing M33 inheritance; the eventual Go error-handling pass will need to revisit this regex entry.
 - [2026-05-30 | "unknown"] `crates/sdivi-patterns/tests/dispatch_disjointness.rs:168-174` â The `loser_matches` match in `known_overlaps_winner_matches_dispatch_order` is intentionally hardcoded; the `other => panic!` arm forces future milestones to extend it. Valid design, but the intent isn't commented â a new contributor may read it as incomplete code. Low risk.

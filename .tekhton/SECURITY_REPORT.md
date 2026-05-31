@@ -1,5 +1,5 @@
 ## Summary
-M35 adds the `framework_hooks` pattern category: a new module (`framework_hooks.rs`) with a single `LazyLock<Regex>` and a `matches_callee` dispatcher, wired into `CALL_DISPATCH` in `mod.rs` and registered in `categories.rs`. The change introduces no I/O, no network calls, no authentication, no cryptography, no shell execution, and no external user-controlled input paths. The regex `^use[A-Z]` is a compile-time constant anchored at the start, with no quantifiers that could trigger catastrophic backtracking. The overall security posture of the change is sound.
+M36.1 is a purely additive pattern-category change: it registers `"decorator"` as a new tree-sitter node kind in the TS/JS extraction arrays and wires it into the static classification dispatch table (`category_for_node_kind`). No new code paths touch authentication, cryptography, network, file system I/O, or user-controlled input beyond what the existing extraction pipeline already handles. All new code is confined to compile-time string constants and a routing branch. Decorator node text is captured via the pre-existing `truncate_to_256_bytes` bound, consistent with all other node kinds. The change presents no exploitable surface.
 
 ## Findings
 None

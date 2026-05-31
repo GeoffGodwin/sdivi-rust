@@ -13,6 +13,7 @@
 pub mod async_patterns;
 pub mod class_hierarchy;
 pub mod data_access;
+pub mod decorators;
 pub mod error_handling;
 pub mod framework_hooks;
 pub mod logging;
@@ -24,26 +25,23 @@ use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
-/// Note: `logging` is natively classified by the pipeline since M33 via
-/// [`classify_hint`] callee-text inspection. [`category_for_node_kind`] still
-/// never returns `Some("logging")` — the relevant node kinds overlap with
-/// `data_access` and `resource_management` — but `classify_hint` routes matching
-/// callees (e.g. `console.log`, `tracing::info!`) to `logging` directly.
+/// Note: `logging` is classified via [`classify_hint`] callee-text inspection only;
+/// [`category_for_node_kind`] never returns `Some("logging")`.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use sdivi_patterns::queries::ALL_CATEGORIES;
 ///
-/// assert!(ALL_CATEGORIES.contains(&"error_handling"));
-/// assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
+/// assert!(ALL_CATEGORIES.contains(&"decorators"));
 /// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert_eq!(ALL_CATEGORIES.len(), 9);
+/// assert_eq!(ALL_CATEGORIES.len(), 10);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "class_hierarchy",
     "data_access",
+    "decorators",
     "error_handling",
     "framework_hooks",
     "logging",
@@ -76,9 +74,7 @@ pub const ALL_CATEGORIES: &[&str] = &[
 ///
 /// # See also
 ///
-/// [`classify_hint`] — callee-text-aware classifier that returns `["logging"]` for
-/// matching callees and disambiguates Rust `macro_invocation` into `logging` vs
-/// `resource_management`. This is what the native pipeline calls since M33.
+/// [`classify_hint`] — callee-aware classifier; preferred for most callers (M33+).
 pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'static str> {
     if async_patterns::NODE_KINDS.contains(&node_kind) {
         Some("async_patterns")
@@ -86,6 +82,8 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
         Some("class_hierarchy")
     } else if data_access::NODE_KINDS.contains(&node_kind) {
         Some("data_access")
+    } else if decorators::NODE_KINDS.contains(&node_kind) {
+        Some("decorators")
     } else if error_handling::NODE_KINDS.contains(&node_kind) {
         Some("error_handling")
     } else if resource_management::NODE_KINDS.contains(&node_kind) {
@@ -212,9 +210,10 @@ mod tests {
     }
 
     #[test]
-    fn all_categories_has_nine_entries() {
-        assert_eq!(ALL_CATEGORIES.len(), 9);
+    fn all_categories_has_ten_entries() {
+        assert_eq!(ALL_CATEGORIES.len(), 10);
         assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
+        assert!(ALL_CATEGORIES.contains(&"decorators"));
     }
 
     #[test]
@@ -288,13 +287,13 @@ mod tests {
 
     #[test]
     fn call_expression_is_data_access() {
-        assert_eq!(
-            category_for_node_kind("call_expression", "typescript"),
-            Some("data_access")
-        );
-        assert_eq!(
-            category_for_node_kind("call", "python"),
-            Some("data_access")
-        );
+        assert_eq!(category_for_node_kind("call_expression", "typescript"), Some("data_access"));
+        assert_eq!(category_for_node_kind("call", "python"), Some("data_access"));
+    }
+
+    #[test]
+    fn decorator_is_decorators() {
+        assert_eq!(category_for_node_kind("decorator", "typescript"), Some("decorators"));
+        assert_eq!(category_for_node_kind("decorator", "javascript"), Some("decorators"));
     }
 }

@@ -20,6 +20,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. In TypeScript/JavaScript, Promise-chain calls (`.then()`, `.catch()`, `.finally()`) are also classified here via callee-text inspection. |
 | class_hierarchy | Code constructs that establish inheritance, interface implementation, or trait conformance relationships — e.g. classes with `extends`/`implements` clauses, Python classes with base classes, and Rust `impl Trait for Type` blocks. All declaration kinds are classified here regardless of whether they carry a heritage clause; heritage-aware narrowing is the embedder's responsibility. |
 | data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`db.query`, `cursor.*`), HTTP fetches (`fetch`, `axios`), file reads (`open`, `requests.*`). As of M33, only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here; unrecognised callees are dropped. |
+| decorators | TypeScript and JavaScript decorator syntax — any `decorator` node (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.). Every decorator counts regardless of name; decorator-shape entropy is the signal. Added M36.1. |
 | error_handling | Code constructs that propagate, transform, or handle error conditions — e.g., the `?` operator (`try_expression`) and `match` arms that dispatch on `Result` or `Option` variants. |
 | framework_hooks | Component-composition hook calls in React, Preact, Vue (composables), and Svelte-style runtimes — any `call_expression` callee matching `^use[A-Z]` in TypeScript or JavaScript. Covers built-in hooks (`useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`, `useContext`, `useReducer`, `useLayoutEffect`) and the full custom-hook ecosystem. Added M35. |
 | logging | Code constructs that produce diagnostic or observability output — e.g., `console.*` calls, structured logger invocations (`logger.info`), `print` statements, and logging macros (`tracing::info!`, `log::debug!`). **Natively classified since M33** via callee-text inspection in `classify_hint` — see Callee-text classification section. |
@@ -64,6 +65,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | async_patterns | `await_expression`; `call_expression` where callee matches `\.(then\|catch\|finally)\(` | `await_expression` via node-kind; Promise chains via callee-text. Examples: `future.await`, `p.then(r)`, `fetch().catch(e => {})`. |
 | class_hierarchy | `class_declaration`, `abstract_class_declaration`, `interface_declaration` | Abstract classes and interfaces always count. Concrete classes count regardless of `extends` / `implements`; entropy survives the broader collection because heritage-free classes have similar structure and contribute low entropy. (JavaScript: only `class_declaration` is emitted; `interface_declaration` and `abstract_class_declaration` are TS-only AST shapes.) |
 | data_access | `call_expression` where callee matches `^(fetch\|axios)\b\|\b(query\|read\|write\|get\|post\|put\|delete\|patch)\(\|\b(db\|sql)\.\|\.(query\|read\|write\|fetch)\(` | Natively filtered since M33. Examples: `fetch(url)`, `db.query(sql)`. Unrecognised calls (e.g. `Math.max(a, b)`) are dropped. |
+| decorators | `decorator` | Natively classified since M36.1. Examples: `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`. Node-kind only — all decorators count. |
 | error_handling | `try_statement` | None |
 | framework_hooks | `call_expression` where callee matches `^use[A-Z]` | Natively classified since M35. Examples: `useState(0)`, `useEffect(fn, [])`, `useAuth()`. Second character must be uppercase — `user()` does not match. |
 | logging | `call_expression` where callee matches `^(console\|logger\|log)\.` | Natively classified since M33. Examples: `console.log(x)`, `logger.info(x)`. |
@@ -180,7 +182,9 @@ is the contract — future milestones insert at their named slot, never append.
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P6, P8, and P9 are active at M35. All other slots are reserved placeholders.
+P1, P6, P8, and P9 are active at M35. P10 (`decorators`) is node-kind-only and does
+not appear in `CALL_DISPATCH` — it is classified via `category_for_node_kind` in the
+`other =>` arm of `classify_hint`. All other slots are reserved placeholders.
 
 #### KNOWN_OVERLAPS policy
 
@@ -188,7 +192,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M34 (P1/P8/P9 active):
+Documented overlaps at M35 (P1/P6/P8/P9 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -233,7 +237,8 @@ An embedder that supplies `PatternInstanceInput` values must:
 5. **`data_access` is callee-filtered since M33.** Only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here. Embedders that supply `PatternInstanceInput { category: "data_access", … }` directly continue to work — their instances merge with natively classified ones. Embedders that want custom callee filters should apply them before calling `compute_pattern_metrics`.
 6. **As of M33, the `logging` category is natively classified by the pipeline via `classify_hint`.** `sdivi_patterns::queries::category_for_node_kind` still never returns `Some("logging")` — that sentinel is unchanged — but the native pipeline now calls `classify_hint`, which routes matching callees to `logging`. Embedders that pass `PatternInstanceInput { category: "logging" }` directly will continue to round-trip — their instances merge with the natively-classified ones in `compute_pattern_metrics` output. Embedders that previously hand-rolled their own logging filter should consider switching to `classify_hint` (M32) to stay aligned with the canonical regex set.
 7. **As of M35, the `framework_hooks` category is natively classified for TypeScript and JavaScript** via `classify_hint` callee-text inspection (`^use[A-Z]` regex). Hook calls that were previously unrecognised (dropped to `[]`) are now counted in the `framework_hooks` bucket. On the first post-M35 snapshot of a TS/JS repo, `framework_hooks` transitions from zero to non-zero. This is a count-introduction event; see `MIGRATION_NOTES.md` for details.
-8. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
+8. **As of M36.1, the `decorators` category is natively classified for TypeScript and JavaScript** via the `decorator` tree-sitter node kind. `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, and any other decorator node are counted. On the first post-M36.1 snapshot of a TS/JS repo with decorators, the `decorators` bucket transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+9. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 
 Cross-runtime determinism: the WASM `normalize_and_hash` produces **bit-identical** output to the native Rust pipeline for the same input. See `docs/determinism.md` for the full guarantee.
 

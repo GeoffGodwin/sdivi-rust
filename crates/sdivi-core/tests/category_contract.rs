@@ -129,12 +129,12 @@ fn list_categories_returns_non_empty_categories() {
 }
 
 #[test]
-fn list_categories_returns_exactly_nine_categories() {
+fn list_categories_returns_exactly_ten_categories() {
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        9,
-        "list_categories must return exactly 9 categories (P1–P9)"
+        10,
+        "list_categories must return exactly 10 categories (P1–P10)"
     );
 }
 
@@ -145,6 +145,16 @@ fn list_categories_includes_framework_hooks() {
     assert!(
         names.contains(&"framework_hooks"),
         "list_categories must include the 'framework_hooks' category"
+    );
+}
+
+#[test]
+fn list_categories_includes_decorators() {
+    let catalog = sdivi_core::list_categories();
+    let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
+    assert!(
+        names.contains(&"decorators"),
+        "list_categories must include the 'decorators' category"
     );
 }
 

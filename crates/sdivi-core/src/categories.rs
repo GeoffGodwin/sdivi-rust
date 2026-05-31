@@ -37,6 +37,13 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         responsibility.",
     ),
     (
+        "decorators",
+        "TypeScript and JavaScript decorator syntax (`@Injectable()`, `@Component({...})`, \
+        `@Entity()`, `@Get('/')`, `@IsString()`, etc.). Every `decorator` node counts — \
+        broad collection in the spirit of `class_hierarchy`. Decorator-shape entropy is \
+        the signal; no callee allowlist is applied. Added M36.1.",
+    ),
+    (
         "error_handling",
         "Code constructs that propagate, transform, or handle error conditions — \
         e.g., the `?` operator (`try_expression`) and `match` arms that dispatch \
@@ -91,10 +98,10 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// ```rust
 /// use sdivi_core::CATEGORIES;
 ///
-/// assert!(CATEGORIES.contains(&"error_handling"));
+/// assert!(CATEGORIES.contains(&"decorators"));
 /// assert!(CATEGORIES.contains(&"framework_hooks"));
 /// assert!(CATEGORIES.contains(&"logging"));
-/// assert_eq!(CATEGORIES.len(), 9);
+/// assert_eq!(CATEGORIES.len(), 10);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -106,6 +113,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[6].0,
     CATALOG_ENTRIES[7].0,
     CATALOG_ENTRIES[8].0,
+    CATALOG_ENTRIES[9].0,
 ];
 
 /// Metadata for a single canonical pattern category.

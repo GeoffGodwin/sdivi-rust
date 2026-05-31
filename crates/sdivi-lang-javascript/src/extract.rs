@@ -10,6 +10,7 @@ const PATTERN_KINDS: &[&str] = &[
     "await_expression",
     "arrow_function",
     "call_expression",
+    "decorator",
     "generator_function",
     "generator_function_declaration",
     "class_declaration",

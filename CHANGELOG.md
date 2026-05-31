@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `decorators` pattern category (M36.1): TypeScript and JavaScript `decorator` nodes
+  (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.)
+  are now natively classified as `decorators`. Node-kind-only — every decorator counts
+  regardless of name; decorator-shape entropy is the signal. The parsing stage now emits
+  `decorator` hints (previously uncollected). On the first post-upgrade snapshot of a
+  TS/JS repo using decorators, `decorators` transitions from zero to non-zero —
+  a count-introduction event; see `MIGRATION_NOTES.md` for details.
+  `list_categories()` count grows from 9 → 10. `snapshot_version` stays `"1.0"`.
+
 - `framework_hooks` pattern category (M35): TypeScript and JavaScript `call_expression`
   callees matching `^use[A-Z]` are now natively classified as `framework_hooks`. Covers
   built-in React/Vue/Svelte hooks (`useState`, `useEffect`, `useMemo`, etc.) and the
