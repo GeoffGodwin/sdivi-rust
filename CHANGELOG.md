@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `null_safety` pattern category (M37): TypeScript and JavaScript `optional_chain` nodes
+  (`a?.b`, `arr?.[0]`, `fn?.()`) and TypeScript `non_null_expression` nodes (`el!`) are
+  now natively classified as `null_safety`. Node-kind-only — all optional chains and
+  non-null assertions are counted. On the first post-upgrade snapshot of a TS/JS repo
+  using these constructs, `null_safety` transitions from zero to non-zero — a
+  count-introduction event; see `MIGRATION_NOTES.md` for details. Nullish coalescing
+  (`??`) is deferred (requires operator-field inspection beyond the v0 model).
+  `list_categories()` count grows from 10 → 11. `snapshot_version` stays `"1.0"`.
+
 - `decorators` pattern category extended to Python (M36.2): `decorated_definition` nodes
   (the tree-sitter-python wrapper for `@`-decorated functions and classes) are now classified
   as `decorators`. Covers `@dataclass`, `@property`, `@staticmethod`, `@app.route(...)`,

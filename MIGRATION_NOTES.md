@@ -8,6 +8,43 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M37 — `null_safety` pattern category introduced (TS/JS count-introduction event)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** Two tree-sitter node kinds are now collected by the TypeScript and
+JavaScript language adapters and classified as `null_safety`:
+
+- `optional_chain` — optional chaining (`a?.b`, `arr?.[0]`, `fn?.()`) in both TS and JS.
+- `non_null_expression` — TypeScript non-null assertion operator (`el!`); TS only.
+
+`list_categories()` count grows from 10 → 11.
+
+**Count semantics.** Each `optional_chain` node emitted by the grammar counts as one
+instance. A long chain `a?.b?.c` may produce nested `optional_chain` nodes — each
+counts independently. This per-node counting is deterministic.
+
+**Deferred: nullish coalescing (`??`).** `a ?? b` is a `binary_expression` with a `??`
+operator child, not a dedicated node kind. Operator-field inspection is out of scope for
+the v0 node-kind model. `binary_expression` is intentionally excluded.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.null_safety]
+pattern_entropy_rate = 5.0
+expires = "2027-06-30"
+reason = "M37 upgrade: null_safety bucket newly populated; setting initial tolerance"
+```
+
+**Trend continuity.** The first post-M37 snapshot transitions `null_safety` from zero
+to non-zero. This is a count-introduction event — the same class as M35 (`framework_hooks`)
+and M36.1 (`decorators`). The delta for this transition is not meaningful as a drift
+signal; subsequent snapshots establish the baseline.
+
 ## M33 — Native pipeline switchover to `classify_hint` (per-category instance counts shift)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

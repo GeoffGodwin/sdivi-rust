@@ -129,12 +129,12 @@ fn list_categories_returns_non_empty_categories() {
 }
 
 #[test]
-fn list_categories_returns_exactly_ten_categories() {
+fn list_categories_returns_exactly_eleven_categories() {
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        10,
-        "list_categories must return exactly 10 categories (P1–P10)"
+        11,
+        "list_categories must return exactly 11 categories (P1–P11)"
     );
 }
 
@@ -213,6 +213,38 @@ fn decorated_definition_python_is_decorators() {
         category_for_node_kind("decorated_definition", "python"),
         Some("decorators"),
         "decorated_definition must map to decorators (M36.2 acceptance criterion)"
+    );
+}
+
+// ── M37: null_safety ──────────────────────────────────────────────────────────
+
+#[test]
+fn list_categories_includes_null_safety() {
+    let catalog = sdivi_core::list_categories();
+    let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
+    assert!(
+        names.contains(&"null_safety"),
+        "list_categories must include the 'null_safety' category"
+    );
+}
+
+#[test]
+fn optional_chain_typescript_is_null_safety() {
+    use sdivi_patterns::queries::category_for_node_kind;
+    assert_eq!(
+        category_for_node_kind("optional_chain", "typescript"),
+        Some("null_safety"),
+        "optional_chain must map to null_safety (M37 acceptance criterion)"
+    );
+}
+
+#[test]
+fn non_null_expression_typescript_is_null_safety() {
+    use sdivi_patterns::queries::category_for_node_kind;
+    assert_eq!(
+        category_for_node_kind("non_null_expression", "typescript"),
+        Some("null_safety"),
+        "non_null_expression must map to null_safety (M37 acceptance criterion)"
     );
 }
 

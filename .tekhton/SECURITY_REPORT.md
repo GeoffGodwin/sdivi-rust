@@ -1,8 +1,11 @@
 ## Summary
-M36.2 extends the `decorators` pattern category to Python by adding the `"decorated_definition"` node kind to a compile-time constant string slice in `decorators.rs`, extracts an inline test block into a separate `tests.rs` file (no logic change), and adds new test cases in the lang-python and sdivi-core test suites. All changes are purely additive data and test code. There is no new I/O, no user-controlled input processing, no cryptographic code, no authentication surface, and no network interaction introduced by this change.
+
+M37 adds the `null_safety` pattern category for TypeScript and JavaScript by registering two tree-sitter node kind strings (`optional_chain`, `non_null_expression`) in static `&[&str]` slices across `sdivi-patterns`, `sdivi-core`, and the two language adapter crates. All changes are purely additive constant data wired into existing classification dispatch logic. There are no new I/O paths, no user-controlled inputs, no authentication surfaces, no cryptographic operations, and no network calls. The change surface is minimal and carries no meaningful attack surface.
 
 ## Findings
+
 None
 
 ## Verdict
+
 CLEAN

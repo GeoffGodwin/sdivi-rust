@@ -17,6 +17,7 @@ pub mod decorators;
 pub mod error_handling;
 pub mod framework_hooks;
 pub mod logging;
+pub mod null_safety;
 pub mod resource_management;
 pub mod state_management;
 pub mod type_assertions;
@@ -35,7 +36,8 @@ use crate::hint_input::PatternHintInput;
 ///
 /// assert!(ALL_CATEGORIES.contains(&"decorators"));
 /// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert_eq!(ALL_CATEGORIES.len(), 10);
+/// assert!(ALL_CATEGORIES.contains(&"null_safety"));
+/// assert_eq!(ALL_CATEGORIES.len(), 11);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
@@ -45,6 +47,7 @@ pub const ALL_CATEGORIES: &[&str] = &[
     "error_handling",
     "framework_hooks",
     "logging",
+    "null_safety",
     "resource_management",
     "state_management",
     "type_assertions",
@@ -86,6 +89,8 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
         Some("decorators")
     } else if error_handling::NODE_KINDS.contains(&node_kind) {
         Some("error_handling")
+    } else if null_safety::NODE_KINDS.contains(&node_kind) {
+        Some("null_safety")
     } else if resource_management::NODE_KINDS.contains(&node_kind) {
         Some("resource_management")
     } else if state_management::NODE_KINDS.contains(&node_kind) {

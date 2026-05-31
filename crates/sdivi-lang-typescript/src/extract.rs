@@ -16,6 +16,8 @@ const PATTERN_KINDS: &[&str] = &[
     "class_declaration",
     "abstract_class_declaration",
     "interface_declaration",
+    "optional_chain",
+    "non_null_expression",
 ];
 
 /// Declaration kinds that may appear as the `declaration` child of an

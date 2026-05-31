@@ -14,6 +14,7 @@ const PATTERN_KINDS: &[&str] = &[
     "generator_function",
     "generator_function_declaration",
     "class_declaration",
+    "optional_chain",
 ];
 
 /// Declaration kinds that may appear as the `declaration` child of an

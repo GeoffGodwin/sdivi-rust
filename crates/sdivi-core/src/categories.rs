@@ -71,6 +71,15 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         those instances merge with natively classified ones.",
     ),
     (
+        "null_safety",
+        "Code constructs that guard against null or undefined values — optional \
+        chaining (`a?.b`, `arr?.[0]`, `fn?.()`) via the `optional_chain` node kind \
+        and TypeScript non-null assertions (`el!`) via `non_null_expression`. \
+        TypeScript and JavaScript only; other languages produce no instances in v0. \
+        Nullish coalescing (`??`) is deferred — it requires operator-field \
+        inspection beyond the v0 node-kind model. Added M37.",
+    ),
+    (
         "resource_management",
         "Code constructs that allocate, release, or manage system or heap resources — \
         e.g., macro invocations such as `drop!`, `vec!`, or standard I/O macros.",
@@ -101,7 +110,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"decorators"));
 /// assert!(CATEGORIES.contains(&"framework_hooks"));
 /// assert!(CATEGORIES.contains(&"logging"));
-/// assert_eq!(CATEGORIES.len(), 10);
+/// assert!(CATEGORIES.contains(&"null_safety"));
+/// assert_eq!(CATEGORIES.len(), 11);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -114,6 +124,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[7].0,
     CATALOG_ENTRIES[8].0,
     CATALOG_ENTRIES[9].0,
+    CATALOG_ENTRIES[10].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -173,6 +184,7 @@ pub struct CategoryCatalog {
 /// let names: Vec<&str> = a.categories.iter().map(|c| c.name.as_str()).collect();
 /// assert!(names.contains(&"error_handling"));
 /// assert!(names.contains(&"async_patterns"));
+/// assert!(names.contains(&"null_safety"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {

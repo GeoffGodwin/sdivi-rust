@@ -38,10 +38,11 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_ten_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 10);
+fn all_categories_has_eleven_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 11);
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
+    assert!(ALL_CATEGORIES.contains(&"null_safety"));
 }
 
 #[test]
@@ -135,4 +136,37 @@ fn decorator_is_decorators() {
         category_for_node_kind("decorator", "javascript"),
         Some("decorators")
     );
+}
+
+// ── M37: null_safety ──────────────────────────────────────────────────────────
+
+#[test]
+fn optional_chain_is_null_safety() {
+    assert_eq!(
+        category_for_node_kind("optional_chain", "typescript"),
+        Some("null_safety")
+    );
+    assert_eq!(
+        category_for_node_kind("optional_chain", "javascript"),
+        Some("null_safety")
+    );
+}
+
+#[test]
+fn non_null_expression_is_null_safety() {
+    assert_eq!(
+        category_for_node_kind("non_null_expression", "typescript"),
+        Some("null_safety")
+    );
+}
+
+#[test]
+fn null_safety_node_kinds_do_not_match_non_ts_js_languages() {
+    for lang in ["rust", "python", "go", "java"] {
+        assert_eq!(
+            category_for_node_kind("optional_chain", lang),
+            Some("null_safety"),
+            "category_for_node_kind is language-unaware — optional_chain maps to null_safety regardless of language; adapters that don't emit it produce no hits"
+        );
+    }
 }
