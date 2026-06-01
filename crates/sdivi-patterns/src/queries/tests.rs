@@ -103,20 +103,17 @@ fn abstract_class_declaration_is_class_hierarchy() {
     );
 }
 
-// M30 sentinel: tests `category_for_node_kind` (node-kind-only, unchanged).
-// M33 promoted `logging` via `classify_hint`; `category_for_node_kind` is
-// intentionally unchanged. See `tests/m33_sentinels.rs` for the M33 counterpart.
+// M30 sentinel: `category_for_node_kind` is node-kind-only; M33 promoted `logging`
+// via `classify_hint` without changing this function. See m33_sentinels.rs.
 #[test]
 fn category_for_node_kind_never_returns_logging() {
-    // `category_for_node_kind` never returns logging — that requires callee-text
-    // inspection (see `classify_hint`). This is unchanged through M32 and M33.
     for kind in ["call_expression", "call", "macro_invocation"] {
         for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
             assert_ne!(
                 category_for_node_kind(kind, lang),
                 Some("logging"),
-                "logging is catalog-only in v0 for category_for_node_kind; \
-                 routing for ({kind}, {lang}) would steal from data_access/resource_management"
+                "category_for_node_kind never returns logging; callee-text routing via classify_hint \
+                 ({kind}, {lang})"
             );
         }
     }
@@ -290,12 +287,12 @@ fn non_null_expression_is_null_safety() {
 }
 
 #[test]
-fn null_safety_node_kinds_do_not_match_non_ts_js_languages() {
+fn category_for_node_kind_is_language_unaware_optional_chain_always_maps_to_null_safety() {
     for lang in ["rust", "python", "go", "java"] {
         assert_eq!(
             category_for_node_kind("optional_chain", lang),
             Some("null_safety"),
-            "category_for_node_kind is language-unaware — optional_chain maps to null_safety regardless of language; adapters that don't emit it produce no hits"
+            "optional_chain maps to null_safety regardless of language parameter"
         );
     }
 }

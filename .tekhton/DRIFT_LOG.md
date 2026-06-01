@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 24
+- Runs since audit: 25
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-06-01 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:123-132` â `call_expression_is_data_access` asserts `category_for_node_kind("call_expression", "typescript") == Some("data_access")`, which is correct behavior but directly contradicts the new `ALL_CATEGORIES` doc prose. The test is the ground truth here; the doc is wrong. Accumulates as a known doc debt item.
+- [2026-06-01 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `category_for_node_kind` checks `concurrency::NODE_KINDS` which includes `go_statement` and `select_statement` (pure Go node kinds), yet there is no test asserting `category_for_node_kind("go_statement", "go") == Some("concurrency")`. The node-kind path for these two concurrency kinds has no direct coverage in `tests.rs`; covered only via integration tests in the Go adapter. Low risk but worth a unit test sentinel on the next pass.
 - [2026-06-01 | "unknown"] `DRIFT_LOG.md` was created new by M47; M01âM46 drift decisions (e.g. KDD-6 serde_yaml comment loss, bundler vs. `--target web` choice) are absent â the log is incomplete as a historical audit trail (carried from cycle 1).
 - [2026-06-01 | "unknown"] `wasm.yml`: the job creates two independent `node_modules` trees in the same workspace (a symlink at `tests/node_smoke/node_modules/@geoffgodwin/sdivi-wasm` for smoke tests and a real `node_modules/typescript/` at the repo root for the typecheck); currently non-conflicting but worth noting if future steps add more `npm install` calls (carried from cycle 1).
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md:22-24` â the canonical category list table has a pre-existing alphabetical ordering inconsistency: `concurrency` (conâ¦) appears before `collection_pipelines` (colâ¦) and `comprehensions` (comâ¦). The `markdown_table_matches_list_categories_output` test uses `HashSet` comparison so the disorder is invisible to CI. M46 correctly placed `comprehensions` between `collection_pipelines` and `data_access` in the doc's existing sequence, consistent but not fixing the underlying sort. Track for a dedicated doc-cleanup pass.

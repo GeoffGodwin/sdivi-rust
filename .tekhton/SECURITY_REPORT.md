@@ -1,9 +1,10 @@
 ## Summary
 
-M47 adds CI test infrastructure only: a TypeScript negative fixture (`negative.ts`), a consumer tsconfig (`tsconfig.json`), a POSIX shell doc-lint script (`check_docs.sh`), and three new steps in the WASM GitHub Actions workflow. No authentication, cryptography, user-input handling, or network communication was introduced in the new code paths. The shell script uses `set -eu`, properly quotes all variables, and passes all patterns to `grep -F` (fixed-string mode), eliminating regex injection risk. The CI workflow interpolates only static `env:` block values (e.g. `TYPESCRIPT_VERSION: "5.5.4"`) into `run:` blocks — no user-controlled GitHub context (event payloads, branch names, actor strings) reaches any shell command, so there is no script injection surface. Overall security posture for this change is clean.
+This changeset addresses 55 non-blocking tech-debt notes accumulated across milestones M23–M47. The changes are predominantly test renames, doc comment accuracy fixes, assertion message updates, and one code-consistency refactor (Rust `extract.rs`). Three files warrant closer inspection: the shell script `check_docs.sh` (glob loop replacing hardcoded filenames), the Rust `sdivi-lang-rust/src/extract.rs` (inline truncation replaced by a shared helper), and the GitHub Actions `wasm.yml` (npm install flag additions). No authentication, cryptography, user input handling, or network communication logic was modified. The overall security posture of this change is low risk.
 
 ## Findings
-None
+
+- [LOW] [category:A06] [.github/workflows/wasm.yml:171] fixable:yes — `npm install` step adds `--no-audit`, which suppresses the npm advisory check for the TypeScript dev-tool installation. TypeScript is a pinned build-time dependency (`typescript@5.5.4`) and not a runtime dependency, so the blast radius is minimal; however, suppressing the audit removes one automated advisory signal. Suggestion: replace `--no-audit` with `--audit-level=none` (which still performs the audit request but does not fail on any advisory level) if the goal is suppressing noisy exit-code behavior, or accept the low risk given the version pin.
 
 ## Verdict
-CLEAN
+FINDINGS_PRESENT

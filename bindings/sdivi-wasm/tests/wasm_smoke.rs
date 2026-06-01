@@ -240,13 +240,14 @@ fn test_normalize_and_hash_differs_by_kind() {
 fn list_categories_returns_schema_version_and_expected_count() {
     let catalog = list_categories().unwrap();
     assert_eq!(catalog.schema_version, "1.0");
-    // 18 categories defined for snapshot_version "1.0" (M44 adds concurrency)
-    assert_eq!(catalog.categories.len(), 18);
+    // 19 categories defined for snapshot_version "1.0" (M46 adds comprehensions)
+    assert_eq!(catalog.categories.len(), 19);
     let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
     assert!(names.contains(&"async_patterns"));
     assert!(names.contains(&"class_hierarchy"));
-    assert!(names.contains(&"concurrency"));
     assert!(names.contains(&"collection_pipelines"));
+    assert!(names.contains(&"comprehensions"));
+    assert!(names.contains(&"concurrency"));
     assert!(names.contains(&"data_access"));
     assert!(names.contains(&"decorators"));
     assert!(names.contains(&"error_handling"));

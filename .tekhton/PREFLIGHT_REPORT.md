@@ -1,9 +1,12 @@
-# Pre-flight Report — 2026-05-31 23:45:09
+# Pre-flight Report — 2026-06-01 17:31:57
 
 ## Summary
-✓ 3 passed  ⚠ 0 warned  ✗ 0 failed  🔧 0 auto-fixed
+✓ 4 passed  ⚠ 0 warned  ✗ 0 failed  🔧 0 auto-fixed
 
 ## Checks
+
+### ✓ Dependencies (node_modules)
+node_modules is up-to-date.
 
 ### ✓ Dependencies (Rust)
 Cargo.lock exists.

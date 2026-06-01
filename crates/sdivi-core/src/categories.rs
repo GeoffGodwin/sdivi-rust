@@ -80,10 +80,10 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         "framework_hooks",
         "Component-composition hook calls in React, Preact, Vue (composables), and \
         Svelte-style runtimes — any `call_expression` callee matching `^use[A-Z]` in \
-        TypeScript or JavaScript. Covers built-in hooks (`useState`, `useEffect`, \
-        `useMemo`, `useCallback`, `useRef`, `useContext`, `useReducer`, \
-        `useLayoutEffect`) and the full custom-hook ecosystem (`useAuth`, `useStore`, \
-        etc.). Other languages produce no instances.",
+        TypeScript or JavaScript. Built-in hooks (`useState`, `useEffect`, `useMemo`, \
+        `useCallback`, `useRef`, `useContext`, `useReducer`, `useLayoutEffect`) and the \
+        custom-hook ecosystem (`useAuth`, `useTheme`, etc.). Note: `useSelector`, \
+        `useDispatch`, `useStore` route to `state_store` (P5 > P6). Other languages: none.",
     ),
     (
         "http_routing",

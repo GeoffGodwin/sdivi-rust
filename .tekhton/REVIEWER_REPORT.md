@@ -2,30 +2,18 @@
 APPROVED_WITH_NOTES
 
 ## Complex Blockers (senior coder)
-- None
+None
 
 ## Simple Blockers (jr coder)
-- None
+None
 
 ## Non-Blocking Notes
-- `check_docs.sh` still scans two hardcoded example filenames rather than a glob; a future third example would need a manual addition to stay in scope (carried from cycle 1).
-- `wasm.yml` "Install TypeScript (pinned)" runs `npm install --no-save` at the workspace root which has no `package.json`; works with npm 7+ but may emit warnings if the CI runner's npm version changes (carried from cycle 1).
+- `crates/sdivi-patterns/src/queries/mod.rs:36-43` — `ALL_CATEGORIES` doc says `category_for_node_kind` never returns `data_access` or `concurrency`, but both appear in its dispatch: `data_access::NODE_KINDS = &["call_expression", "call"]` and `concurrency::NODE_KINDS = &["go_statement", "select_statement"]`. The pre-existing `call_expression_is_data_access` test in `tests.rs:123-132` confirms `category_for_node_kind` does return `data_access`. The doc should move these two categories from the "callee-text only" list to the "returned by both" list, or drop them from the note and describe them as "hybrid" (node-kind for structural forms, callee-text for call-expression routing).
+- `bindings/sdivi-wasm/tests/check_docs.sh:17-26` — "Files scanned" comment header still names `examples/binding_node.ts` and `examples/binding_bundler.ts` explicitly after the glob change; the comment should now read `examples/*.ts` or be removed, since the code at line 63 already explains itself.
 
 ## Coverage Gaps
-- The tsconfig `paths` map includes `@geoffgodwin/sdivi-wasm/bundler` and `@geoffgodwin/sdivi-wasm/node` subpath entries, but neither example nor the negative fixture imports via those subpaths; type drift specific to a subpath condition would go undetected (carried from cycle 1).
+None
 
 ## Drift Observations
-- `DRIFT_LOG.md` was created new by M47; M01–M46 drift decisions (e.g. KDD-6 serde_yaml comment loss, bundler vs. `--target web` choice) are absent — the log is incomplete as a historical audit trail (carried from cycle 1).
-- `wasm.yml`: the job creates two independent `node_modules` trees in the same workspace (a symlink at `tests/node_smoke/node_modules/@geoffgodwin/sdivi-wasm` for smoke tests and a real `node_modules/typescript/` at the repo root for the typecheck); currently non-conflicting but worth noting if future steps add more `npm install` calls (carried from cycle 1).
-
----
-
-## Prior-Blocker Verification (cycle 2)
-
-**Blocker from cycle 1:** `negative.ts` — all four `// @ts-expect-error` directives had an intermediate comment line between the directive and the type-erroring code; TypeScript only suppresses diagnostics on the immediately following line, so the directives would have been unused (TS2578 × 4) and the actual errors would have been reported unremediated.
-
-**Status: FIXED.**
-
-Lines 34–35, 44–45, 53–54, 63–64 of the current `negative.ts` each show the directive on line N immediately preceding the code on line N+1, with explanatory prose moved above the directive. No intermediate comment line remains between any `// @ts-expect-error` and its guarded statement. The fix matches the correction prescribed in cycle 1 exactly.
-
-No regression was introduced by the rework: the change is purely comment-reordering within a single file; the tsconfig, check_docs.sh, wasm.yml steps, and all other files are unchanged from cycle 1.
+- `crates/sdivi-patterns/src/queries/tests.rs:123-132` — `call_expression_is_data_access` asserts `category_for_node_kind("call_expression", "typescript") == Some("data_access")`, which is correct behavior but directly contradicts the new `ALL_CATEGORIES` doc prose. The test is the ground truth here; the doc is wrong. Accumulates as a known doc debt item.
+- `crates/sdivi-patterns/src/queries/mod.rs` — `category_for_node_kind` checks `concurrency::NODE_KINDS` which includes `go_statement` and `select_statement` (pure Go node kinds), yet there is no test asserting `category_for_node_kind("go_statement", "go") == Some("concurrency")`. The node-kind path for these two concurrency kinds has no direct coverage in `tests.rs`; covered only via integration tests in the Go adapter. Low risk but worth a unit test sentinel on the next pass.

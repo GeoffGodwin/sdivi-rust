@@ -164,9 +164,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         # --no-save: do not create/update any package.json.
         # --no-package-lock: do not emit package-lock.json in the repo root.
+        # --no-fund: suppress funding messages (no package.json → npm emits them by default).
+        # --no-audit: suppress audit output (no lockfile to audit).
         # This installs tsc to node_modules/.bin/tsc in the workspace root so
         # npx tsc resolves it without a network fetch in the next step.
-        run: npm install --no-save --no-package-lock typescript@${{ env.TYPESCRIPT_VERSION }}
+        run: npm install --no-save --no-package-lock --no-fund --no-audit typescript@${{ env.TYPESCRIPT_VERSION }}
 
       - name: Typecheck WASM consumer surface (tsc --noEmit)
         if: matrix.os == 'ubuntu-latest'

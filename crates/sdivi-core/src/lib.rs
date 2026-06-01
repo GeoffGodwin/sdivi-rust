@@ -123,6 +123,18 @@ pub use sdivi_patterns::fingerprint::PatternFingerprint;
 /// Contains only the two fields that `classify_hint` inspects: `node_kind` and `text`.
 /// Foreign extractors construct this directly; the native pipeline uses
 /// `sdivi_parsing::feature_record::PatternHint` and M33 will wire the conversion.
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_core::PatternHintInput;
+///
+/// let hint = PatternHintInput {
+///     node_kind: "call_expression".to_string(),
+///     text: "console.log(\"x\")".to_string(),
+/// };
+/// assert_eq!(hint.node_kind, "call_expression");
+/// ```
 pub use sdivi_patterns::hint_input::PatternHintInput;
 
 /// Callee-text-aware classification — re-exported from `sdivi-patterns::queries`.
@@ -131,11 +143,19 @@ pub use sdivi_patterns::hint_input::PatternHintInput;
 /// Provides higher precision than [`category_for_node_kind`] by inspecting
 /// `hint.text` against per-language regex tables.
 ///
-/// **The native pipeline (`Pipeline::snapshot`) still uses `category_for_node_kind`
-/// in M32** — M33 switches the pipeline. Foreign extractors can adopt `classify_hint`
-/// immediately.
-///
 /// [`category_for_node_kind`]: sdivi_patterns::queries::category_for_node_kind
+///
+/// # Examples
+///
+/// ```rust
+/// use sdivi_core::{classify_hint, PatternHintInput};
+///
+/// let hint = PatternHintInput {
+///     node_kind: "call_expression".to_string(),
+///     text: "console.log(\"x\")".to_string(),
+/// };
+/// assert_eq!(classify_hint(&hint, "typescript"), vec!["logging"]);
+/// ```
 pub use sdivi_patterns::queries::classify_hint;
 
 /// Commonly-imported items from sdivi-core.

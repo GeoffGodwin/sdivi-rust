@@ -44,15 +44,24 @@ scan_pattern() {
     "bindings/sdivi-wasm/README.md" \
     "README.md" \
     "docs/pattern-categories.md" \
-    "bindings/sdivi-wasm/src/lib.rs" \
-    "examples/binding_node.ts" \
-    "examples/binding_bundler.ts"
+    "bindings/sdivi-wasm/src/lib.rs"
   do
     ABS="$REPO_ROOT/$REL"
     if [ ! -f "$ABS" ]; then
       echo "WARN: $ABS not found, skipping"
       continue
     fi
+    HITS="$(grep -nF "$PAT" "$ABS" 2>/dev/null)" || true
+    if [ -n "$HITS" ]; then
+      printf '%s\n' "$HITS" | while IFS= read -r LINE; do
+        echo "FAIL: $ABS:$LINE"
+      done
+      FAIL=1
+    fi
+  done
+  # Scan all .ts examples so new files are covered automatically.
+  for ABS in "$REPO_ROOT"/examples/*.ts; do
+    [ -f "$ABS" ] || continue
     HITS="$(grep -nF "$PAT" "$ABS" 2>/dev/null)" || true
     if [ -n "$HITS" ]; then
       printf '%s\n' "$HITS" | while IFS= read -r LINE; do

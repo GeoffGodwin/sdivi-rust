@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[test]
-    fn rust_node_kind_does_not_match() {
+    fn non_comprehension_node_kinds_do_not_match() {
         assert!(!NODE_KINDS.contains(&"await_expression"));
         assert!(!NODE_KINDS.contains(&"closure_expression"));
     }

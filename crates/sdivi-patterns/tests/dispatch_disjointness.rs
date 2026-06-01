@@ -170,7 +170,8 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("conint(gt=0)", "python", "schema_validation"),
     // Negative: bare method calls or non-schema callees must NOT match schema_validation
     ("SomeClass.parse(x)", "typescript", ""), // no namespace prefix, not .safeParse(
-    // M36.1: decorators — node-kind-only via category_for_node_kind, not CALL_DISPATCH.
+    // M36.1: decorators are node-kind-only (not CALL_DISPATCH). The `@` prefix belongs to
+    // the outer `decorator` node; the inner call text would be `Injectable()` — both produce "".
     ("@Injectable()", "typescript", ""),
     // P9: data_access — per-language tables
     ("fetch(\"/api/users\")", "typescript", "data_access"),

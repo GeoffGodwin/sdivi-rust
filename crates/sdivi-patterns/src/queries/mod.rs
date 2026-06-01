@@ -34,8 +34,12 @@ use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
-/// Note: `logging` is classified via [`classify_hint`] callee-text inspection only;
-/// [`category_for_node_kind`] never returns `Some("logging")`.
+/// Note: the following categories are classified via [`classify_hint`] callee-text inspection
+/// only; [`category_for_node_kind`] never returns them: `logging`, `testing`, `serialization`,
+/// `schema_validation`, `state_store`, `framework_hooks`, `http_routing`, `data_access`,
+/// `collection_pipelines`, and `concurrency`. Node-kind-only categories (`async_patterns`,
+/// `class_hierarchy`, `comprehensions`, `decorators`, `error_handling`, `null_safety`,
+/// `resource_management`, `state_management`, and `type_assertions`) are returned by both.
 ///
 /// # Examples
 ///
@@ -137,6 +141,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("collection_pipelines", collection_pipelines::matches_callee),
     ("concurrency", concurrency::matches_callee),
 ];
+
 /// Classify a [`PatternHintInput`] using both node kind and callee-text inspection.
 ///
 /// Returns a `Vec` of category name(s) the hint belongs to. In v0 the return is
