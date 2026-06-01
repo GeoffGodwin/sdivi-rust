@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `concurrency` pattern category (M44): goroutine launches (`go_statement`) and channel
+  multiplexing (`select_statement`) in Go — already collected by the Go adapter but
+  previously dropped — are now routed to `concurrency`. Multi-future coordination calls are
+  also classified: `Promise.all/allSettled/race/any` (TypeScript/JavaScript) and
+  `asyncio.gather/create_task/wait/as_completed/run` (Python) at CALL_DISPATCH slot P11
+  (lowest). `defer_statement` is not concurrency. `promise.then/catch/finally` chains stay
+  in `async_patterns`. `list_categories()` count grows from 17 → 18. `snapshot_version`
+  stays `"1.0"`. No existing category assignments change. See `MIGRATION_NOTES.md`.
+
 - `serialization` pattern category (M43): (de)serialization boundary calls are now
   natively classified as `serialization` via receiver-anchored callee-text at CALL_DISPATCH
   slot P3 (below `testing` P2, above `schema_validation` P4). TypeScript/JavaScript:

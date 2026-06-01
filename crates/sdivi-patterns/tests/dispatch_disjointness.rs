@@ -11,7 +11,7 @@
 //!    `KNOWN_OVERLAPS` entry with the winner named.
 
 use sdivi_patterns::queries::{
-    async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks,
+    async_patterns, classify_hint, collection_pipelines, concurrency, data_access, framework_hooks,
     http_routing, logging, schema_validation, serialization, state_store, testing,
 };
 use sdivi_patterns::PatternHintInput;
@@ -24,7 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M43, P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
+/// At M44, P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
@@ -56,6 +56,9 @@ fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     }
     if collection_pipelines::matches_callee(text, language) {
         matched.push("collection_pipelines");
+    }
+    if concurrency::matches_callee(text, language) {
+        matched.push("concurrency");
     }
     matched
 }
@@ -116,24 +119,18 @@ const KNOWN_OVERLAPS: &[(&str, &str, &str, &str)] = &[
 const CORPUS: &[(&str, &str, &str)] = &[
     // P1: async_patterns — Promise chains (TypeScript/JavaScript only)
     ("promise.then(resolve)", "typescript", "async_patterns"),
-    ("describe('suite', fn)", "typescript", "testing"), // P2 testing
-    // P3: serialization — receiver-anchored (TS/JS, Python, Go)
-    ("JSON.parse(s)", "typescript", "serialization"),
-    ("json.dumps(o)", "python", "serialization"),
-    ("json.Marshal(v)", "go", "serialization"),
     (
         "fetch(url).catch(err => {})",
         "javascript",
         "async_patterns",
     ),
-    ("p.finally(() => {})", "typescript", "async_patterns"),
+    ("describe('suite', fn)", "typescript", "testing"), // P2 testing
+    // P3: serialization — receiver-anchored (TS/JS, Python, Go)
+    ("JSON.parse(s)", "typescript", "serialization"),
+    ("json.dumps(o)", "python", "serialization"),
+    ("json.Marshal(v)", "go", "serialization"),
     ("useState(0)", "typescript", "framework_hooks"), // P6 framework_hooks
     ("useEffect(fn, [])", "typescript", "framework_hooks"),
-    ("useMemo(() => v, [])", "javascript", "framework_hooks"),
-    ("useCustomHook(opts)", "typescript", "framework_hooks"),
-    ("useAuth()", "javascript", "framework_hooks"),
-    ("user()", "typescript", ""),  // lowercase 2nd char: no match
-    ("useState(0)", "python", ""), // wrong language: no match
     // P8>P9 overlap: logging callee with a data_access verb method name; logging wins.
     ("logger.get(\"x\")", "typescript", "logging"),
     ("console.log(\"x\")", "typescript", "logging"),
@@ -145,14 +142,10 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("fmt.Printf(\"%v\", x)", "go", "logging"),
     ("System.out.println(\"x\")", "java", "logging"),
     ("logger.info(\"x\")", "java", "logging"),
-    ("LOG.debug(\"x\")", "java", "logging"),
     // P5: state_store — ^-anchored factory calls (TS/JS only)
     ("createSlice({})", "typescript", "state_store"),
-    ("configureStore({})", "typescript", "state_store"),
     ("createStore(rootReducer)", "javascript", "state_store"),
-    ("atom(0)", "typescript", "state_store"),
     ("makeAutoObservable(this)", "typescript", "state_store"),
-    ("signal(0)", "typescript", "state_store"),
     ("createSignal(0)", "typescript", "state_store"),
     ("create((set) => ({}))", "typescript", "state_store"),
     // React-Redux hooks: state_store (P5) beats framework_hooks (P6)
@@ -178,7 +171,6 @@ const CORPUS: &[(&str, &str, &str)] = &[
     // Negative: bare method calls or non-schema callees must NOT match schema_validation
     ("SomeClass.parse(x)", "typescript", ""), // no namespace prefix, not .safeParse(
     // M36.1: decorators — node-kind-only via category_for_node_kind, not CALL_DISPATCH.
-    // A `decorator` hint routed as `call_expression` should NOT match any dispatch entry.
     ("@Injectable()", "typescript", ""),
     // P9: data_access — per-language tables
     ("fetch(\"/api/users\")", "typescript", "data_access"),
@@ -199,6 +191,10 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("xs.find(p)", "typescript", "collection_pipelines"),
     // Negative: data_access methods must not match collection_pipelines
     ("client.read(buf)", "typescript", "data_access"),
+    // P11: concurrency — Promise.all/race/any (TS/JS) and asyncio.* (Python)
+    ("Promise.all([a, b])", "typescript", "concurrency"),
+    ("Promise.race([x, y])", "javascript", "concurrency"),
+    ("asyncio.gather(*tasks)", "python", "concurrency"),
     // Unrecognised — classify_hint must return empty Vec (represented as "")
     ("Math.max(a, b)", "typescript", ""),
     ("len(x)", "python", ""),
@@ -289,6 +285,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
             "data_access" => data_access::matches_callee(text, lang),
             "collection_pipelines" => collection_pipelines::matches_callee(text, lang),
             "http_routing" => http_routing::matches_callee(text, lang),
+            "concurrency" => concurrency::matches_callee(text, lang),
             other => panic!("KNOWN_OVERLAPS references unknown category {other:?}"),
         };
         assert!(

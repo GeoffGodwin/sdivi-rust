@@ -19,6 +19,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 |---|---|
 | async_patterns | Code constructs that implement or leverage asynchronous execution — e.g., `.await` expressions on `Future` values and `async fn` definitions. In TypeScript/JavaScript, Promise-chain calls (`.then()`, `.catch()`, `.finally()`) are also classified here via callee-text inspection. |
 | class_hierarchy | Code constructs that establish inheritance, interface implementation, or trait conformance relationships — e.g. classes with `extends`/`implements` clauses, Python classes with base classes, and Rust `impl Trait for Type` blocks. All declaration kinds are classified here regardless of whether they carry a heritage clause; heritage-aware narrowing is the embedder's responsibility. |
+| concurrency | Concurrent-execution primitives distinct from single-future async patterns — Go goroutine launches (`go_statement`) and channel multiplexing (`select_statement`), plus multi-future coordination calls: `Promise.all/allSettled/race/any` (TypeScript/JavaScript) and `asyncio.gather/create_task/wait/as_completed/run` (Python). Detected via node kind (Go, no parsing change required) and callee-text at CALL_DISPATCH slot P11 (TS/JS and Python). `defer_statement` is **not** concurrency — it belongs to `resource_management` (M45.1). `promise.then/catch/finally` chains stay in `async_patterns`. Added M44. |
 | collection_pipelines | Functional collection-transform method calls — `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat`. Detected via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — more specific categories resolve first). Callee-text cannot distinguish the receiver type: `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match — treated as acceptable noise for an entropy measure. Bare calls without a dot prefix are not matched. TypeScript and JavaScript primary targets; the regex also matches Go/Java where these method names appear. Added M40. |
 | data_access | Code constructs that perform I/O against data stores or external resources — e.g., database queries (`db.query`, `cursor.*`), HTTP fetches (`fetch`, `axios`), file reads (`open`, `requests.*`). As of M33, only `call_expression`/`call` nodes whose callee text matches the per-language data-access regex are classified here; unrecognised callees are dropped. |
 | decorators | Decorator usage across languages. TypeScript/JavaScript: any `decorator` node (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.) — one instance per decorator line. Python: any `decorated_definition` wrapper node (`@dataclass`, `@property`, `@app.get(...)`, `@pytest.fixture`, `@cached_property`, etc.) — one instance per decorated function or class (wrapper-granularity). Added M36.1 (TS/JS); M36.2 (Python). |
@@ -64,6 +65,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | logging | `call` where callee matches `^(logging\.\|print\b)` | Natively classified since M33. Examples: `logging.info(x)`, `print(x)`. |
 | resource_management | (none in v0) | — |
 | schema_validation | `call` where callee matches `\bField\(|\bconstr\(|\bconint\(` | Pydantic field-constraint call forms only. `class Foo(BaseModel)` counts under `class_hierarchy`, not here. Added M38. |
+| concurrency | `call` where callee matches `^asyncio\.(gather\|create_task\|wait\|as_completed\|run)\(` | Natively classified at CALL_DISPATCH slot P11. Examples: `asyncio.gather(*tasks)`, `asyncio.create_task(coro())`, `asyncio.run(main())`. Added M44. |
 | serialization | `call` where callee matches `^(json\|pickle)\.(loads\|dumps\|load\|dump)\(` | Natively classified at CALL_DISPATCH slot P3. Examples: `json.loads(s)`, `json.dumps(o)`, `pickle.dumps(o)`. Receiver-anchored — `json.` is not in the data_access regex. Added M43. |
 | state_management | `lambda` | None |
 | type_assertions | (none in v0) | — |
@@ -75,6 +77,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | async_patterns | `await_expression`; `call_expression` where callee matches `\.(then\|catch\|finally)\(` | `await_expression` via node-kind; Promise chains via callee-text. Examples: `future.await`, `p.then(r)`, `fetch().catch(e => {})`. |
 | class_hierarchy | `class_declaration`, `abstract_class_declaration`, `interface_declaration` | Abstract classes and interfaces always count. Concrete classes count regardless of `extends` / `implements`; entropy survives the broader collection because heritage-free classes have similar structure and contribute low entropy. (JavaScript: only `class_declaration` is emitted; `interface_declaration` and `abstract_class_declaration` are TS-only AST shapes.) |
 | collection_pipelines | `call_expression` where callee matches `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` | Member-call pattern — requires a preceding dot. Callee-text cannot distinguish receiver type: `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Natively classified at CALL_DISPATCH slot P10 (M40). |
+| concurrency | `call_expression` where callee matches `^Promise\.(all\|allSettled\|race\|any)\(` | Natively classified at CALL_DISPATCH slot P11 (lowest). Examples: `Promise.all([a, b])`, `Promise.race([x, y])`, `Promise.any([p1, p2])`. `promise.then/catch/finally` chains are intentionally excluded — they belong to `async_patterns`. A chained `Promise.all([]).then(cb)` AST node matches both P1 (`.then(`) and P11; P1 wins by precedence. Added M44. |
 | data_access | `call_expression` where callee matches `^(fetch\|axios)\b\|\b(query\|read\|write\|get\|post\|put\|delete\|patch)\(\|\b(db\|sql)\.\|\.(query\|read\|write\|fetch)\(` | Natively filtered since M33. Examples: `fetch(url)`, `db.query(sql)`. Unrecognised calls (e.g. `Math.max(a, b)`) are dropped. |
 | decorators | `decorator` | Natively classified since M36.1. Examples: `@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`. Node-kind only — all decorators count. |
 | error_handling | `try_statement` | None |
@@ -97,6 +100,7 @@ These languages share the common callee-text filter via `classify_hint`. Go and 
 | Category | Node kinds | Structural constraint |
 |---|---|---|
 | class_hierarchy | Java: `class_declaration`, `interface_declaration`. Go: (none in v0 — Go has no class/interface AST shape; the duck-typed interface model does not surface as a `class_hierarchy` declaration. The category exists in the catalog so cross-language reporting is uniform, but it produces zero Go hits.) | Java: same broader-collection caveat as other languages — all declaration kinds are classified regardless of heritage. |
+| concurrency | Go: `go_statement`, `select_statement` (node kind, no parsing change — already collected by the Go adapter). Java: (none in v0). | Already collected but previously dropped; M44 routes them to `concurrency`. `defer_statement` is excluded — it belongs to `resource_management` (M45.1). Added M44. |
 | data_access | `call_expression` where callee matches the shared TS/JS/Go regex (`^(fetch\|axios)\b\|\b(db\|sql)\.` etc.) | Natively filtered since M33. Examples: `db.query(sql)`, `sql.Open(dsn)`. Java `call_expression` returns `false` in v0 — data-access detection is library-shaped and deferred. |
 | http_routing | Go: `call_expression` where callee matches `^(http\|mux\|r\|e\|router\|engine\|g\|rg)\.(HandleFunc\|Handle\|GET\|POST\|PUT\|DELETE\|PATCH\|Any\|Group)\(` | Receiver-allowlist anchored at P7. Examples: `http.HandleFunc("/", h)`, `r.GET("/users", h)`, `mux.Handle("/", h)`, `e.POST("/user", h)`. Go uppercase verb names avoid overlap with data_access (lowercase `\bget\(`). Java returns `false` in v0. Added M41. |
 | logging | Go: `call_expression` where callee matches `^fmt\.(Print\|Println\|Printf\|Errorf\|Fprint\|Sprint)`. Java: `call_expression` where callee matches `^(System\.(out\|err)\.\|logger\.\|Log\.\|LOG\.)` | Natively classified since M33. Go examples: `fmt.Println(x)`, `fmt.Printf(f, x)`. Java examples: `System.out.println(x)`, `LOG.info(x)`. |
@@ -247,6 +251,24 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 
 **NestJS / FastAPI distinction:** Decorator-style routes (`@Get('/')`, `@app.get(...)`) are `decorator` / `decorated_definition` nodes, classified under `decorators` (M36.1/M36.2). They are counted once, in `decorators`, not here.
 
+### `concurrency::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Deliberately NOT matched |
+|---|---|---|---|
+| TypeScript / JavaScript | `^Promise\.(all\|allSettled\|race\|any)\(` | `Promise.all([a, b])`, `Promise.allSettled([p1, p2])`, `Promise.race([a, b])`, `Promise.any([p1, p2])` | `promise.then(r)` (async_patterns), `Promise.resolve(x)` (not a coordination function) |
+| Python | `^asyncio\.(gather\|create_task\|wait\|as_completed\|run)\(` | `asyncio.gather(*tasks)`, `asyncio.create_task(coro())`, `asyncio.run(main())` | `asyncio.sleep(1)` (not coordination) |
+| All others | (none — Go uses node kind) | — | — |
+
+**Worked example (TypeScript):** `Promise.all([fetchA(), fetchB()])` → `["concurrency"]`
+
+**Worked example (Python):** `asyncio.gather(*coroutines)` → `["concurrency"]`
+
+**Boundary with `async_patterns`:** `async_patterns` covers single-future `.await` and `.then/catch/finally` chaining. `concurrency` covers multi-future coordination (`Promise.all`) and goroutine/channel primitives. The two buckets are disjoint for bare calls. A chained `Promise.all([]).then(cb)` node matches both P1 and P11; `async_patterns` (P1) wins by precedence.
+
+**Go node-kind path:** `go_statement` and `select_statement` are classified via `category_for_node_kind`, not `matches_callee`. They arrive as pattern hints from the Go adapter — no parsing change is required.
+
+**Seeds forward:** `tokio::spawn`/`thread::spawn` (Rust) require adding `call_expression` to the Rust adapter's `PATTERN_KINDS` — a separate change. Go channel operators (`ch <- x`, `<-ch`) and `sync.WaitGroup`/`Mutex` require operator/receiver extraction beyond the v0 node-kind model.
+
 ### `collection_pipelines::matches_callee(text, language)`
 
 | Language | Pattern | Examples matched | Deliberately NOT matched |
@@ -306,10 +328,11 @@ is the contract — future milestones insert at their named slot, never append.
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P2, P3, P4, P5, P6, P7, P8, P9, and P10 are active at M43. The `decorators` and `null_safety` categories are
+P1 through P11 are active at M44. The `decorators` and `null_safety` categories are
 node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
-`category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
-reserved placeholders.
+`category_for_node_kind` in the `other =>` arm of `classify_hint`. The `concurrency`
+category uses **both** paths: `go_statement`/`select_statement` via `category_for_node_kind`,
+and `Promise.all`/`asyncio.gather` etc. via CALL_DISPATCH P11.
 
 #### KNOWN_OVERLAPS policy
 
@@ -317,7 +340,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M43 (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 active):
+Documented overlaps at M44 (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -328,8 +351,8 @@ Documented overlaps at M43 (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 active):
 | `app.get('/u', h)` | typescript | `http_routing` | `data_access` | Receiver `app` in allowlist (P7); `\b(get)\(` also matches data_access (P9); P7 wins |
 | `router.post('/user', cb)` | typescript | `http_routing` | `data_access` | Same mechanism — `router` in allowlist (P7); `\b(post)\(` matches data_access (P9) |
 
-Future overlaps introduced by M42–M44:
-- `Promise.all([]).then(cb)` outer node → **async_patterns** (P1) wins; bare inner `Promise.all(…)` resolves to `concurrency` (P11).
+Overlap introduced by M44:
+- `Promise.all([]).then(cb)` outer AST node → **async_patterns** (P1) wins via `.then(`; bare inner `Promise.all(…)` resolves to `concurrency` (P11). Not in KNOWN_OVERLAPS because the outer node contains the chained text — it only appears if the adapter captures the entire chain as one `call_expression`.
 
 #### `macro_invocation` arm
 
@@ -372,6 +395,7 @@ An embedder that supplies `PatternInstanceInput` values must:
 12. **As of M40, the `collection_pipelines` category is natively classified** via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — all more-specific categories resolve first). `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any receiver are now counted in `collection_pipelines` for TypeScript and JavaScript (and Go/Java where these method names appear). Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Bare calls without a dot prefix (`map(f)`) are intentionally not matched. On the first post-M40 snapshot of a TS/JS repo using these methods, `collection_pipelines` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
 13. **As of M41, the `http_routing` category is natively classified** via receiver-allowlist-anchored callee-text at CALL_DISPATCH slot P7 (above `logging` P8 and `data_access` P9). Express/Koa/Fastify (`app.get`, `router.post`, `fastify.route`, `server.use`), Go net/http + Gin/Echo/Gorilla (`http.HandleFunc`, `r.GET`, `mux.Handle`), and Flask/FastAPI imperative registration (`app.add_url_rule`) are now counted in `http_routing`. **Precedence note:** `app.get(...)` / `router.post(...)` previously matched `data_access` (P9) via the `\b(get|post)\(` verb regex; they now resolve to `http_routing` (P7) — a count shift between an existing and a new category. `axios.get(url)` / `client.get(url)` stay in `data_access` because their receiver is outside the allowlist. NestJS and FastAPI decorator routes (`@Get('/')`, `@app.get(...)`) are `decorator`/`decorated_definition` nodes and remain in `decorators`. See `MIGRATION_NOTES.md` for the worked before/after.
 15. **As of M43, the `serialization` category is natively classified** via receiver-anchored callee-text inspection at CALL_DISPATCH slot P3 (above `schema_validation` P4). `JSON.parse`/`JSON.stringify`/`structuredClone` in TypeScript and JavaScript, `json.loads`/`json.dumps`/`pickle.dumps` etc. in Python, and `json.Marshal`/`json.Unmarshal`/`json.NewDecoder` etc. in Go are now counted in `serialization`. Bare `.parse(` on arbitrary receivers is intentionally not matched — it remains in `schema_validation` (e.g. `UserSchema.safeParse(x)`) or falls through to `data_access`. On the first post-M43 snapshot of a repo using these calls, `serialization` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+16. **As of M44, the `concurrency` category is natively classified** via two paths: Go `go_statement` and `select_statement` node kinds (via `category_for_node_kind`), and `Promise.all/allSettled/race/any` (TypeScript/JavaScript) plus `asyncio.gather/create_task/wait/as_completed/run` (Python) via callee-text at CALL_DISPATCH slot P11 (lowest). Go goroutines and select statements were already collected by the Go adapter but previously dropped; M44 routes them to `concurrency`. On the first post-M44 snapshot of a Go repo with goroutines or select blocks, `concurrency` transitions from zero to non-zero — a count-introduction event. `defer_statement` is not concurrency; it belongs to `resource_management` (M45.1). See `MIGRATION_NOTES.md`.
 14. **As of M42, the `testing` category is natively classified** via callee-text inspection at CALL_DISPATCH slot P2 (above all other categories except `async_patterns` P1). BDD globals (`describe`, `it`, `test`, `context`), lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`), `expect(…)` roots, focused/excluded variants (`xit`, `xdescribe`, `fit`, `fdescribe`), and framework-namespaced helpers (`jest.fn`, `jest.mock`, `vi.fn`, `vi.mock`, etc.) in TypeScript and JavaScript; `testing.T` method calls (`t.Run`, `t.Fatal`, etc.) in Go; and `self.assert*` methods in Python are now counted in `testing`. **`scope_exclude` interaction:** the `testing` bucket is non-empty only when test files are in the pattern scope. Repos that exclude test paths via `patterns.scope_exclude` will see a zero count — this is by design, not a miss. See `MIGRATION_NOTES.md` for the count-introduction event.
 15. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 

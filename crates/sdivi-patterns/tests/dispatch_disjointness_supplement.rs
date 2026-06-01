@@ -61,8 +61,32 @@ fn fmt_print_is_logging_go() {
 #[test]
 fn fmt_errorf_is_logging_go() {
     // fmt.Errorf is a Go logging/diagnostic call, matched by the Go logging regex.
-    let r = classify_hint(&hint("call_expression", "fmt.Errorf(\"err: %v\", err)"), "go");
+    let r = classify_hint(
+        &hint("call_expression", "fmt.Errorf(\"err: %v\", err)"),
+        "go",
+    );
     assert_eq!(r, vec!["logging"]);
+}
+
+// ── concurrency — callee variants absent from main dispatch_disjointness.rs CORPUS ──────────
+// Gap flagged by M44 reviewer: Promise.allSettled and asyncio.create_task appear in unit and
+// contract tests but have no representative in the CALL_DISPATCH corpus.
+
+#[test]
+fn promise_all_settled_is_concurrency_in_dispatch() {
+    // CORPUS in dispatch_disjointness.rs covers Promise.all and Promise.race; allSettled is absent.
+    let r = classify_hint(
+        &hint("call_expression", "Promise.allSettled([p1, p2])"),
+        "javascript",
+    );
+    assert_eq!(r, vec!["concurrency"]);
+}
+
+#[test]
+fn asyncio_create_task_is_concurrency_in_dispatch() {
+    // CORPUS in dispatch_disjointness.rs covers asyncio.gather; create_task is absent.
+    let r = classify_hint(&hint("call", "asyncio.create_task(coro())"), "python");
+    assert_eq!(r, vec!["concurrency"]);
 }
 
 // ── Unrecognised callee — classify_hint returns empty Vec ─────────────────────

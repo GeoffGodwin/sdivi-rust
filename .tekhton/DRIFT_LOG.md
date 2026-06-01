@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 19
+- Runs since audit: 20
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,10 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several categories added since M33 are also callee-only. Pre-existing drift, not introduced by M44.
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs` â file is exactly at 300 lines after trimming a `state_store` assertion. Any future milestone adding to this file will require a trim or split; the pressure point is predictable.
+- [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` is built by manually indexing `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[17].0`; each new milestone must keep the entries array and the index list in sync. The runtime drift-gate test in `category_contract.rs` catches divergence, but a `.iter().map(|e| e.0).collect()` derivation would make it structurally impossible.
+- [2026-05-31 | "unknown"] `dispatch_disjointness.rs` CORPUS is trimmed to 297 lines. The 7 entries removed at M43 (Go logging variants, additional `collection_pipelines` callees) live in `dispatch_disjointness_supplement.rs` â a reasonable split, but two files now need updating together when those categories grow.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several categories added since M33 (serialization, testing, schema_validation, etc.) are also callee-only. Pre-existing drift, not introduced by M43.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:292` â `null_safety_node_kinds_do_not_match_non_ts_js_languages` test name is semantically inverted relative to what the body asserts. Pre-existing carry-over from M37.
 - [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` is built by manually indexing `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[16].0`; each new milestone must update both the entries array and the index list in sync. The drift-gate test in `category_contract.rs` catches mismatches at runtime, but a macro or `.iter().map(|e| e.0).collect()` derivation would make divergence structurally impossible.

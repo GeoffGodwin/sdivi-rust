@@ -3,120 +3,123 @@
 
 ## What Was Implemented
 
-### M43: `serialization` pattern category
+### M44: `concurrency` pattern category
 
-**`crates/sdivi-patterns/src/queries/serialization.rs`** (NEW — 208 lines)
-- `NODE_KINDS: &[&str] = &[]` (callee-text-only detection).
-- Three `LazyLock<Regex>` statics: `TS_JS_RE` (`JSON.parse`, `JSON.stringify`, `structuredClone`),
-  `PYTHON_RE` (`json.*`/`pickle.*`), `GO_RE` (`json.Marshal`/`json.Unmarshal`/etc.).
-- `matches_callee(text, language)` — TypeScript/JavaScript, Python, Go; others return `false`.
-- Module doc covers: CALL_DISPATCH slot P3, receiver-anchored design, seeds forward.
-- Inline unit tests: all TS/JS, Python, Go positives and key negatives.
+**`crates/sdivi-patterns/src/queries/concurrency.rs`** (NEW — 176 lines)
+- `NODE_KINDS: &[&str] = &["go_statement", "select_statement"]` for Go goroutine/select detection (node-kind path).
+- `TS_JS_RE`: `^Promise\.(all|allSettled|race|any)\(` for TypeScript/JavaScript.
+- `PYTHON_RE`: `^asyncio\.(gather|create_task|wait|as_completed|run)\(` for Python.
+- `matches_callee(text, language)` covering TS/JS and Python; Go uses node-kind path.
+- Module doc covers: CALL_DISPATCH slot P11, boundary with `async_patterns`, `defer_statement` exclusion, deferred seeds.
+- Inline unit tests: all TS/JS and Python positives and key negatives.
 
-**`crates/sdivi-patterns/src/queries/mod.rs`** (201 lines)
-- Added `pub mod serialization;` (alphabetical, between `schema_validation` and `state_management`).
-- Added `"serialization"` to `ALL_CATEGORIES` (16 → 17 entries); updated doc example and count.
-- Inserted `("serialization", serialization::matches_callee)` at P3 in `CALL_DISPATCH`
-  (after `testing` P2, before `schema_validation` P4).
-- Updated CALL_DISPATCH comment: P3=serialization added.
-- Updated `classify_hint` doc: M42 → M43 active-slots reference.
+**`crates/sdivi-patterns/src/queries/mod.rs`** (200 lines)
+- Added `pub mod concurrency;` (alphabetical after `collection_pipelines`; `cargo fmt` auto-fixed ordering).
+- Added `"concurrency"` to `ALL_CATEGORIES` in alphabetical position (after `collection_pipelines`, before `data_access`); count 17 → 18.
+- Added `concurrency::NODE_KINDS` check in `category_for_node_kind` (between `class_hierarchy` and `data_access` branches).
+- Added `("concurrency", concurrency::matches_callee)` at end of `CALL_DISPATCH` (P11, lowest).
+- Updated CALL_DISPATCH comment to add P11; updated `classify_hint` doc M43 → M44.
 
-**`crates/sdivi-core/src/categories.rs`** (300 lines)
-- Added `serialization` entry to `CATALOG_ENTRIES` (between `schema_validation` and `state_management`).
-- Added `CATALOG_ENTRIES[16].0` to `CATEGORIES` (16 → 17 entries).
-- Updated `CATEGORIES` and `list_categories` doc examples: count 16 → 17, added `serialization`.
+**`crates/sdivi-core/src/categories.rs`** (299 lines)
+- Added `concurrency` entry to `CATALOG_ENTRIES` at alphabetical position [3] (after `collection_pipelines[2]`, before `data_access[4]`).
+- Added `CATALOG_ENTRIES[17].0` to `CATEGORIES` (17 → 18 entries).
+- Updated `CATEGORIES` and `list_categories` doc examples: count 17 → 18, replaced most assertions with fewer + `concurrency`.
 
 **`crates/sdivi-patterns/src/queries/tests.rs`** (300 lines)
-- Renamed count test: 16 → 17 (`all_categories_has_seventeen_entries`).
-- Added `serialization` assertion to the count test.
-- Removed 1 blank line to stay within 300-line ceiling.
+- Renamed count test 17 → 18 (`all_categories_has_eighteen_entries`).
+- Added `concurrency` assertion; trimmed `state_store` assertion to stay at 300 lines.
 
-**`crates/sdivi-core/tests/category_contract.rs`** (279 lines)
-- Renamed count test: 16 → 17 (`list_categories_returns_exactly_seventeen_categories`).
+**`crates/sdivi-core/tests/category_contract.rs`**
+- Renamed count test 17 → 18 (`list_categories_returns_exactly_eighteen_categories`).
 
 **`crates/sdivi-core/tests/category_contract_m42.rs`**
-- Updated count test 16 → 17 to reflect M43's addition (m42 test function previously asserted
-  the total count, which now correctly reflects both M42 and M43 contributions).
+- Updated count test 17 → 18 to reflect M44's addition.
 
-**`crates/sdivi-core/tests/category_contract_m43.rs`** (NEW — 146 lines)
-- M43 acceptance-criterion tests via `classify_hint`:
-  - `JSON.parse(s)` → `["serialization"]` (milestone criterion).
-  - `json.dumps(o)` → `["serialization"]` (milestone criterion).
-  - TS/JS, Python, Go positives.
-  - Negatives: `schema.parse` → not serialization; `z.object({})` → schema_validation;
-    `requests.get` → data_access; `json.loads` → not data_access.
-  - `list_categories_includes_serialization`, `list_categories_count_is_seventeen`.
-  - 17 tests total.
+**`crates/sdivi-core/tests/category_contract_m43.rs`**
+- Updated count test 17 → 18 to reflect M44's addition.
 
-**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`** (300 lines)
-- Added `serialization` to use imports.
-- Added `serialization::matches_callee` block in `all_matching_categories` at P3 slot.
-- Updated M42 comment → M43 in function doc.
-- Added 3 corpus entries: `JSON.parse(s)/typescript`, `json.dumps(o)/python`, `json.Marshal(v)/go`.
-- Added `"serialization"` match arm in `known_overlaps_winner_matches_dispatch_order`.
-- Trimmed 7 lines to stay within 300-line ceiling (5 collection_pipelines entries removed,
-  2 Go logging entries removed, 1 unrecognised entry removed).
+**`crates/sdivi-core/tests/category_contract_m44.rs`** (NEW — 166 lines)
+- M44 acceptance-criterion tests:
+  - `go_statement_is_concurrency` — `category_for_node_kind("go_statement", "go") == Some("concurrency")`.
+  - `select_statement_is_concurrency` — `category_for_node_kind("select_statement", "go") == Some("concurrency")`.
+  - `classify_hint_go_statement_is_concurrency`, `classify_hint_select_statement_is_concurrency`.
+  - TS/JS: `promise_all_is_concurrency_ts`, `promise_all_settled_is_concurrency_js`, `promise_race_is_concurrency_js`, `promise_any_is_concurrency_ts`.
+  - Python: `asyncio_gather_is_concurrency_python`, `asyncio_create_task_is_concurrency_python`, `asyncio_run_is_concurrency_python`.
+  - Negatives: `promise_then_is_async_patterns_not_concurrency`, `promise_resolve_is_not_concurrency`, `defer_statement_is_not_concurrency`.
+  - `list_categories_includes_concurrency`, `list_categories_count_is_eighteen`.
 
-**`bindings/sdivi-wasm/tests/wasm_smoke.rs`** (263 lines)
-- Updated count 16 → 17; added `serialization` name assertion.
+**`crates/sdivi-patterns/tests/concurrency_go_fixture.rs`** (NEW — 128 lines)
+- Integration tests via `build_catalog` (no Go adapter dependency required):
+  - `go_statement_routes_to_concurrency_bucket` (M44 acceptance criterion).
+  - `select_statement_routes_to_concurrency_bucket` (M44 acceptance criterion).
+  - `go_goroutine_plus_select_yields_concurrency_instances` — combined count test.
+  - `defer_statement_does_not_route_to_concurrency` — boundary check.
 
-**`bindings/sdivi-wasm/tests/m23_native.rs`** (101 lines)
-- Updated count 16 → 17; added `serialization` name assertion.
+**`crates/sdivi-patterns/tests/dispatch_disjointness.rs`** (297 lines)
+- Added `concurrency` to imports.
+- Added `concurrency::matches_callee` call in `all_matching_categories` (P11, after `collection_pipelines`).
+- Updated comment "M43" → "M44".
+- Added 3 corpus entries: `Promise.all([a, b])/typescript`, `Promise.race([x, y])/javascript`, `asyncio.gather(*tasks)/python`.
+- Added `"concurrency"` match arm in `known_overlaps_winner_matches_dispatch_order`.
+- Trimmed 7 CORPUS entries (redundant framework_hooks, state_store, async_patterns, Java logging) to stay under 300 lines.
+
+**`bindings/sdivi-wasm/tests/wasm_smoke.rs`** (264 lines)
+- Updated count 17 → 18; added `concurrency` name assertion.
+
+**`bindings/sdivi-wasm/tests/m23_native.rs`** (105 lines)
+- Updated count 17 → 18; added `concurrency` name assertion.
 
 **`docs/pattern-categories.md`**
-- Added `serialization` row to canonical category list table.
-- Added `serialization` row to Python, TypeScript/JavaScript, Go/Java per-language tables.
-- Added `serialization::matches_callee` callee-text section (before schema_validation section).
-- Updated dispatch table P3: active **M43**.
-- Updated active-slots comment: M42 → M43.
-- Updated KNOWN_OVERLAPS policy reference: M41 → M43.
-- Added embedder responsibility #15 for M43; renumbered old #14 to remain #14.
+- Added `concurrency` row to canonical category list table.
+- Added `concurrency` row to Python table (asyncio callee detection).
+- Added `concurrency` row to TypeScript/JavaScript table (Promise.all/race/any).
+- Added `concurrency` row to Go/Java table (go_statement, select_statement node kinds).
+- Added `concurrency::matches_callee` callee-text section with worked examples.
+- Updated dispatch table active count: P1–P10 at M43 → P1–P11 at M44.
+- Updated KNOWN_OVERLAPS policy reference to M44; documented Promise.all overlap as M44 introduction.
+- Added embedder responsibility #16 for M44.
 
 **`MIGRATION_NOTES.md`**
-- Added M43 section (before M42): count-introduction event (16→17), receiver-anchored rationale,
-  disjointness note, escape hatch TOML.
+- Added M44 section (before M43): count-introduction event (17→18), two-path detection rationale,
+  `defer_statement` exclusion, async_patterns boundary, escape hatch TOML.
 
 **`CHANGELOG.md`**
-- Added M43 entry under `[Unreleased] ### Added` (before M42 entry).
+- Added M44 entry under `[Unreleased] ### Added` (before M43 entry).
 
 ## Root Cause (bugs only)
 N/A — new feature milestone.
 
 ## Files Modified
-- `crates/sdivi-patterns/src/queries/serialization.rs` (NEW) — 208 lines
-- `crates/sdivi-patterns/src/queries/mod.rs` — module, CALL_DISPATCH P3, ALL_CATEGORIES 17; 201 lines
-- `crates/sdivi-core/src/categories.rs` — serialization CATALOG_ENTRIES, CATEGORIES[12]; 300 lines
-- `crates/sdivi-patterns/src/queries/tests.rs` — count 17, serialization assertion; 300 lines
-- `crates/sdivi-core/tests/category_contract.rs` — count 17; 279 lines
-- `crates/sdivi-core/tests/category_contract_m42.rs` — count 16→17 (M43 added 17th)
-- `crates/sdivi-core/tests/category_contract_m43.rs` (NEW) — M43 acceptance criterion tests; 146 lines
-- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — serialization import, all_matching_categories, corpus entries, match arm; 300 lines
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — count 17, serialization name; 263 lines
-- `bindings/sdivi-wasm/tests/m23_native.rs` — count 17, serialization name; 101 lines
-- `docs/pattern-categories.md` — canonical list, Python/TS/JS/Go tables, callee-text section, dispatch table P3, embedder responsibility #15
-- `MIGRATION_NOTES.md` — M43 section added (before M42)
-- `CHANGELOG.md` — M43 entry added
+- `crates/sdivi-patterns/src/queries/concurrency.rs` (NEW) — 176 lines
+- `crates/sdivi-patterns/src/queries/mod.rs` — module, CALL_DISPATCH P11, ALL_CATEGORIES 18; 200 lines
+- `crates/sdivi-core/src/categories.rs` — concurrency CATALOG_ENTRIES[3], CATEGORIES[17]; 299 lines
+- `crates/sdivi-patterns/src/queries/tests.rs` — count 18, concurrency assertion; 300 lines
+- `crates/sdivi-core/tests/category_contract.rs` — count 18; 279 lines
+- `crates/sdivi-core/tests/category_contract_m42.rs` — count 17→18 (M44 added 18th)
+- `crates/sdivi-core/tests/category_contract_m43.rs` — count 17→18 (M44 added 18th)
+- `crates/sdivi-core/tests/category_contract_m44.rs` (NEW) — M44 acceptance criterion tests; 166 lines
+- `crates/sdivi-patterns/tests/concurrency_go_fixture.rs` (NEW) — Go fixture integration tests; 128 lines
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — concurrency import, all_matching_categories, corpus entries, match arm; 297 lines
+- `bindings/sdivi-wasm/tests/wasm_smoke.rs` — count 18, concurrency name; 264 lines
+- `bindings/sdivi-wasm/tests/m23_native.rs` — count 18, concurrency name; 105 lines
+- `docs/pattern-categories.md` — canonical list, Python/TS/JS/Go tables, callee-text section, dispatch table P11, embedder responsibility #16
+- `MIGRATION_NOTES.md` — M44 section added (before M43)
+- `CHANGELOG.md` — M44 entry added
 
 ## Human Notes Status
-- Non-blocking note re `ALL_CATEGORIES` doc comment staleness: NOT_ADDRESSED (out of scope per scope adherence rules)
-- Non-blocking note re missing blank line before `classify_hint` doc: NOT_ADDRESSED (out of scope)
-- Drift observation re `null_safety_node_kinds_do_not_match_non_ts_js_languages` test name: NOT_ADDRESSED (out of scope)
-- Drift observation re `category_for_node_kind` doc listing only logging as callee-only: NOT_ADDRESSED (out of scope)
-- Drift observation re `CALL_DISPATCH` P3 comment gap: ADDRESSED — P3=serialization added to dispatch comment
-- Drift observation re stale wasm count test name: NOT_ADDRESSED (out of scope)
+- No Human Notes section present in this milestone run.
 
 ## Docs Updated
-- `docs/pattern-categories.md` — canonical list table, Python table, TS/JS table, Go/Java table,
-  `serialization::matches_callee` callee-text section, dispatch table P3 active M43, embedder #15.
-- `MIGRATION_NOTES.md` — M43 section with receiver-anchored rationale, disjointness note, escape hatch.
-- `CHANGELOG.md` — M43 entry under `[Unreleased]`.
+- `docs/pattern-categories.md` — canonical list table, Python/TS/JS/Go per-language tables,
+  `concurrency::matches_callee` callee-text section, dispatch table P11 active M44, embedder #16.
+- `MIGRATION_NOTES.md` — M44 section with two-path detection, boundary notes, escape hatch.
+- `CHANGELOG.md` — M44 entry under `[Unreleased]`.
 
 ## Observed Issues (out of scope)
 - Pre-existing: `wasm_package_json_version_matches_workspace` test failure — `package.json`
-  stranded at 0.2.23 vs workspace 0.2.34. Not introduced by M43.
-- Pre-existing: Test name `null_safety_node_kinds_do_not_match_non_ts_js_languages` is
-  semantically inverted (body asserts a match). Carry-over from M37.
-- Pre-existing: `crates/sdivi-patterns/src/queries/mod.rs` — no blank line between closing
-  `];` of `CALL_DISPATCH` and the `/// Classify…` doc block for `classify_hint`. Carry-over.
-- Pre-existing: `category_for_node_kind` doc comment lists only `logging` as callee-only;
-  several other categories are also callee-only. Staleness accumulated across milestones.
+  stranded at 0.2.23 vs workspace 0.2.35. Not introduced by M44.
+- Pre-existing: `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`;
+  several categories including `concurrency` (Go path) use both paths. Carry-over drift.
+- Pre-existing: `simple_go_fixture.rs` is 367 lines (over 300-line ceiling) — not touched by M44.
+- Pre-existing: `list_categories_wasm_export_returns_eight_categories` test function name in
+  `m23_native.rs` is a historical artifact (body asserts 18); body comment acknowledges this.

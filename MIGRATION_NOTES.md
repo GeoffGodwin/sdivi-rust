@@ -8,6 +8,55 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M44 — `concurrency` pattern category introduced
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `concurrency` is a new CALL_DISPATCH category (slot P11, lowest) and
+node-kind category. It detects concurrent-execution primitives via two paths:
+
+- **Go (node kind — zero parsing change):** `go_statement` (goroutine launch) and
+  `select_statement` (channel multiplexing). These were already collected by the Go adapter
+  but previously dropped. They now route to `concurrency`.
+- **TypeScript / JavaScript (CALL_DISPATCH P11):** `Promise.all(…)`, `Promise.allSettled(…)`,
+  `Promise.race(…)`, `Promise.any(…)`.
+- **Python (CALL_DISPATCH P11):** `asyncio.gather(…)`, `asyncio.create_task(…)`,
+  `asyncio.wait(…)`, `asyncio.as_completed(…)`, `asyncio.run(…)`.
+
+`list_categories()` count grows from 17 → 18.
+
+**Boundary with `async_patterns`.** `async_patterns` covers single-future `.await` and
+`.then/catch/finally` chaining; `concurrency` covers multi-future coordination
+(`Promise.all`) and goroutine/channel primitives. The two categories are disjoint for
+bare calls. A chained `Promise.all([]).then(cb)` AST node matches both P1 (`.then(`) and
+P11; `async_patterns` wins by precedence.
+
+**`defer_statement` is not concurrency.** It belongs to `resource_management` (M45.1).
+
+**Disjointness.** `Promise.all` does not match `async_patterns` (which requires `.then(`,
+`.catch(`, or `.finally(`). `asyncio.gather` does not match Python `data_access`
+(`^(open\(|requests\.|...)`) or `logging` (`^(logging\.|print\b)`). No new `KNOWN_OVERLAPS`
+entries are required.
+
+**Count-introduction event.** On the first post-M44 snapshot of a Go repo with goroutines
+or select blocks, `concurrency` transitions from zero to non-zero. Prior snapshots had no
+`concurrency` bucket — trend continuity is broken for this dimension at the upgrade boundary.
+The trend line resumes cleanly from the second post-upgrade snapshot.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.concurrency]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Migrating Go services to structured concurrency; goroutine count in flux"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M43 — `serialization` pattern category introduced
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

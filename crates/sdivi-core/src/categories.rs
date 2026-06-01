@@ -41,6 +41,15 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         regex applies to Go and Java where these method names appear. Added M40.",
     ),
     (
+        "concurrency",
+        "Concurrent-execution primitives distinct from single-future async patterns — \
+        Go goroutine launches (`go_statement`) and channel multiplexing (`select_statement`), \
+        plus multi-future coordination calls: `Promise.all/allSettled/race/any` \
+        (TypeScript/JavaScript) and `asyncio.gather/create_task/wait/as_completed/run` \
+        (Python). Detected via node kind (Go) and callee-text at CALL_DISPATCH slot P11 \
+        (TS/JS and Python). Added M44.",
+    ),
+    (
         "data_access",
         "Code constructs that perform I/O against data stores or external resources — \
         e.g., database queries (`query`, `cursor.*`), HTTP fetches (`fetch`), \
@@ -189,17 +198,9 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// ```rust
 /// use sdivi_core::CATEGORIES;
 ///
-/// assert!(CATEGORIES.contains(&"collection_pipelines"));
-/// assert!(CATEGORIES.contains(&"decorators"));
-/// assert!(CATEGORIES.contains(&"framework_hooks"));
-/// assert!(CATEGORIES.contains(&"http_routing"));
-/// assert!(CATEGORIES.contains(&"logging"));
-/// assert!(CATEGORIES.contains(&"null_safety"));
-/// assert!(CATEGORIES.contains(&"schema_validation"));
+/// assert!(CATEGORIES.contains(&"concurrency"));
 /// assert!(CATEGORIES.contains(&"serialization"));
-/// assert!(CATEGORIES.contains(&"state_store"));
-/// assert!(CATEGORIES.contains(&"testing"));
-/// assert_eq!(CATEGORIES.len(), 17);
+/// assert_eq!(CATEGORIES.len(), 18);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -219,6 +220,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[14].0,
     CATALOG_ENTRIES[15].0,
     CATALOG_ENTRIES[16].0,
+    CATALOG_ENTRIES[17].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -276,14 +278,11 @@ pub struct CategoryCatalog {
 /// assert_eq!(a.schema_version, "1.0");
 ///
 /// let names: Vec<&str> = a.categories.iter().map(|c| c.name.as_str()).collect();
+/// assert!(names.contains(&"concurrency"));
 /// assert!(names.contains(&"collection_pipelines"));
 /// assert!(names.contains(&"error_handling"));
-/// assert!(names.contains(&"async_patterns"));
 /// assert!(names.contains(&"http_routing"));
-/// assert!(names.contains(&"null_safety"));
-/// assert!(names.contains(&"schema_validation"));
 /// assert!(names.contains(&"serialization"));
-/// assert!(names.contains(&"state_store"));
 /// assert!(names.contains(&"testing"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {

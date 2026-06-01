@@ -40,8 +40,9 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_seventeen_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 17);
+fn all_categories_has_eighteen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 18);
+    assert!(ALL_CATEGORIES.contains(&"concurrency"));
     assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"http_routing"));
@@ -49,7 +50,6 @@ fn all_categories_has_seventeen_entries() {
     assert!(ALL_CATEGORIES.contains(&"testing"));
     assert!(ALL_CATEGORIES.contains(&"schema_validation"));
     assert!(ALL_CATEGORIES.contains(&"serialization"));
-    assert!(ALL_CATEGORIES.contains(&"state_store"));
 }
 
 #[test]

@@ -13,6 +13,7 @@
 pub mod async_patterns;
 pub mod class_hierarchy;
 pub mod collection_pipelines;
+pub mod concurrency;
 pub mod data_access;
 pub mod decorators;
 pub mod error_handling;
@@ -40,21 +41,16 @@ use crate::hint_input::PatternHintInput;
 /// ```rust
 /// use sdivi_patterns::queries::ALL_CATEGORIES;
 ///
-/// assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
-/// assert!(ALL_CATEGORIES.contains(&"decorators"));
-/// assert!(ALL_CATEGORIES.contains(&"http_routing"));
-/// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert!(ALL_CATEGORIES.contains(&"null_safety"));
-/// assert!(ALL_CATEGORIES.contains(&"schema_validation"));
+/// assert!(ALL_CATEGORIES.contains(&"concurrency"));
 /// assert!(ALL_CATEGORIES.contains(&"serialization"));
-/// assert!(ALL_CATEGORIES.contains(&"state_store"));
 /// assert!(ALL_CATEGORIES.contains(&"testing"));
-/// assert_eq!(ALL_CATEGORIES.len(), 17);
+/// assert_eq!(ALL_CATEGORIES.len(), 18);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "class_hierarchy",
     "collection_pipelines",
+    "concurrency",
     "data_access",
     "decorators",
     "error_handling",
@@ -101,6 +97,8 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
         Some("async_patterns")
     } else if class_hierarchy::NODE_KINDS.contains(&node_kind) {
         Some("class_hierarchy")
+    } else if concurrency::NODE_KINDS.contains(&node_kind) {
+        Some("concurrency")
     } else if data_access::NODE_KINDS.contains(&node_kind) {
         Some("data_access")
     } else if decorators::NODE_KINDS.contains(&node_kind) {
@@ -120,7 +118,7 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
-#[allow(clippy::type_complexity)] // P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines; future milestones insert at their slot
+#[allow(clippy::type_complexity)] // P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines > P11=concurrency; future milestones insert at their slot
 const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("async_patterns", async_patterns::matches_callee),
     ("testing", testing::matches_callee),
@@ -132,6 +130,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("logging", logging::matches_callee),
     ("data_access", data_access::matches_callee),
     ("collection_pipelines", collection_pipelines::matches_callee),
+    ("concurrency", concurrency::matches_callee),
 ];
 /// Classify a [`PatternHintInput`] using both node kind and callee-text inspection.
 ///
@@ -143,7 +142,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 active at M43).
+/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 active at M44).
 ///
 /// ## `macro_invocation`
 ///
