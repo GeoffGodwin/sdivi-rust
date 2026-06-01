@@ -40,7 +40,8 @@ fn python_list_comprehension_routes_to_comprehensions() {
         .filter(|h| h.node_kind == "list_comprehension")
         .count();
     assert_eq!(
-        list_comp_count, 1,
+        list_comp_count,
+        1,
         "PythonAdapter must emit exactly 1 list_comprehension hint from tree-sitter parse; \
          got {list_comp_count}. Hints: {:?}",
         records[0]
@@ -80,7 +81,8 @@ fn python_set_comprehension_routes_to_comprehensions() {
         .filter(|h| h.node_kind == "set_comprehension")
         .count();
     assert_eq!(
-        set_comp_count, 1,
+        set_comp_count,
+        1,
         "PythonAdapter must emit exactly 1 set_comprehension hint; \
          got {set_comp_count}. Hints: {:?}",
         records[0]
@@ -120,7 +122,8 @@ fn python_dictionary_comprehension_routes_to_comprehensions() {
         .filter(|h| h.node_kind == "dictionary_comprehension")
         .count();
     assert_eq!(
-        dict_comp_count, 1,
+        dict_comp_count,
+        1,
         "PythonAdapter must emit exactly 1 dictionary_comprehension hint; \
          got {dict_comp_count}. Hints: {:?}",
         records[0]
@@ -164,7 +167,8 @@ fn python_generator_expression_routes_to_comprehensions() {
         .filter(|h| h.node_kind == "generator_expression")
         .count();
     assert_eq!(
-        gen_expr_count, 1,
+        gen_expr_count,
+        1,
         "PythonAdapter must emit exactly 1 generator_expression hint from `sum(x for x in xs)`; \
          got {gen_expr_count}. \
          If 0: the tree-sitter-python grammar may use a different node-kind spelling. \
@@ -204,10 +208,10 @@ fn all_four_comprehension_forms_yield_four_instances() {
     let source = concat!(
         "xs = [1, 2, 3]\n",
         "items = [(\"a\", 1), (\"b\", 2)]\n",
-        "squares = [x * x for x in xs]\n",       // list_comprehension
-        "unique = {x for x in xs}\n",             // set_comprehension
-        "mapping = {k: v for k, v in items}\n",   // dictionary_comprehension
-        "total = sum(x for x in xs)\n",           // generator_expression
+        "squares = [x * x for x in xs]\n", // list_comprehension
+        "unique = {x for x in xs}\n",      // set_comprehension
+        "mapping = {k: v for k, v in items}\n", // dictionary_comprehension
+        "total = sum(x for x in xs)\n",    // generator_expression
     );
     let records = vec![parse_python(source)];
 

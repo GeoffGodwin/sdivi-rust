@@ -62,7 +62,10 @@ fn python_except_clause_routes_to_error_handling() {
         .values()
         .map(|s| s.count)
         .sum();
-    assert_eq!(total, 1, "error_handling bucket must contain 1 except_clause");
+    assert_eq!(
+        total, 1,
+        "error_handling bucket must contain 1 except_clause"
+    );
 }
 
 /// M45.2: multi-arm Python try/except — each except_clause counted separately.
@@ -102,11 +105,7 @@ fn java_catch_clause_routes_to_error_handling() {
     let records = vec![make_record(
         "Service.java",
         "java",
-        vec![make_hint(
-            "catch_clause",
-            "catch (IOException e) { }",
-            10,
-        )],
+        vec![make_hint("catch_clause", "catch (IOException e) { }", 10)],
     )];
     let catalog = build_catalog(&records, &min1_config());
     assert!(
@@ -119,7 +118,10 @@ fn java_catch_clause_routes_to_error_handling() {
         .values()
         .map(|s| s.count)
         .sum();
-    assert_eq!(total, 1, "error_handling bucket must contain 1 catch_clause");
+    assert_eq!(
+        total, 1,
+        "error_handling bucket must contain 1 catch_clause"
+    );
 }
 
 /// M45.2: Java `throw_statement` routes to error_handling.

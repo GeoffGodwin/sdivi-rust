@@ -114,6 +114,10 @@ mod tests {
 
     #[test]
     fn node_kinds_is_empty() {
-        assert!(NODE_KINDS.is_empty());
+        // NODE_KINDS is intentionally empty: this category is callee-only (classified
+        // via classify_hint). The assertion guards that contract against regressions.
+        #[allow(clippy::const_is_empty)]
+        let empty = NODE_KINDS.is_empty();
+        assert!(empty);
     }
 }

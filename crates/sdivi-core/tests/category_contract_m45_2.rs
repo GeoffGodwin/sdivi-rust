@@ -63,7 +63,10 @@ fn classify_hint_catch_clause_routes_to_error_handling() {
 
 #[test]
 fn classify_hint_throw_statement_routes_to_error_handling() {
-    let result = classify_hint(&hint("throw_statement", "throw new RuntimeException(msg)"), "java");
+    let result = classify_hint(
+        &hint("throw_statement", "throw new RuntimeException(msg)"),
+        "java",
+    );
     assert_eq!(result, vec!["error_handling"]);
 }
 

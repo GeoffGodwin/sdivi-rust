@@ -323,7 +323,7 @@ fn non_test_call_in_test_file_is_not_testing() {
     // logging from console.log is present (or some other non-testing category)
     // The key assertion: logging must not be in the testing bucket.
     if let Some(testing_entries) = catalog.entries.get("testing") {
-        for (_fp, stats) in testing_entries {
+        for stats in testing_entries.values() {
             // All instances in the testing bucket must have come from testing callees.
             // There is no direct way to check the callee text post-catalog, but we can
             // assert that logging is separately bucketed (not merged into testing).
