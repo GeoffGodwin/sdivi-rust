@@ -1,13 +1,17 @@
 ## Planned Tests
-- [x] `crates/sdivi-patterns/tests/comprehensions_fixture.rs` — integration: real Python adapter parses all four comprehension forms and routes each to `comprehensions` bucket
-- [x] `crates/sdivi-lang-python/tests/extract_behavior.rs` — M46 adapter-level: all four comprehension node kinds are captured as pattern hints from real Python source
+- [x] `bindings/sdivi-wasm/tests/test_check_docs.sh` — shell integration: doc-lint happy-path exits 0; forbidden-pattern detection exits 1 with FAIL message
+- [x] `bindings/sdivi-wasm/tests/test_negative_integrity.sh` — structural: negative.ts has exactly 4 @ts-expect-error directives each immediately followed by code (no gap), and wasm.yml contains the required pinned steps
+- [x] `bindings/sdivi-wasm/tests/typecheck/subpath_imports.ts` — TypeScript fixture importing via /bundler and /node subpaths to close coverage gap; update tsconfig include list
 
 ## Test Run Results
-Passed: 121 integration + 279 unit + 125 doc = 525 total  Failed: 1 (pre-existing: wasm_package_json_version_matches_workspace — package.json at 0.2.23 vs workspace 0.2.38; not introduced by M46)
+Passed: 46  Failed: 0
 
 ## Bugs Found
-None
+- BUG: [bindings/sdivi-wasm/tests/typecheck/negative.ts:70] Line contains `// @ts-expect-error directives above...` — TypeScript interprets any line beginning `// @ts-expect-error` as a suppression directive; since the immediately following `void _badEdgeWeights;` has no type error, this produces TS2578 "Unused '@ts-expect-error' directive" causing `tsc --noEmit` to exit non-zero. Verified: `npx tsc --noEmit -p bindings/sdivi-wasm/tests/typecheck/tsconfig.json` exits 2 before and after my changes.
+- BUG: [bindings/sdivi-wasm/tests/typecheck/tsconfig.json] `"lib": ["ES2020"]` does not include `dom`; `console` global used throughout `examples/binding_node.ts` and `examples/binding_bundler.ts` is unavailable, producing TS2584 on every `console.log` call. The primary acceptance criterion ("tsc exits 0 with the corrected examples") fails due to this omission. Fix: add `"dom"` (or `"ES2020.Console"`) to the lib array, or replace `console.log` calls in the examples with alternative output.
 
 ## Files Modified
-- [x] `crates/sdivi-patterns/tests/comprehensions_fixture.rs`
-- [x] `crates/sdivi-lang-python/tests/extract_behavior.rs`
+- [x] `bindings/sdivi-wasm/tests/test_check_docs.sh`
+- [x] `bindings/sdivi-wasm/tests/test_negative_integrity.sh`
+- [x] `bindings/sdivi-wasm/tests/typecheck/subpath_imports.ts`
+- [x] `bindings/sdivi-wasm/tests/typecheck/tsconfig.json`

@@ -8,6 +8,15 @@ target
 # build/publish; never consumed from git. pkg-template/ is the tracked source.
 bindings/sdivi-wasm/pkg/
 
+# TypeScript build info (emitted by tsc incremental mode; excluded via
+# "incremental": false in the typecheck tsconfig, but gitignored as a safeguard).
+tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
+
+# node_modules created by `npm install --no-save typescript@...` during the M47
+# consumer-surface typecheck. Not committed; ephemeral CI and local-dev artifact.
+node_modules/
+
 # Harness runtime lock/state files
 .claude/scheduled_tasks.lock
 

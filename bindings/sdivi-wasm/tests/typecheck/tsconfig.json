@@ -1,0 +1,40 @@
+{
+  // Consumer-contract typecheck for @geoffgodwin/sdivi-wasm.
+  //
+  // Mirrors a realistic *strict* bundler consumer — the same settings the
+  // binding README advertises ("Compatible with --strict
+  // --noUncheckedIndexedAccess --exactOptionalPropertyTypes").
+  //
+  // IMPORTANT: pkg/ is CI-built (gitignored). Run ./build.sh in
+  // bindings/sdivi-wasm/ before invoking tsc locally.
+  //
+  // NOTE: The paths entries bypass the package.json exports map and point
+  // directly to the generated .d.ts files. This is intentional — the exports
+  // map's runtime resolution is already validated by the node_smoke CJS/ESM
+  // tests. This guard validates consumer *usage* against the *types*.
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noEmit": true,
+    "incremental": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "@geoffgodwin/sdivi-wasm":         ["../../pkg/bundler/sdivi_wasm.d.ts"],
+      "@geoffgodwin/sdivi-wasm/bundler": ["../../pkg/bundler/sdivi_wasm.d.ts"],
+      "@geoffgodwin/sdivi-wasm/node":    ["../../pkg/node/sdivi_wasm.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../examples/binding_node.ts",
+    "../../../../examples/binding_bundler.ts",
+    "./negative.ts",
+    "./subpath_imports.ts"
+  ]
+}

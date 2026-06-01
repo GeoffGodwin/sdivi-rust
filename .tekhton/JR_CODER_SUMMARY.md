@@ -1,26 +1,15 @@
-# JR Coder Summary — M35: Pattern Category `framework_hooks`
+# Junior Coder Summary
 
 ## What Was Fixed
 
-- **`crates/sdivi-core/tests/category_contract.rs`**: Added two new test functions to explicitly verify the M35 category contract:
-  - `list_categories_returns_exactly_nine_categories()` — asserts the catalog contains exactly 9 categories (P1–P9)
-  - `list_categories_includes_framework_hooks()` — asserts that `framework_hooks` is present in the runtime category list
+- **`bindings/sdivi-wasm/tests/typecheck/negative.ts` lines 33–64**: Corrected four `// @ts-expect-error` directive placements.
+  - **Case 1** (line 34): Moved explanatory text before the `@ts-expect-error` directive so it applies to the `await init()` call on line 35.
+  - **Case 2a** (line 44): Moved explanatory text before the `@ts-expect-error` directive so it applies to the `const _badEdgeWeights...` assignment on line 45.
+  - **Case 2b** (line 53): Collapsed multi-line object literal to single line and placed `@ts-expect-error` immediately before it so the directive applies to line 54.
+  - **Case 3** (line 63): Moved explanatory text before the `@ts-expect-error` directive so it applies to the `const _badBracket...` assignment on line 64.
 
-- **`bindings/sdivi-wasm/tests/wasm_smoke.rs`**: Updated the WASM integration test `list_categories_returns_schema_version_and_expected_count()`:
-  - Changed hardcoded count assertion from 8 to 9 categories
-  - Added `framework_hooks` to the explicit category checks
-  - Updated comment from "8 categories defined" to "9 categories defined (P1–P9)"
-  - Reordered category assertions into alphabetical order for consistency
+TypeScript `@ts-expect-error` applies only to the immediately next **non-comment** physical line. Prior to the fix, continuation comments on N+1 were receiving the suppression (becoming unused → TS2578) while the actual type errors on N+2 were not suppressed and reported as real errors. The fix ensures each directive is positioned to suppress the line it's intended for.
 
 ## Files Modified
 
-- `crates/sdivi-core/tests/category_contract.rs`
-- `bindings/sdivi-wasm/tests/wasm_smoke.rs`
-
-## Verification
-
-All tests pass:
-- ✓ `cargo test -p sdivi-core --test category_contract` — 8 tests pass (6 original + 2 new)
-- ✓ `cargo test -p sdivi-patterns --test framework_hooks` — 12 tests pass
-- ✓ Integration test `no_category_string_in_patterns_src_missing_from_list_categories` confirms `framework_hooks` from `sdivi-patterns` is properly registered in `sdivi-core::list_categories()`
-- ✓ WASM build compiles successfully with updated test assertions
+- `bindings/sdivi-wasm/tests/typecheck/negative.ts`

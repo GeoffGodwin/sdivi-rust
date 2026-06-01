@@ -1,157 +1,56 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 11 test functions
-- `crates/sdivi-patterns/tests/comprehensions_fixture.rs` — 7 test functions (new file)
-- `crates/sdivi-lang-python/tests/extract_behavior.rs` — 4 new M46 test functions (lines 401–488; pre-existing tests not under audit)
+Tests audited: 4 files, ~20 discrete test scenarios
+- `bindings/sdivi-wasm/tests/test_check_docs.sh` — 5 test scenarios (15 sub-assertions)
+- `bindings/sdivi-wasm/tests/test_negative_integrity.sh` — 13 numbered tests
+- `bindings/sdivi-wasm/tests/typecheck/subpath_imports.ts` — TypeScript fixture (validated by tsc)
+- `bindings/sdivi-wasm/tests/typecheck/tsconfig.json` — Configuration file for the tsc guard
 
-Verdict: PASS
+Verdict: **NEEDS_WORK**
 
 ---
 
 ### Findings
 
-#### SCOPE: Shell-detected orphan claims are false positives — do not remove the tests
-- File: `crates/sdivi-patterns/tests/comprehensions_fixture.rs` (all lines)
-- File: `crates/sdivi-lang-python/tests/extract_behavior.rs` (all lines)
-- Issue: The "Shell-Detected Orphans (pre-verified)" section asserts both files
-  "import deleted module '.tekhton/.commit_decision'" (four entries total). After
-  reading both files in full, this is factually incorrect. Neither file contains
-  any reference to `.tekhton` or `.commit_decision`. The only `use` declarations
-  in both files are valid Rust crate paths (`sdivi_config`, `sdivi_lang_python`,
-  `sdivi_parsing`, `sdivi_patterns`, `std::path::Path`). `.tekhton/.commit_decision`
-  is a pipeline state file and cannot appear as a Rust `use` declaration. The
-  detection script is producing a false positive — most likely pattern-matching
-  against the audit context preamble which mentions the deleted file, rather than
-  inspecting the source files themselves. This is the same false-positive class
-  reported in the M45.1, M45.2, and M44 audits; a prioritized fix to the detection
-  script is overdue.
-- Severity: LOW
-- Action: Do NOT remove or modify either test file on the basis of the orphan
-  report. No action required on any test file. Fix the orphan-detection script.
+#### INTEGRITY: Pre-verified orphan detection is entirely wrong — do not delete these files
+- File: bindings/sdivi-wasm/tests/test_check_docs.sh, test_negative_integrity.sh, typecheck/subpath_imports.ts, typecheck/tsconfig.json
+- Issue: The audit context's "Shell-Detected Orphans (pre-verified)" section claims all four test files import the deleted module `.tekhton/.commit_decision`. A full grep of `bindings/sdivi-wasm/tests/` for `.commit_decision` and `.tekhton` returns zero matches. None of the test files contain any reference to that path. This is the same class of false positive seen in M44–M46 audits: the detection script matches against the audit context preamble (which mentions the deleted file) rather than inspecting the actual test file contents.
+- Severity: HIGH
+- Action: Do NOT remove or modify any of the four listed test files on the basis of the orphan report. Fix the orphan-detection script — this is at least the fourth consecutive false-positive from it.
 
-#### COVERAGE: Missing catalog-key guard in `nested_list_comprehension_yields_two_instances`
-- File: `crates/sdivi-patterns/tests/comprehensions_fixture.rs:277`
-- Issue: The nested-comprehension test indexes `catalog.entries["comprehensions"]`
-  directly without first asserting the key exists. Every other test in this file
-  guards with `assert!(catalog.entries.contains_key("comprehensions"), ...)` before
-  indexing, which produces a descriptive failure message on key absence. The nested
-  test would panic with a generic index message if the comprehensions bucket were
-  unexpectedly absent, masking the real failure.
-- Severity: LOW
-- Action: Add a key-existence guard before the index, consistent with the six other
-  tests in the file:
-  ```rust
-  assert!(
-      catalog.entries.contains_key("comprehensions"),
-      "build_catalog must produce a `comprehensions` bucket for nested list comprehensions. \
-       Present categories: {:?}",
-      catalog.entries.keys().collect::<Vec<_>>()
-  );
-  let total: u32 = catalog.entries["comprehensions"]
-      .values()
-      .map(|s| s.count)
-      .sum();
-  ```
+#### INTEGRITY: Wrong grep anchor produces false negative for the known spurious directive
+- File: bindings/sdivi-wasm/tests/test_negative_integrity.sh:38, :77
+- Issue: Tests 1 and 2 detect `@ts-expect-error` directives using the pattern `"^// @ts-expect-error$"` — anchored at the end with `$`. TypeScript recognises any comment line that *starts with* `// @ts-expect-error` (with or without trailing text) as a suppression directive. `negative.ts` line 70 contains `// @ts-expect-error directives above would become unused and tsc would fail.` — TypeScript interprets this as a directive; the immediately following `void _badEdgeWeights;` (line 71) has no type error, so tsc emits TS2578 "Unused '@ts-expect-error' directive". Test 1 counts 4 matching lines (pattern misses line 70) and passes. Test 2 never sets `PREV_WAS_DIRECTIVE=1` for line 70 and therefore skips the check. Both tests produce false negatives; neither would catch a future recurrence of this class of bug.
+- Severity: HIGH
+- Action: In Test 1 (`test_negative_integrity.sh:38`), change `"^// @ts-expect-error$"` to `"^// @ts-expect-error"` (drop the trailing `$`). In Test 2 (line 77), same change. Then fix `negative.ts:70`: reword the prose comment so it does not begin with `// @ts-expect-error` — e.g., change it to `// The @ts-expect-error directives above would become unused...`.
+
+#### EXERCISE: Shell tests never run tsc; the primary M47 acceptance criterion is untested
+- File: bindings/sdivi-wasm/tests/test_check_docs.sh, bindings/sdivi-wasm/tests/test_negative_integrity.sh
+- Issue: M47's primary acceptance criterion is that `npx tsc --noEmit -p bindings/sdivi-wasm/tests/typecheck/tsconfig.json` exits 0. Neither shell test invokes tsc. The tester's report explicitly states "tsc --noEmit exits non-zero before and after my changes" due to two unfixed bugs: (1) `negative.ts:70` spurious directive (described in the INTEGRITY finding above) and (2) `tsconfig.json "lib": ["ES2020"]` lacks DOM types, causing TS2584 on `console.log` in `examples/binding_node.ts` and `examples/binding_bundler.ts`. The reported "Passed: 46  Failed: 0" result covers only structural grep checks — none of which exercise the broken tsc gate. The M47 feature adds a CI guard that currently fails in CI.
+- Severity: HIGH
+- Action: Fix both bugs: (1) fix `negative.ts:70` (see INTEGRITY finding); (2) add `"dom"` to `"lib"` in `tsconfig.json:24` (`"lib": ["ES2020", "dom"]`). Then add a test that actually runs tsc — extend `test_negative_integrity.sh` with a step that invokes `npx tsc --noEmit -p <tsconfig-path>` and asserts exit 0 (guarded by an `npx tsc` availability check so the test degrades gracefully when TypeScript is not installed locally).
+
+#### COVERAGE: check_docs.sh failure path has no end-to-end coverage
+- File: bindings/sdivi-wasm/tests/test_check_docs.sh:60-111
+- Issue: Tests 2 and 3 exercise `grep -nF` in isolation against controlled temp files. They prove that the grep tool can detect the patterns — not that `check_docs.sh` handles the failure path correctly. Test 1 is the only test that calls the actual script, and it covers only the happy path (exit 0). There is no test that injects a forbidden pattern into a file that `check_docs.sh` actually scans and then asserts the script exits 1 with a `FAIL:` prefixed line. If `check_docs.sh`'s exit-code or output-format logic were broken, Tests 2-3 would still pass because they bypass the script entirely.
+- Severity: MEDIUM
+- Action: Add an end-to-end failure-path test: copy one of the scanned files to a temp path, inject a forbidden pattern, temporarily redirect `check_docs.sh`'s file list to include only the temp file (or add a `FILES` env-override to the script), run the script, and assert exit 1 plus a `FAIL:` prefix in stdout. Alternatively, refactor `check_docs.sh` to accept an explicit file list argument so tests can supply a fully controlled input without patching.
+
+#### SCOPE: Two implementation bugs identified by tester remain unfixed despite tester modifying the affected file
+- File: bindings/sdivi-wasm/tests/typecheck/negative.ts:70; bindings/sdivi-wasm/tests/typecheck/tsconfig.json:24
+- Issue: The tester correctly identified both bugs. `tsconfig.json` is in the tester's "Files Modified" list — the tester added paths/include entries but did not fix `"lib": ["ES2020"]` even while editing the file. `negative.ts` is not in the tester's "Files Modified" list and was not fixed either. The tester report documents these as "Bugs Found" with no corresponding fix.
+- Severity: MEDIUM
+- Action: Fix `negative.ts:70` (reword comment) and `tsconfig.json:24` (add `"dom"` to lib). Both are one-line fixes. They are blocking: no part of M47's tsc guard is functional until both are applied.
 
 ---
 
-### No Additional Issues Found
+### Notes
 
-The following rubric points were checked and found clean across both audited files.
+**subpath_imports.ts quality**: The TypeScript fixture is well-designed. It imports from both `/bundler` and `/node` subpaths, uses `edge_weights: new Map([...])` (correct shape), iterates `Map` outputs with for-of rather than bracket indexing, and has anti-vacuous-pass `void` guards. Once the tsconfig bugs are fixed and tsc can successfully compile the file, the fixture closes the subpath coverage gap it was written to address. No issues with the fixture itself.
 
-#### 1. Assertion Honesty — PASS
+**test_negative_integrity.sh Test 1 count**: The count of 4 is correct for the *intended* directives (lines 34, 44, 53, 63). After the grep pattern fix, it will also detect line 70, raising the count to 5. The fix to `negative.ts:70` (rewording the comment) must be applied first, then the pattern fix — otherwise the test will fail on count 5 ≠ 4 with no prior fix having been made.
 
-**`comprehensions_fixture.rs`:**
-All expected values are grounded in implementation logic:
-- Count assertions of 1 per single-form test are grounded in the single comprehension
-  node in each input string, per the tree-sitter-python grammar.
-- The `assert_eq!(total, 4, ...)` in `all_four_comprehension_forms_yield_four_instances`
-  follows directly from four distinct comprehension nodes in the source (one of each kind).
-- The `assert_eq!(list_comp_count, 2, ...)` in the nested test is grounded in the
-  documented count semantics in `comprehensions.rs` lines 9–14: an inner
-  `list_comprehension` nested inside an outer one emits two distinct AST nodes.
-- The absence assertion in `python_file_without_comprehensions_produces_no_comprehensions_bucket`
-  cannot vacuously pass: the input `"x = 1\ny = x + 2\n"` contains no comprehension
-  syntax and tree-sitter-python produces no comprehension nodes.
+**test_check_docs.sh Tests 4-5**: These tests read live version-controlled source files (`examples/binding_node.ts`, `examples/binding_bundler.ts`). This is intentional and appropriate — they are checking the same files the production guard is designed to protect. These are not mutable pipeline artifacts; they are source files. No isolation concern here.
 
-**`extract_behavior.rs` M46 additions (lines 401–488):**
-All four tests verify `any()` presence of the respective node kind in `pattern_hints`.
-Each assertion is backed by `PATTERN_KINDS` in `crates/sdivi-lang-python/src/extract.rs`
-(lines 8–21), which includes all four comprehension kinds at lines 16–19, and by the
-`collect_hints` DFS walker (lines 200–223) that emits one hint per matching node.
-No hard-coded magic numbers. No tautological assertions.
-
-#### 2. Edge Case Coverage — PASS
-
-`comprehensions_fixture.rs` covers:
-- Each of the four comprehension kinds in isolation (4 tests)
-- All four in a single file (1 acceptance-criterion test)
-- Nested comprehensions and their count semantics (1 test)
-- A Python file with no comprehensions producing no catalog bucket (1 negative test)
-
-The negative test `python_file_without_comprehensions_produces_no_comprehensions_bucket`
-is the key error-path check and it is present. The combined suite exercises happy-path,
-multi-kind, nested, and absent-feature scenarios.
-
-#### 3. Implementation Exercise — PASS
-
-Both files call the real `PythonAdapter.parse_file` backed by the pinned
-tree-sitter-python grammar. `build_catalog` is called with real `FeatureRecord`
-inputs in `comprehensions_fixture.rs`. No internals are mocked anywhere. The
-integration fixture covers the full parse → hint-collection → catalog-routing path
-that the synthetic-FeatureRecord tests in `category_contract_m46.rs` do not exercise.
-
-#### 4. Test Weakening Detection — PASS
-
-`extract_behavior.rs` received four new tests appended after the M45.2 section
-(lines 401–488). All pre-existing test functions were not modified. No assertions
-were removed, broadened, or relaxed anywhere in the file.
-
-#### 5. Test Naming and Intent — PASS
-
-All 11 test names encode both the scenario and the expected outcome:
-- `python_list_comprehension_routes_to_comprehensions`
-- `python_set_comprehension_routes_to_comprehensions`
-- `python_dictionary_comprehension_routes_to_comprehensions`
-- `python_generator_expression_routes_to_comprehensions`
-- `all_four_comprehension_forms_yield_four_instances`
-- `nested_list_comprehension_yields_two_instances`
-- `python_file_without_comprehensions_produces_no_comprehensions_bucket`
-- `list_comprehension_captured_as_pattern_hint`
-- `set_comprehension_captured_as_pattern_hint`
-- `dictionary_comprehension_captured_as_pattern_hint`
-- `generator_expression_captured_as_pattern_hint`
-
-All follow the established naming convention in the repo.
-
-#### 6. Scope Alignment — PASS (orphan claims are false positives — see SCOPE finding above)
-
-All `use` declarations in both files resolve to current public API. No test references
-a deleted function, renamed symbol, or removed feature. The implementation files
-changed by the coder (`comprehensions.rs`, `mod.rs`, `categories.rs`,
-`crates/sdivi-lang-python/src/extract.rs`) are exactly what these tests exercise.
-`PATTERN_KINDS` in `extract.rs` lines 16–19 confirms all four comprehension kinds
-are registered and will produce hints from real parses.
-
-#### 7. Test Isolation — PASS
-
-Both files construct all fixture data from inline string literals. Neither file reads
-any mutable project file, pipeline report, config state file, `.tekhton/` artifact,
-or run artifact. Pass/fail outcome is fully independent of prior pipeline runs and
-repo state.
-
----
-
-### Summary Table
-
-| File | New functions | Verdict | Notes |
-|---|---|---|---|
-| `crates/sdivi-patterns/tests/comprehensions_fixture.rs` | 7 | PASS | New file; full integration coverage including negative case |
-| `crates/sdivi-lang-python/tests/extract_behavior.rs` | 4 | PASS | Additive M46 section; pre-existing tests unchanged |
-
-**Overall: PASS** — No HIGH findings. Two LOW findings: a recurring false-positive
-in the orphan-detection script (no test action required), and a missing catalog-key
-guard in one nested-comprehension test (cosmetic robustness fix recommended).
-The M46 additions to both files are honest, implementation-grounded, well-named,
-and fully isolated.
+**False-positive orphan detection**: This is the fourth consecutive audit with false orphan claims (M44, M45.1, M45.2, M47). The detection script is a systemic reliability problem. Recommend fixing it before the next audit cycle or removing the pre-verification step and relying solely on the auditor's direct file inspection.

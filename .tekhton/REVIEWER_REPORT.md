@@ -8,12 +8,24 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `comprehensions.rs:73-76` — the unit test `rust_node_kind_does_not_match` checks `await_expression` and `closure_expression`; neither is distinctively "Rust" (Python also has `await`). Renaming to `non_comprehension_node_kinds_do_not_match` would be clearer. Cosmetic only.
-- `mod.rs:37-39` — `ALL_CATEGORIES` doc comment still says only `logging` is callee-only via `classify_hint`. Several other categories (`collection_pipelines`, `testing`, `serialization`, `schema_validation`, `state_store`, `framework_hooks`, `http_routing`, `concurrency`) are also callee-only. Pre-existing, not introduced by M46; worth a targeted doc fix in a cleanup pass.
+- `check_docs.sh` still scans two hardcoded example filenames rather than a glob; a future third example would need a manual addition to stay in scope (carried from cycle 1).
+- `wasm.yml` "Install TypeScript (pinned)" runs `npm install --no-save` at the workspace root which has no `package.json`; works with npm 7+ but may emit warnings if the CI runner's npm version changes (carried from cycle 1).
 
 ## Coverage Gaps
-- Missing integration test: the milestone Tests section explicitly lists "Integration: Python fixture count" — a test that parses actual Python source containing all four comprehension forms and asserts each yields one instance. The current `category_contract_m46.rs` exercises only the classification routing layer via synthetic `PatternHintInput`, not the tree-sitter parsing path through the Python adapter. When the tester adds this fixture, verify `generator_expression` node-kind spelling against the pinned tree-sitter-python grammar (the milestone Watch For section flagged this).
+- The tsconfig `paths` map includes `@geoffgodwin/sdivi-wasm/bundler` and `@geoffgodwin/sdivi-wasm/node` subpath entries, but neither example nor the negative fixture imports via those subpaths; type drift specific to a subpath condition would go undetected (carried from cycle 1).
 
 ## Drift Observations
-- `docs/pattern-categories.md:22-24` — the canonical category list table has a pre-existing alphabetical ordering inconsistency: `concurrency` (con…) appears before `collection_pipelines` (col…) and `comprehensions` (com…). The `markdown_table_matches_list_categories_output` test uses `HashSet` comparison so the disorder is invisible to CI. M46 correctly placed `comprehensions` between `collection_pipelines` and `data_access` in the doc's existing sequence, consistent but not fixing the underlying sort. Track for a dedicated doc-cleanup pass.
-- `mod.rs:126` — the `#[allow(clippy::type_complexity)]` inline justification lists eleven priority slots as a long annotation on the `#[allow]` line itself. As `CALL_DISPATCH` grows this comment will drift. Moving the priority explanation to a separate `//` block above the const would be easier to maintain.
+- `DRIFT_LOG.md` was created new by M47; M01–M46 drift decisions (e.g. KDD-6 serde_yaml comment loss, bundler vs. `--target web` choice) are absent — the log is incomplete as a historical audit trail (carried from cycle 1).
+- `wasm.yml`: the job creates two independent `node_modules` trees in the same workspace (a symlink at `tests/node_smoke/node_modules/@geoffgodwin/sdivi-wasm` for smoke tests and a real `node_modules/typescript/` at the repo root for the typecheck); currently non-conflicting but worth noting if future steps add more `npm install` calls (carried from cycle 1).
+
+---
+
+## Prior-Blocker Verification (cycle 2)
+
+**Blocker from cycle 1:** `negative.ts` — all four `// @ts-expect-error` directives had an intermediate comment line between the directive and the type-erroring code; TypeScript only suppresses diagnostics on the immediately following line, so the directives would have been unused (TS2578 × 4) and the actual errors would have been reported unremediated.
+
+**Status: FIXED.**
+
+Lines 34–35, 44–45, 53–54, 63–64 of the current `negative.ts` each show the directive on line N immediately preceding the code on line N+1, with explanatory prose moved above the directive. No intermediate comment line remains between any `// @ts-expect-error` and its guarded statement. The fix matches the correction prescribed in cycle 1 exactly.
+
+No regression was introduced by the rework: the change is purely comment-reordering within a single file; the tsconfig, check_docs.sh, wasm.yml steps, and all other files are unchanged from cycle 1.

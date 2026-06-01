@@ -68,7 +68,8 @@ function main() {
 
   // 6. Assemble a Snapshot from the compute outputs. The Map-typed fields
   //    (cluster_assignments, internal_edge_density) are passed straight through
-  //    from detect_boundaries — they are already JS Maps.
+  //    from detect_boundaries — they are already JS Maps. Optional fields
+  //    (commit, boundary_count) are simply omitted when not available.
   const nodeIds = graph.nodes.map((n) => n.id);
   const snapshot1 = assemble_snapshot({
     node_ids: nodeIds,
@@ -84,8 +85,6 @@ function main() {
     pattern_metrics: pm,
     pattern_instances: patterns,
     timestamp: new Date().toISOString(),
-    commit: undefined,
-    boundary_count: undefined,
     leiden_seed: cfg.seed,
   });
   console.log('snapshot_version:', snapshot1.snapshot_version);

@@ -3,95 +3,90 @@
 
 ## What Was Implemented
 
-### M46: Pattern Category — `comprehensions` (Python-only)
+### M47: WASM Consumer-Surface Typecheck Guard
 
-**`crates/sdivi-patterns/src/queries/comprehensions.rs`** (NEW) — 77 lines
-- `NODE_KINDS: &[&str]` with four entries: `dictionary_comprehension`,
-  `generator_expression`, `list_comprehension`, `set_comprehension`.
-- Inline `#[cfg(test)] mod tests` with 7 unit tests covering each kind and a
-  non-Python sanity check.
+Added a deterministic CI guard that typechecks the `@geoffgodwin/sdivi-wasm`
+consumer TypeScript surface against the freshly built `.d.ts`, with a
+self-verifying negative fixture and a forbidden-pattern doc lint.
 
-**`crates/sdivi-patterns/src/queries/mod.rs`** — 207 lines
-- Added `pub mod comprehensions;` (alphabetically between `collection_pipelines`
-  and `concurrency`).
-- Added `"comprehensions"` to `ALL_CATEGORIES` in alphabetical order.
-- Added comprehensions arm to `category_for_node_kind` (between class_hierarchy
-  and concurrency branches).
-- Updated `ALL_CATEGORIES` doc count from 18 to 19.
+**New files:**
 
-**`crates/sdivi-core/src/categories.rs`** — 299 lines
-- Inserted comprehensions entry in `CATALOG_ENTRIES` (position 3, between
-  `collection_pipelines` and `concurrency`).
-- Added `CATALOG_ENTRIES[18].0` to `CATEGORIES` constant (now 19 entries).
-- Updated doc examples to reference `comprehensions` and count 19.
+- `bindings/sdivi-wasm/tests/typecheck/tsconfig.json` — strict consumer tsconfig
+  with `paths` → freshly built `pkg/*.d.ts` and `include` → repo-root examples +
+  `./negative.ts`. Settings: `strict`, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, `noEmit`, `incremental: false`, `esModuleInterop`,
+  `skipLibCheck`, `target: ES2020`, `moduleResolution: bundler`, `module: ESNext`.
 
-**`crates/sdivi-core/tests/category_contract_m46.rs`** (NEW) — 124 lines
-- M46 acceptance-criterion tests: all four node kinds classify to comprehensions,
-  classify_hint routing, non-match for unknown nodes, count = 19, includes
-  "comprehensions" in list_categories().
+- `bindings/sdivi-wasm/tests/typecheck/negative.ts` — self-verifying negative
+  fixture with `@ts-expect-error` assertions for:
+  - Case 1: `await init()` — module namespace is not callable (TS2349)
+  - Case 2a: `edge_weights: { ... }` as plain object literal (not Map<string,number>)
+  - Case 2b: `overrides: { ... }` as plain object literal (not Map<string,WasmThresholdOverrideInput>)
+  - Case 3: bracket-indexing `Map<string,number>` output (TS7053)
+  - Guard section with `void` calls prevents vacuous pass from path typos.
 
-**Count tests updated (my changes broke these — fixed):**
-- `category_contract.rs` — `list_categories_returns_exactly_eighteen_categories`
-  renamed and updated to assert 19.
-- `category_contract_m42.rs` — count assertion updated to 19.
-- `category_contract_m43.rs` — count assertion updated to 19.
-- `category_contract_m44.rs` — count assertion updated to 19.
-- `category_contract_m45_1.rs` — count assertion updated to 19.
-- `category_contract_m45_2.rs` — count assertion updated to 19.
-- `crates/sdivi-patterns/src/queries/tests.rs` — `all_categories_has_eighteen_entries`
-  renamed and updated to assert 19.
+- `bindings/sdivi-wasm/tests/check_docs.sh` — POSIX sh forbidden-pattern lint;
+  greps six consumer-facing files for `import init`, `await init(`, `edge_weights: {`;
+  exits non-zero with `FAIL: <path>:<line>` on any hit. Verified: passes on current
+  tree; fails when a forbidden pattern is injected.
 
-**`docs/pattern-categories.md`**
-- Canonical list table: added `comprehensions` row (between `collection_pipelines`
-  and `data_access` in the doc table order).
-- Python table: added `comprehensions` row with all four node kinds.
+- `DRIFT_LOG.md` — created with M47 entry explaining the M12-era `await init()`
+  idiom drift and how M47 closes it.
 
-**`MIGRATION_NOTES.md`**
-- Added M46 section before M45.2: schema unchanged, count 18→19, additive-only,
-  count-introduction event, nested comprehension counting, escape hatch TOML.
+**Modified files:**
 
-**`CHANGELOG.md`**
-- Added M46 entry under `[Unreleased] ### Added` before M45.2 entry.
+- `.github/workflows/wasm.yml`:
+  - Added `TYPESCRIPT_VERSION: "5.5.4"` env key (pinned, like WASM_PACK_VERSION).
+  - Added three ubuntu-only steps after "Set up node_modules for Node smoke tests":
+    1. Install TypeScript (pinned) via `npm install --no-save --no-package-lock`
+    2. Typecheck consumer surface: `npx tsc --noEmit -p bindings/sdivi-wasm/tests/typecheck/tsconfig.json`
+    3. Lint consumer docs: `sh bindings/sdivi-wasm/tests/check_docs.sh`
+  - All steps are required (no `continue-on-error`), ordered after `pkg/` assembly.
 
-## Verification
-- Python adapter already collects all four node kinds (`PATTERN_KINDS` in
-  `crates/sdivi-lang-python/src/extract.rs`) — no parsing change required.
-- `cargo test --workspace`: 1444+ tests pass. Only pre-existing failure:
-  `wasm_package_json_version_matches_workspace` (package.json at 0.2.23 vs
-  workspace 0.2.38; not introduced by M46).
+- `bindings/sdivi-wasm/tests/node_smoke/index.mjs`: updated stale "bundler path not
+  exercised" comment to accurately state the bundler *type* contract is now validated
+  by M47's `tsc` guard, while the bundler *runtime* path remains upstream-validated
+  (deferred per M47 Non-Goals).
+
+- `examples/binding_node.ts`: removed `commit: undefined` and `boundary_count: undefined`
+  from the `assemble_snapshot` call. These caused TS2322 under `exactOptionalPropertyTypes:
+  true` (the optional fields `commit?: string` cannot accept explicit `undefined`). The
+  fix is to simply omit the keys. Updated the adjacent comment.
+
+- `CHANGELOG.md`: added M47 "Added" entry under `[Unreleased]`.
+- `.gitignore`: added `tsconfig.tsbuildinfo`, `**/tsconfig.tsbuildinfo`, and `node_modules/`
+  (the npm install for the typecheck step creates node_modules at repo root in CI).
 
 ## Root Cause (bugs only)
-N/A — feature addition.
+N/A — feature addition (CI test infrastructure).
+
+## Architecture Change Proposals
+None.
 
 ## Files Modified
-- `crates/sdivi-patterns/src/queries/comprehensions.rs` (NEW) — 77 lines
-- `crates/sdivi-patterns/src/queries/mod.rs` — pub mod, ALL_CATEGORIES, category_for_node_kind
-- `crates/sdivi-core/src/categories.rs` — CATALOG_ENTRIES + CATEGORIES updated; 299 lines
-- `crates/sdivi-core/tests/category_contract_m46.rs` (NEW) — 124 lines
-- `crates/sdivi-core/tests/category_contract.rs` — count 18 → 19
-- `crates/sdivi-core/tests/category_contract_m42.rs` — count 18 → 19
-- `crates/sdivi-core/tests/category_contract_m43.rs` — count 18 → 19
-- `crates/sdivi-core/tests/category_contract_m44.rs` — count 18 → 19
-- `crates/sdivi-core/tests/category_contract_m45_1.rs` — count 18 → 19
-- `crates/sdivi-core/tests/category_contract_m45_2.rs` — count 18 → 19
-- `crates/sdivi-patterns/src/queries/tests.rs` — count 18 → 19
-- `docs/pattern-categories.md` — canonical list + Python table
-- `MIGRATION_NOTES.md` — M46 section
-- `CHANGELOG.md` — M46 entry
+- `bindings/sdivi-wasm/tests/typecheck/tsconfig.json` (NEW) — 39 lines
+- `bindings/sdivi-wasm/tests/typecheck/negative.ts` (NEW) — 76 lines
+- `bindings/sdivi-wasm/tests/check_docs.sh` (NEW) — 80 lines
+- `DRIFT_LOG.md` (NEW) — 37 lines
+- `.github/workflows/wasm.yml` — added TYPESCRIPT_VERSION env, 3 ubuntu steps
+- `bindings/sdivi-wasm/tests/node_smoke/index.mjs` — updated stale comment
+- `examples/binding_node.ts` — removed `commit: undefined`, `boundary_count: undefined`
+- `CHANGELOG.md` — M47 Added entry
+- `.gitignore` — tsconfig.tsbuildinfo, node_modules/
 
 ## Human Notes Status
-No human notes in this run.
+Non-blocking notes from reviewer were out of scope for M47:
+- `comprehensions.rs:73-76` — test name rename suggestion: NOT_ADDRESSED (M46 scope)
+- `mod.rs:37-39` — doc comment coverage: NOT_ADDRESSED (M46 scope)
 
 ## Docs Updated
-- `docs/pattern-categories.md` — canonical category list (comprehensions row),
-  Python per-language table (comprehensions row).
-- `MIGRATION_NOTES.md` — M46 section.
-- `CHANGELOG.md` — M46 entry.
+None — no public Rust/TS API surface changes in this milestone.
+The examples are consumer documentation and were updated (`binding_node.ts`
+had explicit `undefined` values removed, which is an improvement).
 
 ## Observed Issues (out of scope)
-- Pre-existing: `wasm_package_json_version_matches_workspace` — package.json
-  stranded at 0.2.23 vs workspace 0.2.38.
-- Pre-existing: `ALL_CATEGORIES` doc note in `mod.rs` says only `logging` is
-  callee-only via `classify_hint`; several other categories are also callee-only.
-- Pre-existing: `docs/pattern-categories.md` embedder responsibilities list has
-  a numbering regression across M42–M44.
+- Pre-existing: `wasm_package_json_version_matches_workspace` — package.json at
+  0.2.23 vs workspace 0.2.38 (not introduced by M47).
+- `binding_node.ts` previously had `commit: undefined` and `boundary_count: undefined`
+  — fixed in this milestone as a necessary consequence of the typecheck guard (not
+  a pre-existing out-of-scope issue).

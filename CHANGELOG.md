@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI:** Added a TypeScript consumer-contract guard for `@geoffgodwin/sdivi-wasm`
+  (M47). The WASM workflow now `tsc --noEmit`-typechecks the published examples
+  (`examples/binding_node.ts`, `examples/binding_bundler.ts`) against the freshly
+  generated `.d.ts` under strict settings (`--strict --noUncheckedIndexedAccess
+  --exactOptionalPropertyTypes`), asserts via a self-verifying negative fixture
+  (`tests/typecheck/negative.ts`) that the previously-broken `await init()` and
+  object-as-`Map` patterns fail to typecheck, and lints the consumer docs for those
+  regressions (`tests/check_docs.sh`). Prevents the binding's documented usage from
+  drifting away from the shipped types.
+
 - `comprehensions` pattern category added (M46): Python `list_comprehension`,
   `set_comprehension`, `dictionary_comprehension`, and `generator_expression` nodes
   are now classified as `comprehensions`. All four node kinds were already collected
