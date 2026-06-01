@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 25
+- Runs since audit: 26
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,7 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-06-01 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:42-44` â The ALL_CATEGORIES "Node-kind only" list still contains `async_patterns`, which has a callee-text path via CALL_DISPATCH P1. The fix in this cycle corrected `data_access` and `concurrency` but left this residual inaccuracy in the same paragraph. Pre-existing; not introduced by this cycle's changes.
 - [2026-06-01 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:123-132` â `call_expression_is_data_access` asserts `category_for_node_kind("call_expression", "typescript") == Some("data_access")`, which is correct behavior but directly contradicts the new `ALL_CATEGORIES` doc prose. The test is the ground truth here; the doc is wrong. Accumulates as a known doc debt item.
 - [2026-06-01 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `category_for_node_kind` checks `concurrency::NODE_KINDS` which includes `go_statement` and `select_statement` (pure Go node kinds), yet there is no test asserting `category_for_node_kind("go_statement", "go") == Some("concurrency")`. The node-kind path for these two concurrency kinds has no direct coverage in `tests.rs`; covered only via integration tests in the Go adapter. Low risk but worth a unit test sentinel on the next pass.
 - [2026-06-01 | "unknown"] `DRIFT_LOG.md` was created new by M47; M01âM46 drift decisions (e.g. KDD-6 serde_yaml comment loss, bundler vs. `--target web` choice) are absent â the log is incomplete as a historical audit trail (carried from cycle 1).

@@ -491,7 +491,9 @@ drift signal; subsequent snapshots establish the baseline.
 **What changed.** Two tree-sitter node kinds are now collected by the TypeScript and
 JavaScript language adapters and classified as `null_safety`:
 
-- `optional_chain` — optional chaining (`a?.b`, `arr?.[0]`, `fn?.()`) in both TS and JS.
+- `optional_chain` — optional chaining (`a?.b`, `arr?.[0]`) in both TS and JS.
+  Note: optional calls (`fn?.()`) emit `call_expression` in the grammar, not
+  `optional_chain` — they are not classified under `null_safety`.
 - `non_null_expression` — TypeScript non-null assertion operator (`el!`); TS only.
 
 `list_categories()` count grows from 10 → 11.

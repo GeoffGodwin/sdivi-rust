@@ -81,7 +81,7 @@ pub struct WasmPriorPartition {
     pub cluster_assignments: BTreeMap<String, u32>,
 }
 
-/// A prior partition for [`crate::infer_boundaries`] — mirrors [`sdivi_core::SnapshotPriorPartition`].
+/// A prior partition for `infer_boundaries` — mirrors [`sdivi_core::SnapshotPriorPartition`].
 /// Kept separate from [`WasmPriorPartition`] to surface struct-shape divergence at compile time.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -206,7 +206,7 @@ pub struct WasmPatternMetricsResult {
     pub convention_drift_per_category: BTreeMap<String, f64>,
 }
 
-/// A proposed boundary from [`crate::infer_boundaries`].
+/// A proposed boundary from `infer_boundaries`.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmBoundaryProposal {
@@ -215,7 +215,7 @@ pub struct WasmBoundaryProposal {
     pub node_ids: Vec<String>,
 }
 
-/// Output of [`crate::infer_boundaries`].
+/// Output of `infer_boundaries`.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmBoundaryInferenceResult {
@@ -223,7 +223,7 @@ pub struct WasmBoundaryInferenceResult {
     pub partition_count: usize,
 }
 
-/// Output of [`crate::compute_trend`].
+/// Output of `compute_trend`.
 #[derive(Tsify, Serialize, Deserialize, Clone, Debug)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmTrendResult {

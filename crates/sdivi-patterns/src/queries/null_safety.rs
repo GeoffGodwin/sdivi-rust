@@ -33,8 +33,9 @@
 /// Two node kinds are classified here:
 ///
 /// - `optional_chain` — TypeScript and JavaScript optional chaining
-///   (`a?.b`, `arr?.[0]`, `fn?.()`). One instance per `optional_chain` node
-///   as emitted by the grammar.
+///   (`a?.b`, `arr?.[0]`). One instance per `optional_chain` node as emitted
+///   by the grammar. Note: optional calls (`fn?.()`) emit `call_expression`,
+///   not `optional_chain` — they are not counted here.
 /// - `non_null_expression` — TypeScript non-null assertion operator (`el!`).
 ///   TypeScript-only; not emitted by the JavaScript adapter.
 ///

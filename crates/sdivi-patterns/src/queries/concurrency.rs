@@ -46,6 +46,13 @@ use regex::Regex;
 ///
 /// Emitted by the Go adapter (`sdivi-lang-go`). Classification for these node
 /// kinds happens in `category_for_node_kind`, not in `CALL_DISPATCH`.
+///
+/// **SQL adapter seed:** SQL tree-sitter grammars also emit `select_statement`
+/// for `SELECT` queries. If a SQL language adapter is added, the SQL adapter
+/// must NOT include `select_statement` in its collected `PATTERN_KINDS`, or
+/// SQL `SELECT` statements will be misclassified as `concurrency`. The
+/// `_language` parameter in `category_for_node_kind` exists for exactly this
+/// future per-language override.
 pub const NODE_KINDS: &[&str] = &["go_statement", "select_statement"];
 
 // TypeScript / JavaScript — Promise multi-future coordination.

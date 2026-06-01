@@ -114,11 +114,11 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
     (
         "null_safety",
         "Code constructs that guard against null or undefined values — optional \
-        chaining (`a?.b`, `arr?.[0]`, `fn?.()`) via the `optional_chain` node kind \
-        and TypeScript non-null assertions (`el!`) via `non_null_expression`. \
-        TypeScript and JavaScript only; other languages produce no instances in v0. \
-        Nullish coalescing (`??`) is deferred — it requires operator-field \
-        inspection beyond the v0 node-kind model. Added M37.",
+        chaining (`a?.b`, `arr?.[0]`) via `optional_chain` and TypeScript non-null \
+        assertions (`el!`) via `non_null_expression`. Optional calls (`fn?.()`) \
+        emit `call_expression` in the grammar and are not counted here. \
+        TypeScript and JavaScript only; nullish coalescing (`??`) is deferred. \
+        Added M37.",
     ),
     (
         "resource_management",

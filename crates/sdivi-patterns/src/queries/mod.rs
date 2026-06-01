@@ -34,12 +34,17 @@ use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
-/// Note: the following categories are classified via [`classify_hint`] callee-text inspection
-/// only; [`category_for_node_kind`] never returns them: `logging`, `testing`, `serialization`,
-/// `schema_validation`, `state_store`, `framework_hooks`, `http_routing`, `data_access`,
-/// `collection_pipelines`, and `concurrency`. Node-kind-only categories (`async_patterns`,
-/// `class_hierarchy`, `comprehensions`, `decorators`, `error_handling`, `null_safety`,
-/// `resource_management`, `state_management`, and `type_assertions`) are returned by both.
+/// ## Classification paths
+///
+/// - **Callee-text only** (via [`classify_hint`]; [`category_for_node_kind`] never returns these):
+///   `logging`, `testing`, `serialization`, `schema_validation`, `state_store`,
+///   `framework_hooks`, `http_routing`, and `collection_pipelines`.
+/// - **Node-kind only** (via [`category_for_node_kind`]; no callee-text table):
+///   `async_patterns`, `class_hierarchy`, `comprehensions`, `decorators`, `error_handling`,
+///   `null_safety`, `resource_management`, `state_management`, and `type_assertions`.
+/// - **Hybrid** (both paths active): `data_access` (`call_expression`/`call` node kinds
+///   plus per-language callee regex) and `concurrency` (`go_statement`/`select_statement`
+///   node kinds plus `Promise.all`/`asyncio.gather` callee regex at CALL_DISPATCH P11).
 ///
 /// # Examples
 ///

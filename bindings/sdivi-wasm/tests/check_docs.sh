@@ -20,8 +20,7 @@
 #   README.md
 #   docs/pattern-categories.md
 #   bindings/sdivi-wasm/src/lib.rs   (rustdoc code fences)
-#   examples/binding_node.ts
-#   examples/binding_bundler.ts
+#   examples/*.ts                    (glob — all current and future .ts examples)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 #
