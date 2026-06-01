@@ -75,3 +75,4 @@ id_rsa
 *.swp
 *.swo
 Thumbs.db
+.claude/dashboard/data/

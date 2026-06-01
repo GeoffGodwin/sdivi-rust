@@ -1,6 +1,6 @@
 ## Summary
 
-This change set is almost entirely documentation and comment corrections, with a single version bump in `bindings/sdivi-wasm/pkg-template/package.json` (0.2.40 → 0.2.41) and three broken rustdoc link fixes in `bindings/sdivi-wasm/src/types.rs`. No new logic, dependencies, I/O paths, authentication code, cryptographic primitives, or user-input handling was introduced. The only file with any shell execution surface is `bindings/sdivi-wasm/tests/check_docs.sh`, which was modified only in a comment line. The security posture of this change set is sound.
+This change touches three files — `crates/sdivi-patterns/src/queries/mod.rs`, `crates/sdivi-patterns/src/queries/async_patterns.rs`, and `crates/sdivi-patterns/tests/test_all_categories_doc_classification.rs` — making purely documentation and test-classification corrections. The `mod.rs` doc comment is updated to move `async_patterns` from the "Node-kind only" list to the "Hybrid" list; `async_patterns.rs` gains a clarifying module-level doc block; and the test file adds an `async_patterns_is_hybrid_both_node_kind_and_callee` assertion while removing `async_patterns` from the node-kind-only test vector. None of the changed lines touch authentication, cryptography, user input validation, network communication, filesystem access, or secret handling. The regex in `async_patterns.rs` (`\.(then|catch|finally)\(`) is used exclusively for in-process classification and presents no injection surface. Security posture is unchanged by this diff.
 
 ## Findings
 
