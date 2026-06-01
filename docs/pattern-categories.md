@@ -29,6 +29,7 @@ The authoritative runtime source of truth is `sdivi_core::list_categories()`. Th
 | null_safety | Code constructs that guard against null or undefined values — optional chaining (`a?.b`, `arr?.[0]`, `fn?.()`) and TypeScript non-null assertions (`el!`). TypeScript and JavaScript only; other languages produce no instances in v0. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | Code constructs that allocate, release, or manage system or heap resources — e.g., Rust macro invocations such as `drop!`, `vec!`, `assert!`. As of M33, Rust logging macros (`tracing::*!`, `log::*!`, `println!`/`eprintln!`/`print!`/`eprint!`/`dbg!`) are excluded and classified as `logging` instead. |
 | schema_validation | Runtime schema and validation declarations — Zod (`z.object`, `z.string`, `z.enum`), Yup (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and the Zod-specific `.safeParse(` validated-parse call in TypeScript and JavaScript. Python: Pydantic field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`). Detected via callee-text at CALL_DISPATCH slot P4. Note: `class Foo(BaseModel)` is a `class_definition` counted under `class_hierarchy`; class-validator decorators (`@IsString()`) belong to `decorators` (M36.1/M36.2). TypeScript, JavaScript, and Python only in v0. Added M38. |
+| serialization | (De)serialization boundary calls — `JSON.parse`, `JSON.stringify`, `structuredClone` in TypeScript and JavaScript; `json.loads`, `json.dumps`, `json.load`, `json.dump`, `pickle.loads`, `pickle.dumps` in Python; `json.Marshal`, `json.Unmarshal`, `json.MarshalIndent`, `json.NewEncoder`, `json.NewDecoder` in Go. Detection is receiver-anchored: only `JSON.`, `json.`, or `pickle.` callee prefixes are matched. Bare `.parse(` is intentionally excluded (collides with schema validators). Detected via callee-text at CALL_DISPATCH slot P3 (above `schema_validation` P4). Added M43. |
 | state_management | Code constructs that capture, transform, or share mutable or shared state — e.g., closures that close over mutable bindings or shared references. |
 | state_store | External state-management library declarations — Redux / RTK (`createSlice`, `configureStore`, `createStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.). Detected via callee-text at CALL_DISPATCH slot P5 (above `framework_hooks` P6). All patterns are `^`-anchored — member-access calls (`prisma.user.create(...)`) are not matched. `useSelector`/`useDispatch`/`useStore` move from `framework_hooks` to `state_store` on upgrade (see `MIGRATION_NOTES.md`). TypeScript and JavaScript only in v0. Added M39. |
 | testing | Test-suite structure and assertion calls — BDD globals (`describe`, `it`, `context`), flat `test` globals, lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`), `expect(…)` assertion roots, focused/excluded variants (`xit`, `xdescribe`, `fit`, `fdescribe`), and framework-namespaced helpers (`jest.fn`, `jest.mock`, `jest.spyOn`, `vi.fn`, `vi.mock`, `vi.spyOn`, etc.) in TypeScript and JavaScript. Go: `testing.T` method calls (`t.Run`, `t.Fatal`, `t.Error`, `t.Errorf`, and the full T method set). Python: `unittest.TestCase` assertion methods (`self.assertEqual`, `self.assertTrue`, and the `self.assert[A-Z]…` family). Detected via callee-text at CALL_DISPATCH slot P2. **`scope_exclude` interaction:** the bucket is non-empty only when test files are in the pattern scope. Added M42. |
@@ -63,6 +64,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | logging | `call` where callee matches `^(logging\.\|print\b)` | Natively classified since M33. Examples: `logging.info(x)`, `print(x)`. |
 | resource_management | (none in v0) | — |
 | schema_validation | `call` where callee matches `\bField\(|\bconstr\(|\bconint\(` | Pydantic field-constraint call forms only. `class Foo(BaseModel)` counts under `class_hierarchy`, not here. Added M38. |
+| serialization | `call` where callee matches `^(json\|pickle)\.(loads\|dumps\|load\|dump)\(` | Natively classified at CALL_DISPATCH slot P3. Examples: `json.loads(s)`, `json.dumps(o)`, `pickle.dumps(o)`. Receiver-anchored — `json.` is not in the data_access regex. Added M43. |
 | state_management | `lambda` | None |
 | type_assertions | (none in v0) | — |
 
@@ -82,6 +84,7 @@ Each cell lists the tree-sitter node-kind strings that map to that category in a
 | null_safety | `optional_chain`; `non_null_expression` (TS only) | `optional_chain`: one instance per node as emitted by the grammar — a nested chain `a?.b?.c` may produce multiple nodes. `non_null_expression`: TypeScript-only; not emitted by the JS adapter. Nullish coalescing (`??`) is deferred. Added M37. |
 | resource_management | (none in v0) | — |
 | schema_validation | `call_expression` where callee matches `^(z\|yup\|v\|s)\.\w` or `\.safeParse\(` | Namespace-anchored: Zod (`z.`), Yup (`yup.`), Valibot (`v.`), Superstruct (`s.`) + Zod-specific `.safeParse(`. Bare `.string()`/`.object()` on arbitrary receivers are intentionally excluded — no receiver-type info available. `SomeSchema.parse(x)` (no namespace prefix) is a known miss. Natively classified at CALL_DISPATCH slot P4 (M38). |
+| serialization | `call_expression` where callee matches `^JSON\.(parse\|stringify)\(` or `^structuredClone\(` | Natively classified at CALL_DISPATCH slot P3. Examples: `JSON.parse(s)`, `JSON.stringify(o)`, `structuredClone(data)`. Bare `.parse(` intentionally excluded — see schema_validation for `SomeSchema.parse(x)`. Added M43. |
 | state_management | `arrow_function` | None |
 | state_store | `call_expression` where callee matches Redux/RTK factories, `^use(Selector\|Dispatch\|Store)\b`, `^create\(`, Jotai/Recoil, MobX, Signals, or Solid createX patterns | All patterns `^`-anchored at callee start. `useSelector`/`useDispatch`/`useStore` match both `state_store` (P5) and `framework_hooks` (P6); state_store wins by precedence. `prisma.user.create(...)` and `document.createElement(...)` are excluded because their callee text does not start with `create(`. Natively classified at CALL_DISPATCH slot P5 (M39). |
 | testing | `call_expression` where callee matches `^(describe\|it\|test\|xit\|xdescribe\|fdescribe\|fit\|context\|beforeEach\|afterEach\|beforeAll\|afterAll\|expect)\(` or `^(jest\|vi)\.(fn\|mock\|spyOn\|clearAllMocks\|resetAllMocks\|useFakeTimers)\(` | BDD globals and lifecycle hooks anchored at `^`. Examples: `describe('x', fn)`, `it('does', fn)`, `expect(y).toBe(z)`, `jest.mock('./m')`, `vi.fn()`. A business function named `test(args)` is a known false positive — accepted as entropy noise. Natively classified at CALL_DISPATCH slot P2 (M42). |
@@ -97,6 +100,7 @@ These languages share the common callee-text filter via `classify_hint`. Go and 
 | data_access | `call_expression` where callee matches the shared TS/JS/Go regex (`^(fetch\|axios)\b\|\b(db\|sql)\.` etc.) | Natively filtered since M33. Examples: `db.query(sql)`, `sql.Open(dsn)`. Java `call_expression` returns `false` in v0 — data-access detection is library-shaped and deferred. |
 | http_routing | Go: `call_expression` where callee matches `^(http\|mux\|r\|e\|router\|engine\|g\|rg)\.(HandleFunc\|Handle\|GET\|POST\|PUT\|DELETE\|PATCH\|Any\|Group)\(` | Receiver-allowlist anchored at P7. Examples: `http.HandleFunc("/", h)`, `r.GET("/users", h)`, `mux.Handle("/", h)`, `e.POST("/user", h)`. Go uppercase verb names avoid overlap with data_access (lowercase `\bget\(`). Java returns `false` in v0. Added M41. |
 | logging | Go: `call_expression` where callee matches `^fmt\.(Print\|Println\|Printf\|Errorf\|Fprint\|Sprint)`. Java: `call_expression` where callee matches `^(System\.(out\|err)\.\|logger\.\|Log\.\|LOG\.)` | Natively classified since M33. Go examples: `fmt.Println(x)`, `fmt.Printf(f, x)`. Java examples: `System.out.println(x)`, `LOG.info(x)`. |
+| serialization | Go: `call_expression` where callee matches `^json\.(Marshal\|Unmarshal\|MarshalIndent\|NewEncoder\|NewDecoder)\(`. Java: (none in v0). | Natively classified at CALL_DISPATCH slot P3. Examples: `json.Marshal(v)`, `json.Unmarshal(b, &v)`, `json.NewDecoder(r)`. `json.` is not in the Go data_access regex — no overlap. Added M43. |
 | testing | Go: `call_expression` where callee matches `\bt\.(Run\|Error\|Errorf\|Fatal\|Fatalf\|Helper\|Skip\|Skipf\|Log\|Logf\|Cleanup\|Parallel)\(`. Java: (none in v0). | `\bt\.` matches the conventional `*testing.T` receiver at a word boundary — `t.Run(...)`, `t.Fatal(err)`. A receiver named `st` does not match (`t` is preceded by a word char). Java testing frameworks (JUnit `@Test`, AssertJ) use annotation/method shapes outside the v0 callee model. Added M42. |
 
 > **Note on per-language node-kind tables:** The v0 tables above are written by hand.
@@ -169,6 +173,26 @@ embedder convenience.** `Pipeline::snapshot` now calls `classify_hint` instead o
 **`scope_exclude` interaction:** The `testing` bucket is non-empty only when test files are included in the pattern scope. If a repo excludes test paths via `patterns.scope_exclude = ["**/*.test.ts", "**/tests/**"]`, the bucket will be empty and the category is effectively a no-op. No auto-detection of test paths is performed — the existing config knob governs scope.
 
 **Known false positives:** `test(args)`, `it(args)`, `context(args)`, and `expect(x)` are valid identifiers outside test files. The `^` anchor prevents mid-identifier matching but cannot distinguish intent. These are accepted as entropy noise at codebase scale.
+
+### `serialization::matches_callee(text, language)`
+
+| Language | Pattern | Examples matched | Deliberately NOT matched |
+|---|---|---|---|
+| TypeScript / JavaScript | `^JSON\.(parse\|stringify)\(` | `JSON.parse(s)`, `JSON.stringify(o)` | `schema.parse(x)`, `SomeSchema.parse(x)` (arbitrary receiver) |
+| TypeScript / JavaScript | `^structuredClone\(` | `structuredClone(data)` | — |
+| Python | `^(json\|pickle)\.(loads\|dumps\|load\|dump)\(` | `json.loads(s)`, `json.dumps(o)`, `pickle.dumps(o)`, `pickle.loads(b)` | `json.` in data_access (regex `^(open\(\|requests\.\|...)` does not include `json.`) |
+| Go | `^json\.(Marshal\|Unmarshal\|MarshalIndent\|NewEncoder\|NewDecoder)\(` | `json.Marshal(v)`, `json.Unmarshal(b, &v)`, `json.NewDecoder(r)` | `json.` is not in the Go data_access pattern |
+| All others | (none) | — | — |
+
+**Worked example (TypeScript):** `JSON.parse(s)` → `["serialization"]`
+
+**Worked example (Python):** `json.dumps(o)` → `["serialization"]`
+
+**Receiver-anchored rationale:** Bare `.parse(` collides with schema validators (`schema.parse`, `UserSchema.parse`), config parsers, and URL parsers. Anchoring on the `JSON`, `json`, or `pickle` receiver is the precision mechanism — only stdlib or well-known serialization modules match.
+
+**Disjointness note:** `json.` is not included in the Python `data_access` regex (`^(open\(|requests\.|httpx\.|cursor\.|session\.|conn\.)`), so `json.loads(s)` routes to `serialization`, not `data_access`. `json.` in Go is not in the `http_routing` receiver allowlist. No new KNOWN_OVERLAPS entries are required.
+
+**Seeds forward:** Protobuf/Avro/MessagePack codecs and ORM serialize hooks are adjacent idioms; deferred until requested.
 
 ### `schema_validation::matches_callee(text, language)`
 
@@ -272,7 +296,7 @@ is the contract — future milestones insert at their named slot, never append.
 |---|---|---|---|
 | P1 | `async_patterns` | M34 | `\.(then\|catch\|finally)\(` |
 | P2 | `testing` | **M42** | `^(describe\|it\|test\|expect)\(`, `^(jest\|vi)\.fn\(` |
-| P3 | `serialization` | M43 | `^JSON\.(parse\|stringify)\(`, `^json\.(Marshal\|Unmarshal)\(` |
+| P3 | `serialization` | **M43** | `^JSON\.(parse\|stringify)\(`, `^json\.(Marshal\|Unmarshal)\(` |
 | P4 | `schema_validation` | M38 | `^(z\|yup\|v\|s)\.\w`, `\.safeParse\(`, `\bBaseModel\b` |
 | P5 | `state_store` | M39 | redux/zustand/jotai factories; `^use(Selector\|Dispatch\|Store)\b` |
 | P6 | `framework_hooks` | M35 | `^use[A-Z]` |
@@ -282,7 +306,7 @@ is the contract — future milestones insert at their named slot, never append.
 | P10 | `collection_pipelines` | M40 | `\.(map\|filter\|reduce\|flatMap\|forEach\|find\|findIndex\|some\|every\|flat)\(` |
 | P11 | `concurrency` | M44 | `^Promise\.(all\|allSettled\|race\|any)\(`, `^asyncio\.gather\(` |
 
-P1, P2, P4, P5, P6, P7, P8, P9, and P10 are active at M42. The `decorators` and `null_safety` categories are
+P1, P2, P3, P4, P5, P6, P7, P8, P9, and P10 are active at M43. The `decorators` and `null_safety` categories are
 node-kind-only and do not appear in `CALL_DISPATCH` — they are classified via
 `category_for_node_kind` in the `other =>` arm of `classify_hint`. All other slots are
 reserved placeholders.
@@ -293,7 +317,7 @@ When a callee string legitimately matches two categories' regexes, the first-mat
 winner is correct by construction. The overlap must be documented in the
 `KNOWN_OVERLAPS` table in `crates/sdivi-patterns/tests/dispatch_disjointness.rs`.
 
-Documented overlaps at M41 (P1/P4/P5/P6/P7/P8/P9/P10 active):
+Documented overlaps at M43 (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 active):
 
 | Callee | Language | Winner | Loser | Rationale |
 |---|---|---|---|---|
@@ -347,6 +371,7 @@ An embedder that supplies `PatternInstanceInput` values must:
 11. **As of M39, the `state_store` category is natively classified for TypeScript and JavaScript** via callee-text inspection at CALL_DISPATCH slot P5. Redux/RTK factories (`createSlice`, `configureStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`), Zustand (`create(...)`), Jotai/Recoil (`atom`, `selector`), MobX (`observable`, `makeAutoObservable`, etc.), Signals (`signal`, `computed`, `effect`), and Solid (`createSignal`, `createStore`, etc.) are now counted in `state_store`. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore` previously resolved to `framework_hooks` (P6); they now resolve to `state_store` (P5). This is a count shift between two new-in-M35/M39 categories — counts move from `framework_hooks` to `state_store`. See `MIGRATION_NOTES.md` for the canonical precedence-reassignment example.
 12. **As of M40, the `collection_pipelines` category is natively classified** via member-call callee-text at CALL_DISPATCH slot P10 (broadest member-call category — all more-specific categories resolve first). `.map`, `.filter`, `.reduce`, `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any receiver are now counted in `collection_pipelines` for TypeScript and JavaScript (and Go/Java where these method names appear). Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`, `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy noise. Bare calls without a dot prefix (`map(f)`) are intentionally not matched. On the first post-M40 snapshot of a TS/JS repo using these methods, `collection_pipelines` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
 13. **As of M41, the `http_routing` category is natively classified** via receiver-allowlist-anchored callee-text at CALL_DISPATCH slot P7 (above `logging` P8 and `data_access` P9). Express/Koa/Fastify (`app.get`, `router.post`, `fastify.route`, `server.use`), Go net/http + Gin/Echo/Gorilla (`http.HandleFunc`, `r.GET`, `mux.Handle`), and Flask/FastAPI imperative registration (`app.add_url_rule`) are now counted in `http_routing`. **Precedence note:** `app.get(...)` / `router.post(...)` previously matched `data_access` (P9) via the `\b(get|post)\(` verb regex; they now resolve to `http_routing` (P7) — a count shift between an existing and a new category. `axios.get(url)` / `client.get(url)` stay in `data_access` because their receiver is outside the allowlist. NestJS and FastAPI decorator routes (`@Get('/')`, `@app.get(...)`) are `decorator`/`decorated_definition` nodes and remain in `decorators`. See `MIGRATION_NOTES.md` for the worked before/after.
+15. **As of M43, the `serialization` category is natively classified** via receiver-anchored callee-text inspection at CALL_DISPATCH slot P3 (above `schema_validation` P4). `JSON.parse`/`JSON.stringify`/`structuredClone` in TypeScript and JavaScript, `json.loads`/`json.dumps`/`pickle.dumps` etc. in Python, and `json.Marshal`/`json.Unmarshal`/`json.NewDecoder` etc. in Go are now counted in `serialization`. Bare `.parse(` on arbitrary receivers is intentionally not matched — it remains in `schema_validation` (e.g. `UserSchema.safeParse(x)`) or falls through to `data_access`. On the first post-M43 snapshot of a repo using these calls, `serialization` transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
 14. **As of M42, the `testing` category is natively classified** via callee-text inspection at CALL_DISPATCH slot P2 (above all other categories except `async_patterns` P1). BDD globals (`describe`, `it`, `test`, `context`), lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`), `expect(…)` roots, focused/excluded variants (`xit`, `xdescribe`, `fit`, `fdescribe`), and framework-namespaced helpers (`jest.fn`, `jest.mock`, `vi.fn`, `vi.mock`, etc.) in TypeScript and JavaScript; `testing.T` method calls (`t.Run`, `t.Fatal`, etc.) in Go; and `self.assert*` methods in Python are now counted in `testing`. **`scope_exclude` interaction:** the `testing` bucket is non-empty only when test files are in the pattern scope. Repos that exclude test paths via `patterns.scope_exclude` will see a zero count — this is by design, not a miss. See `MIGRATION_NOTES.md` for the count-introduction event.
 15. **The `class_hierarchy` category in `snapshot_version "1.0"` is wired natively but classified broadly** — every declaration of the listed node kinds is included regardless of heritage. Embedders that want heritage-only precision (e.g. only classes with an `extends` clause, only `impl Trait for …` blocks) should filter `PatternInstanceInput` on their side before passing to `compute_pattern_metrics`. Entropy-based divergence signals remain meaningful under the broader collection because hierarchy-free declarations contribute low structural variance — the signal is the variance introduced by hierarchical declarations, not the absolute count.
 

@@ -12,7 +12,7 @@
 
 use sdivi_patterns::queries::{
     async_patterns, classify_hint, collection_pipelines, data_access, framework_hooks,
-    http_routing, logging, schema_validation, state_store, testing,
+    http_routing, logging, schema_validation, serialization, state_store, testing,
 };
 use sdivi_patterns::PatternHintInput;
 
@@ -24,7 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M42, P1/P2/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
+/// At M43, P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {
@@ -32,6 +32,9 @@ fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     }
     if testing::matches_callee(text, language) {
         matched.push("testing");
+    }
+    if serialization::matches_callee(text, language) {
+        matched.push("serialization");
     }
     if schema_validation::matches_callee(text, language) {
         matched.push("schema_validation");
@@ -114,6 +117,10 @@ const CORPUS: &[(&str, &str, &str)] = &[
     // P1: async_patterns — Promise chains (TypeScript/JavaScript only)
     ("promise.then(resolve)", "typescript", "async_patterns"),
     ("describe('suite', fn)", "typescript", "testing"), // P2 testing
+    // P3: serialization — receiver-anchored (TS/JS, Python, Go)
+    ("JSON.parse(s)", "typescript", "serialization"),
+    ("json.dumps(o)", "python", "serialization"),
+    ("json.Marshal(v)", "go", "serialization"),
     (
         "fetch(url).catch(err => {})",
         "javascript",
@@ -136,8 +143,6 @@ const CORPUS: &[(&str, &str, &str)] = &[
     ("print(x)", "python", "logging"),
     ("fmt.Println(\"x\")", "go", "logging"),
     ("fmt.Printf(\"%v\", x)", "go", "logging"),
-    ("fmt.Errorf(\"msg\")", "go", "logging"),
-    ("fmt.Fprintf(w, \"x\")", "go", "logging"),
     ("System.out.println(\"x\")", "java", "logging"),
     ("logger.info(\"x\")", "java", "logging"),
     ("LOG.debug(\"x\")", "java", "logging"),
@@ -189,21 +194,15 @@ const CORPUS: &[(&str, &str, &str)] = &[
     // P10: collection_pipelines — member-call regex (TS/JS and Go/Java)
     ("xs.map(f)", "typescript", "collection_pipelines"),
     ("xs.filter(p)", "javascript", "collection_pipelines"),
-    ("xs.reduce(g, 0)", "typescript", "collection_pipelines"),
     ("data.flatMap(fn)", "typescript", "collection_pipelines"),
     ("items.forEach(cb)", "javascript", "collection_pipelines"),
     ("xs.find(p)", "typescript", "collection_pipelines"),
-    ("xs.findIndex(p)", "javascript", "collection_pipelines"),
-    ("xs.some(p)", "typescript", "collection_pipelines"),
-    ("xs.every(p)", "typescript", "collection_pipelines"),
-    ("xs.flat()", "javascript", "collection_pipelines"),
     // Negative: data_access methods must not match collection_pipelines
     ("client.read(buf)", "typescript", "data_access"),
     // Unrecognised — classify_hint must return empty Vec (represented as "")
     ("Math.max(a, b)", "typescript", ""),
     ("len(x)", "python", ""),
     ("os.Exit(1)", "go", ""),
-    ("MyClass.method()", "java", ""),
 ];
 
 // ── Registry resolution test ───────────────────────────────────────────────────
@@ -282,6 +281,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
         let loser_matches = match loser {
             "async_patterns" => async_patterns::matches_callee(text, lang),
             "testing" => testing::matches_callee(text, lang),
+            "serialization" => serialization::matches_callee(text, lang),
             "schema_validation" => schema_validation::matches_callee(text, lang),
             "state_store" => state_store::matches_callee(text, lang),
             "framework_hooks" => framework_hooks::matches_callee(text, lang),

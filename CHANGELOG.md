@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `serialization` pattern category (M43): (de)serialization boundary calls are now
+  natively classified as `serialization` via receiver-anchored callee-text at CALL_DISPATCH
+  slot P3 (below `testing` P2, above `schema_validation` P4). TypeScript/JavaScript:
+  `JSON.parse(…)`, `JSON.stringify(…)`, `structuredClone(…)`. Python: `json.loads(…)`,
+  `json.dumps(…)`, `json.load(…)`, `json.dump(…)`, `pickle.loads(…)`, `pickle.dumps(…)`.
+  Go: `json.Marshal(…)`, `json.Unmarshal(…)`, `json.MarshalIndent(…)`, `json.NewEncoder(…)`,
+  `json.NewDecoder(…)`. Bare `.parse(` is intentionally excluded (collides with schema
+  validators). `list_categories()` count grows from 16 → 17. `snapshot_version` stays
+  `"1.0"`. No existing category assignments change. See `MIGRATION_NOTES.md`.
+
 - `testing` pattern category (M42): test-suite structure and assertion calls are now
   natively classified as `testing` via callee-text inspection at CALL_DISPATCH slot P2
   (just below `async_patterns` P1). TypeScript/JavaScript: BDD globals (`describe`, `it`,

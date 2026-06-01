@@ -22,6 +22,7 @@ pub mod logging;
 pub mod null_safety;
 pub mod resource_management;
 pub mod schema_validation;
+pub mod serialization;
 pub mod state_management;
 pub mod state_store;
 pub mod testing;
@@ -45,9 +46,10 @@ use crate::hint_input::PatternHintInput;
 /// assert!(ALL_CATEGORIES.contains(&"logging"));
 /// assert!(ALL_CATEGORIES.contains(&"null_safety"));
 /// assert!(ALL_CATEGORIES.contains(&"schema_validation"));
+/// assert!(ALL_CATEGORIES.contains(&"serialization"));
 /// assert!(ALL_CATEGORIES.contains(&"state_store"));
 /// assert!(ALL_CATEGORIES.contains(&"testing"));
-/// assert_eq!(ALL_CATEGORIES.len(), 16);
+/// assert_eq!(ALL_CATEGORIES.len(), 17);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
@@ -62,6 +64,7 @@ pub const ALL_CATEGORIES: &[&str] = &[
     "null_safety",
     "resource_management",
     "schema_validation",
+    "serialization",
     "state_management",
     "state_store",
     "testing",
@@ -117,10 +120,11 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
-#[allow(clippy::type_complexity)] // P1 > P2=testing > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines; future milestones insert at their slot
+#[allow(clippy::type_complexity)] // P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines; future milestones insert at their slot
 const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("async_patterns", async_patterns::matches_callee),
     ("testing", testing::matches_callee),
+    ("serialization", serialization::matches_callee),
     ("schema_validation", schema_validation::matches_callee),
     ("state_store", state_store::matches_callee),
     ("framework_hooks", framework_hooks::matches_callee),
@@ -139,7 +143,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P4/P5/P6/P7/P8/P9/P10 active at M42).
+/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10 active at M43).
 ///
 /// ## `macro_invocation`
 ///

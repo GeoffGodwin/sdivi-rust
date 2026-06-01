@@ -50,7 +50,7 @@ fn list_categories_wasm_export_returns_eight_categories() {
     // with each milestone; update the assertion when new categories are added.
     let catalog = sdivi_core::list_categories();
     assert_eq!(catalog.schema_version, "1.0");
-    assert_eq!(catalog.categories.len(), 16); // M42: 16 categories
+    assert_eq!(catalog.categories.len(), 17); // M43: 17 categories
     let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
     assert!(
         names.contains(&"data_access"),
@@ -71,6 +71,10 @@ fn list_categories_wasm_export_returns_eight_categories() {
     assert!(
         names.contains(&"testing"),
         "expected category \"testing\" in list_categories()"
+    );
+    assert!(
+        names.contains(&"serialization"),
+        "expected category \"serialization\" in list_categories()"
     );
 }
 

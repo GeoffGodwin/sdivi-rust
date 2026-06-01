@@ -1,16 +1,15 @@
 ## Planned Tests
-- [x] `crates/sdivi-patterns/tests/http_routing_limitations.rs` — document Next.js App Router limitation and idiosyncratic-receiver limitation; cover remaining Go receivers at integration level
-- [x] `crates/sdivi-patterns/tests/testing_scope_exclude.rs` — fixture-level integration: testing bucket populates when test files are in-scope, is absent when excluded via scope_exclude
+- [x] `crates/sdivi-core/tests/category_contract_m43.rs` — add json.MarshalIndent and json.NewEncoder classify_hint tests (Gap 1)
+- [x] `crates/sdivi-patterns/tests/dispatch_disjointness_supplement.rs` — supplemental corpus for trimmed collection_pipelines/Go-logging entries (Gap 2)
 
 ## Test Run Results
-Passed: 31  Failed: 0
+Passed: 26  Failed: 0
 
-Full sdivi-patterns suite: 225 tests (142 unit + 83 integration/doc) all green.
-Pre-existing failure in wasm crate (`wasm_package_json_version_matches_workspace`) is out-of-scope; unchanged.
+Full workspace: 121 passed, 1 pre-existing failure (wasm_package_json_version_matches_workspace — package.json at 0.2.23 vs workspace 0.2.34; not introduced by M43, out of scope).
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-patterns/tests/http_routing_limitations.rs`
-- [x] `crates/sdivi-patterns/tests/testing_scope_exclude.rs`
+- [x] `crates/sdivi-core/tests/category_contract_m43.rs`
+- [x] `crates/sdivi-patterns/tests/dispatch_disjointness_supplement.rs`

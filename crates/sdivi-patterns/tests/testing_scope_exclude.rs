@@ -193,10 +193,7 @@ fn excluded_tests_dir_yields_empty_testing_bucket() {
         ],
     )];
 
-    let catalog = build_catalog(
-        &records,
-        &config_min1(vec!["src/__tests__/**".to_string()]),
-    );
+    let catalog = build_catalog(&records, &config_min1(vec!["src/__tests__/**".to_string()]));
 
     assert!(
         !catalog.entries.contains_key("testing"),
@@ -262,10 +259,7 @@ fn mixed_in_scope_and_excluded_test_files() {
     );
     let records = vec![excluded, in_scope];
 
-    let catalog = build_catalog(
-        &records,
-        &config_min1(vec!["src/vendor/**".to_string()]),
-    );
+    let catalog = build_catalog(&records, &config_min1(vec!["src/vendor/**".to_string()]));
 
     // testing bucket is present (in-scope file contributes).
     assert!(

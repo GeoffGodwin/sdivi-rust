@@ -8,6 +8,46 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M43 — `serialization` pattern category introduced
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,
+`pattern_metrics` field names, and `DivergenceSummary` structure are all unchanged.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `serialization` is now a native CALL_DISPATCH category (slot P3, below
+`testing` P2 and above `schema_validation` P4), classified via receiver-anchored callee-text:
+
+- **TypeScript / JavaScript:** `JSON.parse(…)`, `JSON.stringify(…)`, `structuredClone(…)`.
+- **Python:** `json.loads(…)`, `json.dumps(…)`, `json.load(…)`, `json.dump(…)`,
+  `pickle.loads(…)`, `pickle.dumps(…)`.
+- **Go:** `json.Marshal(…)`, `json.Unmarshal(…)`, `json.MarshalIndent(…)`,
+  `json.NewEncoder(…)`, `json.NewDecoder(…)`.
+
+`list_categories()` count grows from 16 → 17.
+
+**Disjointness.** The `json.` receiver is not in the Python `data_access` regex
+(`^(open\(|requests\.|httpx\.|cursor\.|session\.|conn\.)`), so `json.loads(s)` routes to
+`serialization`, not `data_access`. Bare `.parse(` is intentionally excluded — it stays in
+`schema_validation` (`UserSchema.safeParse(x)`) or falls through unmatched. No existing callee
+strings change category. No `KNOWN_OVERLAPS` entries added.
+
+**Count-introduction event.** On the first post-M43 snapshot of a repo whose source files
+include serialization calls, `serialization` transitions from zero to non-zero. Prior snapshots
+had no `serialization` bucket — trend continuity is broken for this dimension at the upgrade
+boundary. The trend line resumes cleanly from the second post-upgrade snapshot.
+
+**Escape hatch.** Set per-category threshold overrides with an `expires` date:
+
+```toml
+[thresholds.overrides.serialization]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Migrating from JSON.parse to typed Zod parsers; expect churn during migration"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M42 — `testing` pattern category introduced
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

@@ -123,6 +123,16 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         Added M38.",
     ),
     (
+        "serialization",
+        "Serialization boundary calls — `JSON.parse`, `JSON.stringify`, `structuredClone` \
+        (TypeScript/JavaScript); `json.loads`, `json.dumps`, `json.load`, `json.dump`, \
+        `pickle.loads`, `pickle.dumps` (Python); `json.Marshal`, `json.Unmarshal`, \
+        `json.MarshalIndent`, `json.NewEncoder`, `json.NewDecoder` (Go). \
+        Receiver-anchored: only `JSON.`, `json.`, or `pickle.` callee prefixes are matched; \
+        bare `.parse(` is intentionally excluded (collides with schema validators). \
+        Detected via callee-text at CALL_DISPATCH slot P3 (above `schema_validation` P4). Added M43.",
+    ),
+    (
         "state_management",
         "Code constructs that capture, transform, or share mutable or shared state — \
         e.g., closures that close over mutable bindings or shared references.",
@@ -186,9 +196,10 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// assert!(CATEGORIES.contains(&"logging"));
 /// assert!(CATEGORIES.contains(&"null_safety"));
 /// assert!(CATEGORIES.contains(&"schema_validation"));
+/// assert!(CATEGORIES.contains(&"serialization"));
 /// assert!(CATEGORIES.contains(&"state_store"));
 /// assert!(CATEGORIES.contains(&"testing"));
-/// assert_eq!(CATEGORIES.len(), 16);
+/// assert_eq!(CATEGORIES.len(), 17);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -207,6 +218,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[13].0,
     CATALOG_ENTRIES[14].0,
     CATALOG_ENTRIES[15].0,
+    CATALOG_ENTRIES[16].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -270,6 +282,7 @@ pub struct CategoryCatalog {
 /// assert!(names.contains(&"http_routing"));
 /// assert!(names.contains(&"null_safety"));
 /// assert!(names.contains(&"schema_validation"));
+/// assert!(names.contains(&"serialization"));
 /// assert!(names.contains(&"state_store"));
 /// assert!(names.contains(&"testing"));
 /// ```

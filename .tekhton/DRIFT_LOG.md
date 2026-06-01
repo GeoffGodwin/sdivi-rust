@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 18
+- Runs since audit: 19
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,9 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several categories added since M33 (serialization, testing, schema_validation, etc.) are also callee-only. Pre-existing drift, not introduced by M43.
+- [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:292` â `null_safety_node_kinds_do_not_match_non_ts_js_languages` test name is semantically inverted relative to what the body asserts. Pre-existing carry-over from M37.
+- [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` is built by manually indexing `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[16].0`; each new milestone must update both the entries array and the index list in sync. The drift-gate test in `category_contract.rs` catches mismatches at runtime, but a macro or `.iter().map(|e| e.0).collect()` derivation would make divergence structurally impossible.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs:292-300` â `null_safety_node_kinds_do_not_match_non_ts_js_languages` has an inverted name: the body asserts `Some("null_safety")` (the node kind *does* match for all languages), contradicting "do not match." Carry-over from M37; still unresolved at M42.
 - [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` / `mod.rs` â `category_for_node_kind` doc comment lists only `logging` as callee-only. Now seven categories (`logging`, `framework_hooks`, `schema_validation`, `state_store`, `collection_pipelines`, `http_routing`, `testing`) are callee-only. The stale note has accumulated across six consecutive milestones without a fix.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs:120` â `CALL_DISPATCH` comment lists `P1 > P2=testing > P4=â¦`, skipping P3 without explanation. A brief note that P3 is reserved for a future category would prevent confusion when a future contributor tries to insert at P2.5.

@@ -40,14 +40,15 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_sixteen_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 16);
+fn all_categories_has_seventeen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 17);
     assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));
     assert!(ALL_CATEGORIES.contains(&"http_routing"));
     assert!(ALL_CATEGORIES.contains(&"decorators"));
     assert!(ALL_CATEGORIES.contains(&"testing"));
     assert!(ALL_CATEGORIES.contains(&"schema_validation"));
+    assert!(ALL_CATEGORIES.contains(&"serialization"));
     assert!(ALL_CATEGORIES.contains(&"state_store"));
 }
 
@@ -143,7 +144,6 @@ fn decorator_is_decorators() {
         Some("decorators")
     );
 }
-
 // ── M41: http_routing ────────────────────────────────────────────────────────
 
 #[test]

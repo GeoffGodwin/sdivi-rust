@@ -151,11 +151,11 @@ fn list_categories_includes_testing() {
 }
 
 #[test]
-fn list_categories_count_is_sixteen() {
+fn list_categories_count_is_seventeen() {
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        16,
-        "list_categories must return exactly 16 categories after M42"
+        17,
+        "list_categories must return exactly 17 categories after M43"
     );
 }
