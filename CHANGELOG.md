@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `comprehensions` pattern category added (M46): Python `list_comprehension`,
+  `set_comprehension`, `dictionary_comprehension`, and `generator_expression` nodes
+  are now classified as `comprehensions`. All four node kinds were already collected
+  by the Python adapter but previously dropped. Pure node-kind classification — no
+  parsing change. `list_categories()` count increases from 18 to 19.
+  `snapshot_version` stays `"1.0"`. Python repos gain a non-zero `comprehensions`
+  bucket on the first post-upgrade snapshot. Other languages produce zero instances.
+  Nested comprehensions each emit their own node. See `MIGRATION_NOTES.md`.
+
 - `error_handling` pattern category enriched (M45.2): Python `except_clause` (each
   `except` arm) and Java `catch_clause` (each `catch` arm) plus `throw_statement` (each
   `throw` site) are now classified as `error_handling`. All three node kinds were already

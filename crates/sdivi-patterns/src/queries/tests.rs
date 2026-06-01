@@ -40,8 +40,9 @@ fn unknown_node_kind_returns_none() {
 }
 
 #[test]
-fn all_categories_has_eighteen_entries() {
-    assert_eq!(ALL_CATEGORIES.len(), 18);
+fn all_categories_has_nineteen_entries() {
+    assert_eq!(ALL_CATEGORIES.len(), 19);
+    assert!(ALL_CATEGORIES.contains(&"comprehensions"));
     assert!(ALL_CATEGORIES.contains(&"concurrency"));
     assert!(ALL_CATEGORIES.contains(&"collection_pipelines"));
     assert!(ALL_CATEGORIES.contains(&"framework_hooks"));

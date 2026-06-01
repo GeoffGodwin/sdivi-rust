@@ -13,6 +13,7 @@
 pub mod async_patterns;
 pub mod class_hierarchy;
 pub mod collection_pipelines;
+pub mod comprehensions;
 pub mod concurrency;
 pub mod data_access;
 pub mod decorators;
@@ -41,15 +42,17 @@ use crate::hint_input::PatternHintInput;
 /// ```rust
 /// use sdivi_patterns::queries::ALL_CATEGORIES;
 ///
+/// assert!(ALL_CATEGORIES.contains(&"comprehensions"));
 /// assert!(ALL_CATEGORIES.contains(&"concurrency"));
 /// assert!(ALL_CATEGORIES.contains(&"serialization"));
 /// assert!(ALL_CATEGORIES.contains(&"testing"));
-/// assert_eq!(ALL_CATEGORIES.len(), 18);
+/// assert_eq!(ALL_CATEGORIES.len(), 19);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "class_hierarchy",
     "collection_pipelines",
+    "comprehensions",
     "concurrency",
     "data_access",
     "decorators",
@@ -97,6 +100,8 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
         Some("async_patterns")
     } else if class_hierarchy::NODE_KINDS.contains(&node_kind) {
         Some("class_hierarchy")
+    } else if comprehensions::NODE_KINDS.contains(&node_kind) {
+        Some("comprehensions")
     } else if concurrency::NODE_KINDS.contains(&node_kind) {
         Some("concurrency")
     } else if data_access::NODE_KINDS.contains(&node_kind) {

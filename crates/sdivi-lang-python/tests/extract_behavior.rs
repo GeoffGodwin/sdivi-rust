@@ -396,3 +396,93 @@ fn try_finally_without_except_produces_no_except_clause_hints() {
         "try/finally with no except arms must produce zero except_clause hints; got: {except_count}"
     );
 }
+
+// ── M46: comprehension pattern hints ─────────────────────────────────────────
+
+/// M46: `list_comprehension` is emitted by the Python adapter from real Python source.
+///
+/// Confirms the tree-sitter-python grammar uses "list_comprehension" as the node kind
+/// and that the adapter's PATTERN_KINDS table includes it.
+#[test]
+fn list_comprehension_captured_as_pattern_hint() {
+    let record = parse("squares = [x * x for x in [1, 2, 3]]\n");
+    let has_list_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "list_comprehension");
+    assert!(
+        has_list_comp,
+        "list_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `set_comprehension` is emitted by the Python adapter from real Python source.
+#[test]
+fn set_comprehension_captured_as_pattern_hint() {
+    let record = parse("unique = {x for x in [1, 2, 3]}\n");
+    let has_set_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "set_comprehension");
+    assert!(
+        has_set_comp,
+        "set_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `dictionary_comprehension` is emitted by the Python adapter from real Python source.
+#[test]
+fn dictionary_comprehension_captured_as_pattern_hint() {
+    let record = parse("mapping = {k: v for k, v in [(\"a\", 1)]}\n");
+    let has_dict_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "dictionary_comprehension");
+    assert!(
+        has_dict_comp,
+        "dictionary_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `generator_expression` is emitted by the Python adapter from real Python source.
+///
+/// Verifies the node-kind string "generator_expression" matches the pinned
+/// tree-sitter-python grammar (Watch For item in the M46 milestone spec).
+#[test]
+fn generator_expression_captured_as_pattern_hint() {
+    // The argument to sum() is a generator_expression node in tree-sitter-python.
+    let record = parse("total = sum(x for x in [1, 2, 3])\n");
+    let has_gen_expr = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "generator_expression");
+    assert!(
+        has_gen_expr,
+        "generator_expression must appear in pattern_hints for `sum(x for x in xs)`; \
+         if absent the tree-sitter-python grammar may use a different node-kind spelling. \
+         Got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}

@@ -1,11 +1,8 @@
 ## Summary
-
-M45.2 adds four string literals (`"try_statement"`, `"except_clause"`, `"catch_clause"`, `"throw_statement"`) to the static `NODE_KINDS` constant in `error_handling.rs`, plus three new test files and documentation updates. No authentication, network, cryptography, user-input handling, or I/O is involved. All new code is either a `&[&str]` constant or deterministic test scaffolding using synthetic `FeatureRecord` structs with hard-coded literals. No security-relevant surface is touched.
+M46 adds the `comprehensions` pattern category — four static string constants in `comprehensions.rs`, a new `CATALOG_ENTRIES` row in `categories.rs`, and corresponding test/doc updates. All changes are additive, compile-time constants with no I/O, no user-supplied input, no authentication surface, no cryptographic operations, and no new dependencies. There is no exploitable attack surface introduced.
 
 ## Findings
-
 None
 
 ## Verdict
-
 CLEAN

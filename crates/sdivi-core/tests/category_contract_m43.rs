@@ -155,11 +155,12 @@ fn json_new_encoder_is_serialization_go() {
 }
 
 #[test]
-fn list_categories_count_is_eighteen() {
+fn list_categories_count_after_m43() {
+    // M43 added serialization; M46 added comprehensions — total is now 19.
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        18,
-        "list_categories must return exactly 18 categories after M44"
+        19,
+        "list_categories must return exactly 19 categories (18 at M43 + comprehensions at M46)"
     );
 }

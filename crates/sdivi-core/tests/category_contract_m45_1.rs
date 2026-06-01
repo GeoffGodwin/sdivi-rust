@@ -104,13 +104,13 @@ fn defer_statement_is_not_concurrency() {
 // ── Category count unchanged ──────────────────────────────────────────────────
 
 #[test]
-fn list_categories_count_still_eighteen() {
-    // M45.1 adds node kinds within an existing category — count stays 18.
+fn list_categories_count_after_m45_1() {
+    // M45.1 adds node kinds within an existing category; M46 adds comprehensions (+1).
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        18,
-        "list_categories must still return exactly 18 categories after M45.1 (additive node kinds only)"
+        19,
+        "list_categories must return exactly 19 categories (18 at M45.1 + comprehensions at M46)"
     );
 }
 

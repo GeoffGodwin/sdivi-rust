@@ -156,11 +156,12 @@ fn list_categories_includes_concurrency() {
 }
 
 #[test]
-fn list_categories_count_is_eighteen() {
+fn list_categories_count_after_m44() {
+    // M44 added concurrency; M46 added comprehensions — total is now 19.
     let catalog = sdivi_core::list_categories();
     assert_eq!(
         catalog.categories.len(),
-        18,
-        "list_categories must return exactly 18 categories after M44"
+        19,
+        "list_categories must return exactly 19 categories (18 at M44 + comprehensions at M46)"
     );
 }

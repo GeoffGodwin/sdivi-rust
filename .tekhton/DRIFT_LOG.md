@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 22
+- Runs since audit: 23
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md:22-24` â the canonical category list table has a pre-existing alphabetical ordering inconsistency: `concurrency` (conâ¦) appears before `collection_pipelines` (colâ¦) and `comprehensions` (comâ¦). The `markdown_table_matches_list_categories_output` test uses `HashSet` comparison so the disorder is invisible to CI. M46 correctly placed `comprehensions` between `collection_pipelines` and `data_access` in the doc's existing sequence, consistent but not fixing the underlying sort. Track for a dedicated doc-cleanup pass.
+- [2026-05-31 | "unknown"] `mod.rs:126` â the `#[allow(clippy::type_complexity)]` inline justification lists eleven priority slots as a long annotation on the `#[allow]` line itself. As `CALL_DISPATCH` grows this comment will drift. Moving the priority explanation to a separate `//` block above the const would be easier to maintain.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` embedder responsibilities list has a numbering regression across M42âM44: item numbers 14 and 15 each appear twice (M42's entry is numbered 14 but listed after M43's 15; a second 15 appears later for the `class_hierarchy` note). Pre-existing; not introduced by M45.2; worth fixing in a doc-cleanup pass.
 - [2026-05-31 | "unknown"] `bindings/sdivi-wasm/package.json` stranded at 0.2.23 vs workspace 0.2.37. Pre-existing; flagged in CODER_SUMMARY.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` Embedder responsibilities list has a numbering regression across M42âM44: items appear in order 15 (M43), 16 (M44), 14 (M42), then a second 15 (`class_hierarchy` note). Pre-existing; not introduced by M45.1; worth fixing in a doc-cleanup pass.

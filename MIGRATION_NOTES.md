@@ -8,6 +8,41 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M46 — New `comprehensions` pattern category (Python-only)
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. `list_categories()` count
+increases from 18 to 19.
+
+**Config:** unchanged. No new keys. The new category name `comprehensions` is now valid
+in `[thresholds.overrides.comprehensions]` blocks.
+
+**What changed.** Four Python node kinds already collected by the Python adapter but
+previously dropped are now routed to the new `comprehensions` category:
+
+- `list_comprehension` — `[x for x in xs]`
+- `set_comprehension` — `{x for x in xs}`
+- `dictionary_comprehension` — `{k: v for k, v in items}`
+- `generator_expression` — `(x for x in xs)`, `sum(x*x for x in xs)`
+
+No parsing-layer change. Python-only — other languages produce zero instances.
+
+**Count semantics.** One instance per comprehension node. Nested comprehensions each
+emit their own node: `[[x for x in row] for row in matrix]` counts the inner
+`list_comprehension` separately from the outer one (two instances total).
+
+**Count-introduction event.** On the first post-M46 snapshot of a Python repo,
+`comprehensions` gains a non-zero count (previously dropped). No existing category
+loses instances — additive only.
+
+**Escape hatch.** To suppress the new bucket during a migration window:
+
+```toml
+[thresholds.overrides.comprehensions]
+pattern_entropy_rate = 999.0
+expires = "2027-01-01"
+reason = "Comprehension category new in M46; accepting baseline divergence."
+```
+
 ## M45.2 — `error_handling` enriched: Python `except_clause`, Java `catch_clause`/`throw_statement`
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. No new categories — additive

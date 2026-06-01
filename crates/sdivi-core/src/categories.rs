@@ -41,6 +41,12 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
         regex applies to Go and Java where these method names appear. Added M40.",
     ),
     (
+        "comprehensions",
+        "Python comprehension and generator forms (`list_comprehension`, \
+        `set_comprehension`, `dictionary_comprehension`, `generator_expression`). \
+        Node-kind only; Python-only in v0; nested comprehensions each emit their own node. Added M46.",
+    ),
+    (
         "concurrency",
         "Concurrent-execution primitives distinct from single-future async patterns — \
         Go goroutine launches (`go_statement`) and channel multiplexing (`select_statement`), \
@@ -198,9 +204,8 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// ```rust
 /// use sdivi_core::CATEGORIES;
 ///
-/// assert!(CATEGORIES.contains(&"concurrency"));
-/// assert!(CATEGORIES.contains(&"serialization"));
-/// assert_eq!(CATEGORIES.len(), 18);
+/// assert!(CATEGORIES.contains(&"comprehensions"));
+/// assert_eq!(CATEGORIES.len(), 19);
 /// ```
 pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[0].0,
@@ -221,6 +226,7 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[15].0,
     CATALOG_ENTRIES[16].0,
     CATALOG_ENTRIES[17].0,
+    CATALOG_ENTRIES[18].0,
 ];
 
 /// Metadata for a single canonical pattern category.
@@ -262,10 +268,8 @@ pub struct CategoryCatalog {
 /// - Which category names appear as keys in per-category divergence maps.
 /// - Which category names are accepted by `[thresholds.overrides.<cat>]` in `config.toml`.
 ///
-/// Embedders that supply their own tree-sitter extractors MUST use these names
-/// verbatim — the comparison in `compute_pattern_metrics` is case-sensitive.
-///
-/// This function is referentially transparent: two calls return equal values.
+/// Embedders MUST use these names verbatim — the comparison in
+/// `compute_pattern_metrics` is case-sensitive. Referentially transparent.
 ///
 /// # Examples
 ///
@@ -278,12 +282,8 @@ pub struct CategoryCatalog {
 /// assert_eq!(a.schema_version, "1.0");
 ///
 /// let names: Vec<&str> = a.categories.iter().map(|c| c.name.as_str()).collect();
-/// assert!(names.contains(&"concurrency"));
-/// assert!(names.contains(&"collection_pipelines"));
+/// assert!(names.contains(&"comprehensions"));
 /// assert!(names.contains(&"error_handling"));
-/// assert!(names.contains(&"http_routing"));
-/// assert!(names.contains(&"serialization"));
-/// assert!(names.contains(&"testing"));
 /// ```
 pub fn list_categories() -> CategoryCatalog {
     CategoryCatalog {
