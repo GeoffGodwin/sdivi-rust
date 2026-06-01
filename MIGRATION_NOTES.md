@@ -8,6 +8,52 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M45.1 — `resource_management` enriched: Python/Go/Java node kinds
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. No new categories — additive
+node kinds within an existing category. `list_categories()` count stays 18.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** Three node kinds already collected by their language adapters but
+previously dropped are now routed to `resource_management`:
+
+- **Python (node kind):** `with_statement` — context manager blocks (`with open(p) as f:`,
+  `with lock:`). Already emitted by the Python adapter.
+- **Go (node kind):** `defer_statement` — deferred cleanup (`defer f.Close()`,
+  `defer mu.Unlock()`). Already emitted by the Go adapter.
+- **Java (node kind):** `try_with_resources_statement` — try-with-resources blocks
+  (`try (var r = open(p)) { ... }`). Already emitted by the Java adapter.
+
+No parsing-layer change. No new category.
+
+**Cross-language semantic note.** `with`/`defer`/`try-with-resources` are conceptually
+equivalent — all implement scoped acquire → use → release — but are structurally distinct
+AST shapes. They share the `resource_management` category intentionally so cross-language
+entropy comparisons are uniform. Callers who need per-language breakdowns can filter on
+the `node_kind` field in the pattern catalog.
+
+**`defer_statement` is not concurrency.** Go `defer_statement` routes to
+`resource_management`, not `concurrency`. The M44 boundary holds: `concurrency` covers
+goroutine launches (`go_statement`) and channel multiplexing (`select_statement`) only.
+
+**Count-introduction event.** On the first post-M45.1 snapshot of a Python, Go, or Java
+repo, `resource_management` gains non-zero counts from `with_statement`, `defer_statement`,
+or `try_with_resources_statement` respectively. Prior snapshots had no entries for these
+node kinds — trend continuity is broken for this dimension at the upgrade boundary. Rust
+repos are unaffected (Rust `macro_invocation` behaviour is unchanged).
+
+**Escape hatch.** Use a per-category threshold override with an `expires` date:
+
+```toml
+[thresholds.overrides.resource_management]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Baseline shift from M45.1 adding Python with_statement and Go defer counts"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M44 — `concurrency` pattern category introduced
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `PatternCatalog` JSON shape,

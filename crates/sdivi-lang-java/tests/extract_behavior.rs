@@ -120,6 +120,110 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
     }
 }
 
+// ── try_with_resources_statement pattern hints (M45.1) ───────────────────────
+
+/// M45.1: `try_with_resources_statement` is emitted by the Java adapter from
+/// real Java source — confirming the real tree-sitter parse path that the
+/// synthetic-FeatureRecord tests in `resource_management_fixture.rs` do not cover.
+#[test]
+fn try_with_resources_statement_captured_as_pattern_hint() {
+    let record = parse(concat!(
+        "import java.io.InputStream;\n",
+        "public class A {\n",
+        "    public void f() throws Exception {\n",
+        "        try (InputStream is = A.class.getResourceAsStream(\"f\")) {\n",
+        "        }\n",
+        "    }\n",
+        "}\n",
+    ));
+    let has_twr = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "try_with_resources_statement");
+    assert!(
+        has_twr,
+        "try_with_resources_statement must appear in pattern_hints when parsing real Java source; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M45.1: The captured hint's text is non-empty and starts with "try".
+#[test]
+fn try_with_resources_hint_text_starts_with_try() {
+    let record = parse(concat!(
+        "import java.io.InputStream;\n",
+        "public class A {\n",
+        "    public void f() throws Exception {\n",
+        "        try (InputStream is = A.class.getResourceAsStream(\"f\")) {\n",
+        "        }\n",
+        "    }\n",
+        "}\n",
+    ));
+    let twr = record
+        .pattern_hints
+        .iter()
+        .find(|h| h.node_kind == "try_with_resources_statement")
+        .expect("try_with_resources_statement hint must be present");
+    assert!(
+        twr.text.starts_with("try"),
+        "try_with_resources_statement text must start with 'try'; got: {:?}",
+        twr.text
+    );
+    assert!(twr.text.len() <= 256, "hint text must not exceed 256 bytes");
+}
+
+/// M45.1: `try_with_resources_statement` and plain `try_statement` are
+/// distinct node kinds — the adapter does not conflate them.
+#[test]
+fn try_with_resources_is_distinct_from_try_statement() {
+    let source_twr = concat!(
+        "public class A {\n",
+        "    public void f() throws Exception {\n",
+        "        try (var r = java.io.InputStream.class.getResourceAsStream(\"f\")) {\n",
+        "        }\n",
+        "    }\n",
+        "}\n",
+    );
+    let source_try = concat!(
+        "public class A {\n",
+        "    public void f() {\n",
+        "        try { } catch (Exception e) { }\n",
+        "    }\n",
+        "}\n",
+    );
+    let rec_twr = parse(source_twr);
+    let rec_try = parse(source_try);
+
+    // try-with-resources source must produce try_with_resources_statement, not try_statement
+    assert!(
+        rec_twr
+            .pattern_hints
+            .iter()
+            .any(|h| h.node_kind == "try_with_resources_statement"),
+        "source with try-with-resources must produce try_with_resources_statement hint"
+    );
+    // plain try source must produce try_statement, not try_with_resources_statement
+    assert!(
+        rec_try
+            .pattern_hints
+            .iter()
+            .any(|h| h.node_kind == "try_statement"),
+        "source with plain try must produce try_statement hint"
+    );
+    assert!(
+        !rec_try
+            .pattern_hints
+            .iter()
+            .any(|h| h.node_kind == "try_with_resources_statement"),
+        "plain try source must NOT produce try_with_resources_statement hint"
+    );
+}
+
 // ── class_hierarchy pattern hints (M31) ──────────────────────────────────────
 
 #[test]

@@ -1,111 +1,157 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 1 file, 10 test functions
-(`crates/sdivi-patterns/tests/dispatch_disjointness_supplement.rs`: 10 functions — 8 pre-existing, 2 new)
+Tests audited: 1 file (modified this run), 2 freshness-sample test files
+Test functions audited: 19 (extract_behavior.rs) + 5 (proptest_seeded.rs freshness)
 Verdict: PASS
+
+---
 
 ### Findings
 
-#### SCOPE: Shell-detected orphan claims are false positives
-- File: crates/sdivi-patterns/tests/dispatch_disjointness_supplement.rs (all lines)
-- Issue: The "Shell-Detected Orphans (pre-verified)" section claims this file (listed twice)
-  imports the deleted module `.tekhton/.commit_decision`. Manual inspection confirms the only
-  `use` declarations in the file are:
+#### SCOPE: Shell orphan detector produced false-positive warnings
+- File: `crates/sdivi-lang-java/tests/extract_behavior.rs` (all lines)
+- Issue: The "Shell-Detected Orphans (pre-verified)" section claims this file
+  "imports deleted module '.tekhton/.commit_decision'" (reported twice).
+  Manual inspection of the actual file confirms the only `use` declarations are:
   ```
-  use sdivi_patterns::queries::classify_hint;
-  use sdivi_patterns::PatternHintInput;
+  use sdivi_lang_java::JavaAdapter;
+  use sdivi_parsing::adapter::LanguageAdapter;
+  use sdivi_parsing::feature_record::FeatureRecord;
+  use std::path::Path;
   ```
-  `.tekhton/.commit_decision` is a pipeline state file, not a Rust module — it cannot appear
-  as a Rust `use` path. This is the same class of false positive identified in the M43 audit
-  (see prior TEST_AUDIT_REPORT.md). No orphaned tests exist in the file. All imports resolve
-  to current public API.
-- Severity: LOW
-- Action: Disregard the orphan warnings. No changes to the test file are needed. Investigate
-  the orphan-detection script's pattern-matching heuristic — this false positive has recurred
-  across consecutive milestone audits.
+  `.tekhton/.commit_decision` is a pipeline state file, not a Rust module path.
+  It cannot appear as a Rust `use` declaration. No orphaned import exists.
+  This is the same class of false positive identified in the M44 and M43 audits.
+  The double-report of the same entry for the same file suggests the detection
+  script is running its heuristic twice or pattern-matching across non-Rust
+  source in the audit context preamble rather than in the file itself.
+- Severity: MEDIUM
+- Action: Fix the orphan-detection script. No change needed in
+  `extract_behavior.rs`. This recurrence across three consecutive milestone
+  audits warrants a prioritized script fix.
+
+---
 
 ### No Issues Found In
 
-The following rubric points were checked and found clean:
+The following rubric points were checked and found clean for
+`crates/sdivi-lang-java/tests/extract_behavior.rs`.
 
-**Assertion Honesty — PASS**
-All 10 assertions derive expected values from real implementation logic, verified against the
-source regexes:
+**1. Assertion Honesty — PASS**
 
-- `reduce_is_collection_pipelines`, `some_is_collection_pipelines`, `every_is_collection_pipelines`,
-  `flat_is_collection_pipelines`, `find_index_is_collection_pipelines`: The
-  `collection_pipelines::matches_callee` member-call regex covers `.reduce(`, `.some(`,
-  `.every(`, `.flat(`, and `.findIndex(` — all five assertions are grounded in the
-  implementation. These five entries were confirmed trimmed from `dispatch_disjointness.rs`
-  at M43 and are correctly restored here.
+All three M45.1 assertions derive their expected values from real implementation
+behavior:
 
-- `fmt_print_is_logging_go`, `fmt_errorf_is_logging_go`: Go logging regex
-  `^fmt\.(Print|Println|Printf|Errorf|Fprint|Sprint)` in `logging::matches_callee` matches
-  both callee texts. CALL_DISPATCH P8 (logging) is reached before P9 (data_access). No
-  hard-coded magic values.
+- `try_with_resources_statement_captured_as_pattern_hint` checks that the
+  string `"try_with_resources_statement"` appears as a `node_kind` in
+  `pattern_hints` after a real `JavaAdapter.parse_file` call.  This string is
+  the exact tree-sitter Java grammar node kind and is the same value added to
+  `NODE_KINDS` in `resource_management.rs:24`.  Not invented.
+- `try_with_resources_hint_text_starts_with_try` asserts `hint.text.starts_with("try")`.
+  Grounded: Java try-with-resources syntax mandates `try` as the first lexeme,
+  so this assertion will fail if the adapter emits wrong text, and cannot be a
+  vacuous pass.
+- `try_with_resources_is_distinct_from_try_statement` independently parses two
+  distinct Java source strings and asserts each produces exactly its correct
+  node kind while not producing the other.  This is the strongest form — it
+  would catch both false-positive and false-negative classification bugs.
 
-- `promise_all_settled_is_concurrency_in_dispatch` (NEW, line 76): Calls `classify_hint`
-  with node kind `"call_expression"` and text `"Promise.allSettled([p1, p2])"` in JavaScript.
-  `concurrency::TS_JS_RE = r"^Promise\.(all|allSettled|race|any)\("` matches at the
-  `allSettled` branch. No prior representative of `allSettled` existed in the main
-  CORPUS — this test closes a genuine gap.
+No hard-coded magic numbers.  No tautological assertions (`x == x`, `true`).
 
-- `asyncio_create_task_is_concurrency_in_dispatch` (NEW, line 86): Calls `classify_hint`
-  with node kind `"call"` (Python AST node kind) and text `"asyncio.create_task(coro())"`.
-  `concurrency::PYTHON_RE = r"^asyncio\.(gather|create_task|wait|as_completed|run)\("` matches
-  at the `create_task` branch. The use of `"call"` (not `"call_expression"`) is deliberate
-  and correct — both arms share the same CALL_DISPATCH handling in `mod.rs:177`
-  (`"call_expression" | "call" =>`). This exercises the `call` arm specifically and is a
-  reasonable documentation of the Python node-kind variant.
+**2. Edge Case Coverage — PASS**
 
-- `unrecognised_callee_returns_empty` (line 95): `Math.sqrt(x)` in TypeScript is verified
-  against all 11 active CALL_DISPATCH entries (P1–P11). None match, so `classify_hint`
-  returns empty Vec. The assertion includes a descriptive failure message `{r:?}`. PASS.
+M45.1 additions cover:
+- Happy-path emission: `try_with_resources_statement_captured_as_pattern_hint`
+- Text-content property: `try_with_resources_hint_text_starts_with_try`
+  (also re-checks the 256-byte limit for this new node kind)
+- Boundary / anti-conflation: `try_with_resources_is_distinct_from_try_statement`
 
-**Edge Case Coverage — PASS**
-Suite covers: five collection_pipelines methods absent from the main corpus; two Go fmt
-logging variants absent from the main corpus; two new M44 concurrency callee variants
-(allSettled and create_task) absent from the main corpus; one genuinely unrecognized callee
-returning empty Vec. Positive and negative paths are both represented.
+Pre-existing tests provide additional coverage:
+- `pattern_hints_text_does_not_exceed_256_bytes` — length-limit invariant
+  with multi-byte (`"á"`) input, still present and unmodified
+- `package_private_class_is_not_exported` — negative path (no false positives)
 
-**Implementation Exercise — PASS**
-All 10 tests call `classify_hint` directly through the real implementation. No mocks, no
-stubs. The call chain exercises `CALL_DISPATCH` from `mod.rs`, which in turn calls
-`concurrency::matches_callee`, `collection_pipelines::matches_callee`, and
-`logging::matches_callee` respectively — all real regex evaluation paths.
+No test for empty-source or syntactically invalid Java, but those are orthogonal
+to M45.1 scope (adapter resilience, not classification correctness), and the
+file had no such coverage before this change.
 
-**Test Weakening Detection — PASS**
-The M43 audit established 8 pre-existing functions in this file. The current file has 10
-functions — the 2 additions are `promise_all_settled_is_concurrency_in_dispatch` and
-`asyncio_create_task_is_concurrency_in_dispatch`. No pre-existing test was removed. No
-assertion was broadened (e.g., no `assert!(r == "collection_pipelines")` → `assert!(!r.is_empty())`
-substitution). Assertions use `assert_eq!(r, vec!["concurrency"])` — exact match, not a
-weakened contains/prefix check.
+**3. Implementation Exercise — PASS**
 
-**Test Naming and Intent — PASS**
-All 10 function names encode both the scenario and the expected outcome:
-`reduce_is_collection_pipelines`, `fmt_errorf_is_logging_go`,
-`promise_all_settled_is_concurrency_in_dispatch`, `asyncio_create_task_is_concurrency_in_dispatch`,
-`unrecognised_callee_returns_empty`. No generic names (`test_1`, `test_thing`).
+Every M45.1 test calls `parse()`, which delegates directly to
+`JavaAdapter.parse_file(Path::new("Test.java"), source.to_string())`.  This is
+the real tree-sitter parse path; no internals are mocked.  The tester's
+commentary accurately notes that the companion `resource_management_fixture.rs`
+tests use *synthetic* `FeatureRecord` structs and therefore never exercise the
+Java grammar.  This file covers the adapter's actual AST traversal.
 
-**Scope Alignment — PASS**
-(False orphan claim notwithstanding — see finding above.)
-All imports resolve to current public API. `sdivi_patterns::queries::classify_hint` and
-`sdivi_patterns::PatternHintInput` exist and are unchanged by M44. The `concurrency` module
-referenced indirectly through the dispatch chain is newly introduced by M44 and is present.
+**4. Test Weakening Detection — PASS**
 
-**Test Isolation — PASS**
-The file defines its own `hint()` factory function (lines 14–19) that constructs
-`PatternHintInput` inline. No reads of `.tekhton/` reports, pipeline logs, `package.json`,
-`Cargo.lock`, or any mutable project state. Pass/fail outcome is fully determined by the
-function under test and the inline literal inputs.
+The tester added three new tests at lines 123–225.  No existing test was
+modified.  All 16 pre-existing test functions are intact and their assertions
+are unchanged.  No assertion was broadened (no `assert_eq` → `assert!`
+substitutions).
 
-### Pre-Existing Issues (out of M44 scope — no action required)
-- `wasm_package_json_version_matches_workspace`: `package.json` stranded at 0.2.23 vs
-  workspace 0.2.35. Pre-existing; not introduced by M44. Noted in prior audits.
-- `ALL_CATEGORIES` doc comment in `mod.rs` states only `logging` is callee-only via
-  `classify_hint`, but several categories (including `concurrency` Go path) use both paths.
-  Carry-over documentation drift; not introduced by M44.
-- `list_categories_wasm_export_returns_eight_categories` function name in `m23_native.rs`
-  is a historical artifact (body asserts 18); acknowledged by coder summary.
+**5. Test Naming and Intent — PASS**
+
+All three new test names encode both the scenario and the expected outcome:
+- `try_with_resources_statement_captured_as_pattern_hint`
+- `try_with_resources_hint_text_starts_with_try`
+- `try_with_resources_is_distinct_from_try_statement`
+
+These follow the same convention established by the file's pre-existing names
+(`plain_import_yields_qualified_name`, `package_private_class_is_not_exported`,
+etc.).
+
+**6. Scope Alignment — PASS** (false orphan claim notwithstanding — see finding above)
+
+All `use` declarations resolve to current public API.  The three new tests
+exercise `JavaAdapter` behavior introduced/confirmed by M45.1.  No test
+references a deleted function, renamed symbol, or removed feature.
+
+**7. Test Isolation — PASS**
+
+All 19 tests construct inputs via the inline `parse()` factory with literal
+source strings.  No test reads from `.tekhton/`, `target/`, build reports,
+pipeline logs, `Cargo.lock`, or any mutable project file.  Pass/fail outcome is
+fully independent of prior pipeline runs and repo state.
+
+---
+
+### Freshness Sample Assessment
+
+**`crates/sdivi-detection/tests/proptest_seeded.rs`** — FRESH
+
+Not modified this run.  No stale references; all imports resolve to current API
+(`sdivi_detection::leiden::run_leiden`, `sdivi_detection::partition::LeidenConfig`,
+`sdivi_graph::dependency_graph::build_dependency_graph`).  Coverage:
+determinism (100 identical runs at seed=42), seed variation, disconnected
+components, and the empty-graph boundary case.  The `proptest!` block for
+`prop_any_seed_deterministic` exercises the seeding invariant over the full
+u32 seed range.  No integrity concerns.
+
+**`crates/sdivi-detection/tests/proptest_seeded.proptest-regressions`** — FRESH
+
+Contains 2 saved regression seeds from prior proptest shrinking runs
+(seeds 0 and 2860851616).  Both are valid `cc`-format entries.  No stale
+content.
+
+**`.tekhton/test_dedup.fingerprint`** — NOT A TEST FILE
+
+Contains a single SHA-1 hash.  This is a pipeline dedup artifact; no test
+assertions to audit.
+
+---
+
+### Summary Table
+
+| File | Functions | Verdict | Notes |
+|---|---|---|---|
+| `crates/sdivi-lang-java/tests/extract_behavior.rs` | 19 | PASS | 3 M45.1 additions; pre-existing 16 unchanged |
+| `crates/sdivi-detection/tests/proptest_seeded.rs` | 5 | PASS (freshness) | Unchanged; no stale references |
+| `proptest_seeded.proptest-regressions` | — | PASS (freshness) | 2 saved seeds; valid |
+
+**Overall: PASS** — No HIGH findings.  One MEDIUM finding (recurring false-positive
+in the orphan detection script — no action required on any test file).  The M45.1
+additions to `extract_behavior.rs` are honest, well-exercised, well-named, and
+fully isolated.

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `resource_management` pattern category enriched (M45.1): Python `with_statement`
+  (context managers — `with open(p) as f:`), Go `defer_statement` (deferred cleanup —
+  `defer f.Close()`), and Java `try_with_resources_statement` are now classified as
+  `resource_management`. All three node kinds were already collected by their respective
+  adapters but previously dropped. Pure node-kind classification — no parsing change, no
+  new category. `list_categories()` count stays 18. `snapshot_version` stays `"1.0"`.
+  Python, Go, and Java repos gain non-zero `resource_management` buckets on the first
+  post-upgrade snapshot. Rust `macro_invocation` behaviour is unchanged. See
+  `MIGRATION_NOTES.md`.
+
 - `concurrency` pattern category (M44): goroutine launches (`go_statement`) and channel
   multiplexing (`select_statement`) in Go — already collected by the Go adapter but
   previously dropped — are now routed to `concurrency`. Multi-future coordination calls are

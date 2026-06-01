@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 20
+- Runs since audit: 21
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md` Embedder responsibilities list has a numbering regression across M42âM44: items appear in order 15 (M43), 16 (M44), 14 (M42), then a second 15 (`class_hierarchy` note). Pre-existing; not introduced by M45.1; worth fixing in a doc-cleanup pass.
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md` concurrency canonical-list description contains a forward reference to M45.1 (`defer_statement is not concurrency â it belongs to resource_management (M45.1)`) that was presumably added during M44. Now that M45.1 is complete the cross-reference is correct; no action needed.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several categories added since M33 are also callee-only. Pre-existing drift, not introduced by M44.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/tests.rs` â file is exactly at 300 lines after trimming a `state_store` assertion. Any future milestone adding to this file will require a trim or split; the pressure point is predictable.
 - [2026-05-31 | "unknown"] `crates/sdivi-core/src/categories.rs` â `CATEGORIES` is built by manually indexing `CATALOG_ENTRIES[0].0` through `CATALOG_ENTRIES[17].0`; each new milestone must keep the entries array and the index list in sync. The runtime drift-gate test in `category_contract.rs` catches divergence, but a `.iter().map(|e| e.0).collect()` derivation would make it structurally impossible.

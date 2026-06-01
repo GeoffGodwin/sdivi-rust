@@ -1,6 +1,12 @@
 ## Summary
 
-M44 adds the `concurrency` pattern category — two anchored `LazyLock<Regex>` statics, a `&[&str]` node-kind constant, a pure `matches_callee(&str, &str) -> bool` dispatcher, and a catalog description string. The change introduces no I/O, no network access, no authentication surface, no cryptographic operations, and no direct user-controlled data reaching any execution boundary. Input to `matches_callee` originates from tree-sitter AST extraction performed upstream by `sdivi-parsing`, not from raw user input. The Rust `regex` crate provides a linear-time NFA/DFA engine that structurally prevents ReDoS regardless of input content. Both regex patterns are front-anchored (`^`) with flat alternation over known literals; no nested quantifiers or backreferences are present. Remaining changed files are test assertions, count updates, and documentation — no executable logic of security consequence.
+M45.1 extends the `resource_management` pattern category by adding three static string
+literals (`"with_statement"`, `"defer_statement"`, `"try_with_resources_statement"`) to
+the `NODE_KINDS` constant in `resource_management.rs`, plus two new test files and
+documentation updates. No authentication, network, cryptography, user-input handling, or
+I/O is involved. The change is purely additive compile-time data; all inputs in tests are
+hard-coded literals. The existing `RUST_LOGGING_RE` regex remains unchanged and is
+compiled from a static pattern via `LazyLock` with no user-controlled input path.
 
 ## Findings
 
