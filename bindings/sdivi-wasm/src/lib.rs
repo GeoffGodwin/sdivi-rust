@@ -4,10 +4,22 @@
 //! `wasm-bindgen` + `tsify`-derived TypeScript types.
 //!
 //! ## Usage
+//!
+//! The module initialises itself on import (the `init_wasm` start function runs
+//! automatically), so there is no init call to await:
+//!
 //! ```ts
-//! import init, { detect_boundaries, normalize_and_hash } from '@geoffgodwin/sdivi-wasm';
-//! await init();
+//! // Bundler target (webpack/vite/rollup) — named imports, no init:
+//! import { detect_boundaries, normalize_and_hash } from '@geoffgodwin/sdivi-wasm';
 //! const hash = normalize_and_hash('try_expression', []);
+//! ```
+//!
+//! On Node.js the `node` export condition resolves to the CJS target, which
+//! loads the `.wasm` synchronously at require time — also no init:
+//!
+//! ```ts
+//! import sdivi from '@geoffgodwin/sdivi-wasm';
+//! const { normalize_and_hash } = sdivi;
 //! ```
 
 pub mod assemble_types;

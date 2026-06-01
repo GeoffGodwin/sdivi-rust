@@ -421,9 +421,9 @@ for cat in &catalog.categories {
 From WASM / TypeScript:
 
 ```ts
-import init, { list_categories } from '@geoffgodwin/sdivi-wasm';
+// No init() — the module initialises itself on import.
+import { list_categories } from '@geoffgodwin/sdivi-wasm';
 
-await init();
 const catalog = list_categories();
 console.log(catalog.schema_version); // "1.0"
 for (const cat of catalog.categories) {

@@ -1,28 +1,32 @@
 /**
- * binding_node.ts — consumer-app-shaped usage of @geoffgodwin/sdivi-wasm.
+ * binding_node.ts — Node.js consumer of @geoffgodwin/sdivi-wasm.
  *
- * Demonstrates the init-then-call pattern.  In real use the caller supplies
- * extracted graph/pattern data; here we use a small inline fixture.
+ * On Node, the package's `node` export condition resolves to the wasm-pack
+ * nodejs (CJS) target, which loads the `.wasm` synchronously via fs at require
+ * time. There is NO init() to call — default-import the module namespace and
+ * destructure the functions you need. (This is the same shape the package's
+ * CI smoke test in tests/node_smoke/ exercises.)
  *
- * Run (after `./build.sh` in bindings/sdivi-wasm — builds both bundler and nodejs targets):
+ * For a webpack/vite/rollup (browser) consumer, see binding_bundler.ts.
+ *
+ * Run (after `./build.sh` in bindings/sdivi-wasm — builds both targets):
  *   npx tsx examples/binding_node.ts
  */
-import init, {
+import sdivi from '@geoffgodwin/sdivi-wasm';
+
+const {
   detect_boundaries,
   compute_coupling_topology,
   compute_pattern_metrics,
   compute_delta,
   assemble_snapshot,
   normalize_and_hash,
-} from '@geoffgodwin/sdivi-wasm';
+} = sdivi;
 
 // Types are available from the generated .d.ts — no manual interface needed.
 
-async function main() {
-  // 1. Initialise the WASM module (required once before any compute calls).
-  await init();
-
-  // 2. Build a small dependency graph.
+function main() {
+  // 1. Build a small dependency graph (plain arrays of objects — not Maps).
   const graph = {
     nodes: [
       { id: 'src/lib.rs',    path: 'src/lib.rs',    language: 'rust' },
@@ -36,18 +40,19 @@ async function main() {
     ],
   };
 
-  // 3. Compute coupling metrics.
+  // 2. Compute coupling metrics.
   const coupling = compute_coupling_topology(graph);
   console.log('graph density:', coupling.density.toFixed(4));
   console.log('top hubs:', coupling.top_hubs);
 
-  // 4. Detect communities / boundaries.
+  // 3. Detect communities / boundaries.
   const cfg = { seed: 42, gamma: 1.0, iterations: 100, quality: 'Modularity' as const };
   const boundaries = detect_boundaries(graph, cfg, []);
   console.log('communities detected:', boundaries.community_count);
-  console.log('cluster assignments:', boundaries.cluster_assignments);
+  // cluster_assignments is a JS Map (node_id -> community_id), not a plain object.
+  console.log('cluster assignments:', [...boundaries.cluster_assignments.entries()]);
 
-  // 5. Compute pattern metrics from extracted instances.
+  // 4. Compute pattern metrics from extracted instances.
   const patterns = [
     { fingerprint: 'a'.repeat(64), category: 'error_handling', node_id: 'src/lib.rs' },
     { fingerprint: 'b'.repeat(64), category: 'error_handling', node_id: 'src/models.rs' },
@@ -57,11 +62,13 @@ async function main() {
   console.log('total_entropy:', pm.total_entropy.toFixed(4));
   console.log('convention_drift:', pm.convention_drift.toFixed(4));
 
-  // 6. normalize_and_hash — produces the same blake3 digest as the native Rust pipeline.
+  // 5. normalize_and_hash — produces the same blake3 digest as the native Rust pipeline.
   const hash = normalize_and_hash('try_expression', []);
   console.log('normalize_and_hash("try_expression", []):', hash);
 
-  // 7. Assemble a Snapshot from the compute outputs.
+  // 6. Assemble a Snapshot from the compute outputs. The Map-typed fields
+  //    (cluster_assignments, internal_edge_density) are passed straight through
+  //    from detect_boundaries — they are already JS Maps.
   const nodeIds = graph.nodes.map((n) => n.id);
   const snapshot1 = assemble_snapshot({
     node_ids: nodeIds,
@@ -83,9 +90,9 @@ async function main() {
   });
   console.log('snapshot_version:', snapshot1.snapshot_version);
 
-  // 8. Compute delta between two snapshots (same snapshot → zero deltas).
+  // 7. Compute delta between two snapshots (same snapshot → zero deltas).
   const delta = compute_delta(snapshot1, snapshot1);
   console.log('coupling_delta (same→same):', delta.coupling_delta); // 0
 }
 
-main().catch(console.error);
+main();

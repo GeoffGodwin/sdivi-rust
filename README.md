@@ -288,15 +288,16 @@ the supplied date).
 
 ### WASM, JS, and TS (`@geoffgodwin/sdivi-wasm`)
 
+The module initialises itself on import (no `init()` to await — the `.wasm` is
+instantiated by your bundler, or loaded synchronously on Node). Just import and call:
+
 ```ts
-import init, {
+import {
   compute_coupling_topology,
   compute_pattern_metrics,
   compute_thresholds_check,
   normalize_and_hash,
 } from "@geoffgodwin/sdivi-wasm";
-
-await init();
 
 const fp       = normalize_and_hash("function_item", []);
 const coupling = compute_coupling_topology({ nodes, edges });
@@ -350,8 +351,9 @@ cargo run --example custom_config     # programmatic Config building
 ```
 
 Sources live at [`crates/sdivi-cli/examples/`](crates/sdivi-cli/examples/).
-A TypeScript embedding example lives at
-[`examples/binding_node.ts`](examples/binding_node.ts).
+TypeScript embedding examples live at
+[`examples/binding_node.ts`](examples/binding_node.ts) (Node.js) and
+[`examples/binding_bundler.ts`](examples/binding_bundler.ts) (webpack/vite/rollup).
 
 ---
 
