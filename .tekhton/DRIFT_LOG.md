@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 21
+- Runs since audit: 22
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,8 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [2026-05-31 | "unknown"] `docs/pattern-categories.md` embedder responsibilities list has a numbering regression across M42âM44: item numbers 14 and 15 each appear twice (M42's entry is numbered 14 but listed after M43's 15; a second 15 appears later for the `class_hierarchy` note). Pre-existing; not introduced by M45.2; worth fixing in a doc-cleanup pass.
+- [2026-05-31 | "unknown"] `bindings/sdivi-wasm/package.json` stranded at 0.2.23 vs workspace 0.2.37. Pre-existing; flagged in CODER_SUMMARY.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` Embedder responsibilities list has a numbering regression across M42âM44: items appear in order 15 (M43), 16 (M44), 14 (M42), then a second 15 (`class_hierarchy` note). Pre-existing; not introduced by M45.1; worth fixing in a doc-cleanup pass.
 - [2026-05-31 | "unknown"] `docs/pattern-categories.md` concurrency canonical-list description contains a forward reference to M45.1 (`defer_statement is not concurrency â it belongs to resource_management (M45.1)`) that was presumably added during M44. Now that M45.1 is complete the cross-reference is correct; no action needed.
 - [2026-05-31 | "unknown"] `crates/sdivi-patterns/src/queries/mod.rs` â `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several categories added since M33 are also callee-only. Pre-existing drift, not introduced by M44.

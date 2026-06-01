@@ -8,13 +8,13 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- No Cargo.toml changes accompany the two new test files (`crates/sdivi-core/tests/category_contract_m45_1.rs`, `crates/sdivi-patterns/tests/resource_management_fixture.rs`). Both rely on Cargo's standard auto-discovery of `tests/*.rs` files. This is the established pattern in this workspace and should be fine, but confirm with a full `cargo test --workspace` before merge.
-- Pre-existing: `ALL_CATEGORIES` doc note in `crates/sdivi-patterns/src/queries/mod.rs:36-37` claims only `logging` is callee-only via `classify_hint`; several other categories are also callee-only. Carry-over from M44 (noted by coder).
-- Pre-existing: `bindings/sdivi-wasm/package.json` version stranded at 0.2.23 vs workspace 0.2.36. Not introduced by M45.1 (noted by coder).
+- `mod.rs:36-37` — `ALL_CATEGORIES` doc note says only `logging` is callee-only via `classify_hint`; several post-M33 categories (testing, serialization, schema_validation, etc.) are also callee-only. Pre-existing; not introduced here. Worth a targeted doc fix in a cleanup pass.
+- `tests_m45_2.rs` and `category_contract_m45_2.rs` both assert `except_clause_is_error_handling`, `catch_clause_is_error_handling`, and `throw_statement_is_error_handling`. Mild cross-tier redundancy; acceptable practice, but the per-crate unit tests add no additional coverage beyond what the cross-crate contract tests already provide.
+- `try_statement` was silently absent from `error_handling::NODE_KINDS` before this milestone despite being documented as an existing kind in both the milestone spec and `docs/pattern-categories.md`. The coder's fix is correct and within scope given the milestone's explicit assumption. Clearly called out in CODER_SUMMARY.
 
 ## Coverage Gaps
-- Java `try_with_resources_statement` is covered via synthetic `FeatureRecord` in `resource_management_fixture.rs` but has no real tree-sitter parse path (no `.java` fixture file fed through the actual Java adapter). Acceptable under the testing strategy — only the classifier mapping is new code, and the adapter already emits this node kind — but real parse coverage for the Java path is absent.
+- `error_handling_fixture.rs` constructs `PatternHint` structs synthetically; no test feeds real Python or Java source through the actual language adapter to confirm `except_clause`/`catch_clause`/`throw_statement` are emitted by the adapters' `extract.rs`. The milestone's "Verify only" note was a manual check, so this is expected — but adapter-level regression could go undetected by these tests.
 
 ## Drift Observations
-- `docs/pattern-categories.md` Embedder responsibilities list has a numbering regression across M42–M44: items appear in order 15 (M43), 16 (M44), 14 (M42), then a second 15 (`class_hierarchy` note). Pre-existing; not introduced by M45.1; worth fixing in a doc-cleanup pass.
-- `docs/pattern-categories.md` concurrency canonical-list description contains a forward reference to M45.1 (`defer_statement is not concurrency — it belongs to resource_management (M45.1)`) that was presumably added during M44. Now that M45.1 is complete the cross-reference is correct; no action needed.
+- `docs/pattern-categories.md` embedder responsibilities list has a numbering regression across M42–M44: item numbers 14 and 15 each appear twice (M42's entry is numbered 14 but listed after M43's 15; a second 15 appears later for the `class_hierarchy` note). Pre-existing; not introduced by M45.2; worth fixing in a doc-cleanup pass.
+- `bindings/sdivi-wasm/package.json` stranded at 0.2.23 vs workspace 0.2.37. Pre-existing; flagged in CODER_SUMMARY.

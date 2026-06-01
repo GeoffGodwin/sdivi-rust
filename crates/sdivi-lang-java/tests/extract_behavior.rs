@@ -224,6 +224,174 @@ fn try_with_resources_is_distinct_from_try_statement() {
     );
 }
 
+// ── M45.2: catch_clause and throw_statement pattern hints ────────────────────
+
+/// M45.2: `catch_clause` is emitted by the Java adapter from real Java source —
+/// confirming the real tree-sitter parse path that the synthetic-FeatureRecord tests
+/// in `error_handling_fixture.rs` do not cover.
+#[test]
+fn catch_clause_captured_as_pattern_hint() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public void f() {\n",
+        "        try { } catch (IOException e) { }\n",
+        "    }\n",
+        "}\n",
+    ));
+    let has_catch = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "catch_clause");
+    assert!(
+        has_catch,
+        "catch_clause must appear in pattern_hints when parsing real Java source; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M45.2: Each `catch` arm in a multi-catch try/catch produces a separate
+/// `catch_clause` hint — one hint per arm, not one per try block.
+#[test]
+fn multi_catch_emits_one_hint_per_arm() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public void f() {\n",
+        "        try {\n",
+        "        } catch (IOException e) {\n",
+        "        } catch (SQLException e) {\n",
+        "        } catch (RuntimeException e) {\n",
+        "        }\n",
+        "    }\n",
+        "}\n",
+    ));
+    let catch_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "catch_clause")
+        .count();
+    assert_eq!(
+        catch_count, 3,
+        "three catch arms must produce exactly 3 catch_clause hints; got: {catch_count}"
+    );
+}
+
+/// M45.2: `throw_statement` is emitted by the Java adapter from real Java source.
+#[test]
+fn throw_statement_captured_as_pattern_hint() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public void f() {\n",
+        "        throw new RuntimeException(\"oops\");\n",
+        "    }\n",
+        "}\n",
+    ));
+    let has_throw = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "throw_statement");
+    assert!(
+        has_throw,
+        "throw_statement must appear in pattern_hints when parsing real Java source; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M45.2: A try block with two catch arms and a throw emits 1 try_statement +
+/// 2 catch_clause + 1 throw_statement (double-count semantic verified end-to-end
+/// from the real Java adapter rather than synthetic hints).
+#[test]
+fn try_with_catches_and_throw_emits_all_hint_kinds() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public void f() {\n",
+        "        try {\n",
+        "            risky();\n",
+        "        } catch (IOException e) {\n",
+        "            throw new RuntimeException(e);\n",
+        "        } catch (SQLException e) {\n",
+        "            throw new IllegalStateException(e);\n",
+        "        }\n",
+        "    }\n",
+        "    private void risky() throws IOException, SQLException {}\n",
+        "}\n",
+    ));
+    let try_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "try_statement")
+        .count();
+    let catch_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "catch_clause")
+        .count();
+    let throw_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "throw_statement")
+        .count();
+    assert_eq!(
+        try_count, 1,
+        "one try block must produce exactly 1 try_statement hint; got: {try_count}"
+    );
+    assert_eq!(
+        catch_count, 2,
+        "two catch arms must produce exactly 2 catch_clause hints; got: {catch_count}"
+    );
+    assert_eq!(
+        throw_count, 2,
+        "two throw statements must produce exactly 2 throw_statement hints; got: {throw_count}"
+    );
+}
+
+/// M45.2: A method body with no try/catch produces no `catch_clause` hints.
+#[test]
+fn method_with_no_catch_produces_no_catch_clause_hints() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public int add(int a, int b) { return a + b; }\n",
+        "}\n",
+    ));
+    let catch_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "catch_clause")
+        .count();
+    assert_eq!(
+        catch_count, 0,
+        "method with no catch must produce zero catch_clause hints; got: {catch_count}"
+    );
+}
+
+/// M45.2: A method body with no throw produces no `throw_statement` hints.
+#[test]
+fn method_with_no_throw_produces_no_throw_statement_hints() {
+    let record = parse(concat!(
+        "public class A {\n",
+        "    public int add(int a, int b) { return a + b; }\n",
+        "}\n",
+    ));
+    let throw_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "throw_statement")
+        .count();
+    assert_eq!(
+        throw_count, 0,
+        "method with no throw must produce zero throw_statement hints; got: {throw_count}"
+    );
+}
+
 // ── class_hierarchy pattern hints (M31) ──────────────────────────────────────
 
 #[test]

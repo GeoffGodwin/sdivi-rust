@@ -3,67 +3,82 @@
 
 ## What Was Implemented
 
-### M45.1: Enrich `resource_management` with Python/Go/Java node kinds
+### M45.2: Enrich `error_handling` with Python/Java clause and throw-site node kinds
 
-**`crates/sdivi-patterns/src/queries/resource_management.rs`** — 69 lines
-- Extended `NODE_KINDS` to include `with_statement` (Python), `defer_statement` (Go),
-  and `try_with_resources_statement` (Java) alongside the existing `macro_invocation`.
-- Updated doc comment on `NODE_KINDS` to describe all four forms and their semantic
-  equivalence (scoped acquire → use → release).
-- `excludes_callee` unchanged — the Rust logging-split logic is orthogonal to the new
-  node kinds and is byte-identical to before.
+**`crates/sdivi-patterns/src/queries/error_handling.rs`** — 21 lines
+- Extended `NODE_KINDS` from 2 to 6 entries: added `try_statement` (pre-existing per
+  docs/adapters but previously missing from NODE_KINDS — doc/code drift resolved as part
+  of this milestone's "existing" assumption), `except_clause` (Python), `catch_clause`
+  and `throw_statement` (Java).
+- Updated doc comment to document all six forms.
 
-**`crates/sdivi-core/tests/category_contract_m45_1.rs`** (NEW — 125 lines)
-- M45.1 acceptance-criterion tests:
-  - `with_statement_is_resource_management` — `category_for_node_kind("with_statement", "python") == Some("resource_management")`.
-  - `defer_statement_is_resource_management` — `category_for_node_kind("defer_statement", "go") == Some("resource_management")`.
-  - `try_with_resources_statement_is_resource_management` — `category_for_node_kind("try_with_resources_statement", "java") == Some("resource_management")`.
-  - `classify_hint_*` tests verifying all three node kinds fall through to `category_for_node_kind` via the `other` arm.
-  - `defer_statement_is_not_concurrency` — boundary check confirming M44 classification still holds after M45.1.
-  - `macro_invocation_*` tests confirming Rust behaviour is unchanged.
-  - `list_categories_count_still_eighteen` — additive-only, count stays 18.
+**`crates/sdivi-patterns/src/queries/tests_m45_2.rs`** (NEW) — 41 lines
+- Four unit tests: `try_statement_is_error_handling`, `except_clause_is_error_handling`,
+  `catch_clause_is_error_handling`, `throw_statement_is_error_handling`.
+- Declared via `#[cfg(test)] mod tests_m45_2;` in `queries/mod.rs` — split from `tests.rs`
+  to keep that file at exactly 300 lines.
 
-**`crates/sdivi-patterns/tests/resource_management_fixture.rs`** (NEW — 183 lines)
+**`crates/sdivi-patterns/src/queries/mod.rs`** — `#[cfg(test)] mod tests_m45_2;` added.
+
+**`crates/sdivi-core/tests/category_contract_m45_2.rs`** (NEW) — 110 lines
+- M45.2 acceptance-criterion tests: all three new node kinds classify to error_handling,
+  classify_hint routing verified, existing Rust kinds unchanged, list_categories count = 18.
+
+**`crates/sdivi-patterns/tests/error_handling_fixture.rs`** (NEW) — 179 lines
 - Integration tests via `build_catalog`:
-  - `python_with_statement_routes_to_resource_management` — Python fixture with context manager.
-  - `go_defer_statement_routes_to_resource_management` — Go fixture with defer.
-  - `java_try_with_resources_routes_to_resource_management` — Java fixture with try-with-resources.
-  - `mixed_language_resource_management_counts` — 2 Python + 3 Go + 1 Java = 6 instances.
-  - `defer_statement_does_not_appear_in_concurrency_after_m45_1` — boundary check.
+  - `python_except_clause_routes_to_error_handling`
+  - `python_multi_arm_except_counts_each_clause` — 1 try_statement + 3 except_clause = 4
+    (double-count semantic verified)
+  - `java_catch_clause_routes_to_error_handling`
+  - `java_throw_statement_routes_to_error_handling`
+  - `java_mixed_error_handling_counts` — 2 catch + 1 throw = 3
 
 **`docs/pattern-categories.md`**
-- Canonical list: updated `resource_management` description to cover Python/Go/Java with examples.
-- Python table: replaced "(none in v0)" with `with_statement` row (Added M45.1).
-- Go/Java table: added `resource_management` row for `defer_statement` (Go) and `try_with_resources_statement` (Java).
+- Canonical list: updated `error_handling` description to include Python `except_clause`
+  and Java `catch_clause`/`throw_statement` with double-count semantic note.
+- Python table: updated `error_handling` row to include `except_clause` with per-arm
+  counting note.
+- Go/Java table: added `error_handling` row with `catch_clause`, `throw_statement`
+  (Java only; Go: none in v0).
 
 **`MIGRATION_NOTES.md`**
-- Added M45.1 section (before M44): count stays 18, cross-language semantic note,
-  `defer_statement` boundary, count-introduction event, escape hatch TOML.
+- Added M45.2 section before M45.1: schema unchanged, double-count semantic documented,
+  count-introduction event, escape hatch TOML.
 
 **`CHANGELOG.md`**
-- Added M45.1 entry under `[Unreleased] ### Added` (before M44 entry).
+- Added M45.2 entry under `[Unreleased] ### Added` before M45.1 entry.
 
 ## Root Cause (bugs only)
 N/A — feature addition.
 
 ## Files Modified
-- `crates/sdivi-patterns/src/queries/resource_management.rs` — added 3 node kinds to `NODE_KINDS`; 69 lines
-- `crates/sdivi-core/tests/category_contract_m45_1.rs` (NEW) — M45.1 acceptance criterion tests; 125 lines
-- `crates/sdivi-patterns/tests/resource_management_fixture.rs` (NEW) — integration fixture tests; 183 lines
-- `docs/pattern-categories.md` — canonical list, Python/Go/Java tables updated
-- `MIGRATION_NOTES.md` — M45.1 section added before M44
-- `CHANGELOG.md` — M45.1 entry added
+- `crates/sdivi-patterns/src/queries/error_handling.rs` — 6 node kinds (was 2); 21 lines
+- `crates/sdivi-patterns/src/queries/mod.rs` — added `#[cfg(test)] mod tests_m45_2;`
+- `crates/sdivi-patterns/src/queries/tests_m45_2.rs` (NEW) — 4 unit tests; 41 lines
+- `crates/sdivi-core/tests/category_contract_m45_2.rs` (NEW) — acceptance criteria; 110 lines
+- `crates/sdivi-patterns/tests/error_handling_fixture.rs` (NEW) — integration fixtures; 179 lines
+- `docs/pattern-categories.md` — canonical list, Python table, Go/Java table
+- `MIGRATION_NOTES.md` — M45.2 section
+- `CHANGELOG.md` — M45.2 entry
 
 ## Human Notes Status
-No Human Notes section present in this milestone run.
+- Non-blocking note (cargo test before merge): done — all tests pass except pre-existing
+  `wasm_package_json_version_matches_workspace` (0.2.23 vs 0.2.37, not introduced here).
 
 ## Docs Updated
-- `docs/pattern-categories.md` — canonical category list entry, Python table, Go/Java table.
-- `MIGRATION_NOTES.md` — M45.1 section with cross-language note, `defer_statement` boundary, escape hatch.
-- `CHANGELOG.md` — M45.1 entry under `[Unreleased]`.
+- `docs/pattern-categories.md` — canonical `error_handling` description, Python table
+  (except_clause added), Go/Java table (new error_handling row).
+- `MIGRATION_NOTES.md` — M45.2 section with double-count semantic, count-introduction
+  event, escape hatch.
+- `CHANGELOG.md` — M45.2 entry.
 
 ## Observed Issues (out of scope)
-- Pre-existing: `wasm_package_json_version_matches_workspace` test failure — `package.json`
-  stranded at 0.2.23 vs workspace 0.2.36. Not introduced by M45.1.
-- Pre-existing: `ALL_CATEGORIES` doc note in `mod.rs:36-37` says only `logging` is callee-only
-  via `classify_hint`; several categories are also callee-only. Carry-over drift from M44.
+- Pre-existing: `wasm_package_json_version_matches_workspace` — package.json stranded at
+  0.2.23 vs workspace 0.2.37.
+- Pre-existing: `ALL_CATEGORIES` doc note in `mod.rs:36-37` says only `logging` is
+  callee-only via `classify_hint`; several other categories are also callee-only.
+- Pre-existing: `docs/pattern-categories.md` embedder responsibilities list has a
+  numbering regression across M42–M44.
+- Pre-existing (resolved in scope): `try_statement` was documented as existing in
+  `error_handling` NODE_KINDS but was missing from the code — added to align with the
+  milestone's "existing" assertion and the docs/adapters.

@@ -296,3 +296,103 @@ fn file_with_no_decorators_produces_no_decorated_definition_hints() {
         "a file with no decorators must produce zero decorated_definition hints"
     );
 }
+
+// ── M45.2: except_clause pattern hints ───────────────────────────────────────
+
+/// M45.2: `except_clause` is emitted by the Python adapter from real Python source —
+/// confirming the real tree-sitter parse path that the synthetic-FeatureRecord tests
+/// in `error_handling_fixture.rs` do not cover.
+#[test]
+fn except_clause_captured_as_pattern_hint() {
+    let source = "try:\n    pass\nexcept ValueError:\n    pass\n";
+    let record = parse(source);
+    let has_except = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "except_clause");
+    assert!(
+        has_except,
+        "except_clause must appear in pattern_hints when parsing real Python source; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M45.2: Each `except` arm in a multi-arm try/except produces a separate
+/// `except_clause` hint — one hint per arm, not one per try block.
+#[test]
+fn multi_arm_except_emits_one_hint_per_arm() {
+    let source = concat!(
+        "try:\n",
+        "    pass\n",
+        "except ValueError:\n",
+        "    pass\n",
+        "except (TypeError, KeyError) as e:\n",
+        "    pass\n",
+        "except Exception:\n",
+        "    pass\n",
+    );
+    let record = parse(source);
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        except_count, 3,
+        "three except arms must produce exactly 3 except_clause hints; got: {except_count}"
+    );
+}
+
+/// M45.2: A `try` with `except` arms emits both `try_statement` and `except_clause`
+/// hints — the double-count semantic (1 try + N excepts = 1 + N total).
+#[test]
+fn try_with_excepts_emits_both_try_statement_and_except_clause_hints() {
+    let source = concat!(
+        "try:\n",
+        "    risky()\n",
+        "except OSError:\n",
+        "    pass\n",
+        "except RuntimeError:\n",
+        "    pass\n",
+    );
+    let record = parse(source);
+    let try_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "try_statement")
+        .count();
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        try_count, 1,
+        "one try block must produce exactly 1 try_statement hint; got: {try_count}"
+    );
+    assert_eq!(
+        except_count, 2,
+        "two except arms must produce exactly 2 except_clause hints; got: {except_count}"
+    );
+}
+
+/// M45.2: A bare `try/finally` with no `except` arms produces zero `except_clause` hints.
+#[test]
+fn try_finally_without_except_produces_no_except_clause_hints() {
+    let source = "try:\n    pass\nfinally:\n    pass\n";
+    let record = parse(source);
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        except_count, 0,
+        "try/finally with no except arms must produce zero except_clause hints; got: {except_count}"
+    );
+}

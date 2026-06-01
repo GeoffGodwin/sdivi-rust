@@ -8,6 +8,48 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M45.2 — `error_handling` enriched: Python `except_clause`, Java `catch_clause`/`throw_statement`
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`. No new categories — additive
+node kinds within an existing category. `list_categories()` count stays 18.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** Three node kinds already collected by their language adapters but
+previously dropped are now routed to `error_handling`:
+
+- **Python (node kind):** `except_clause` — individual `except` arms (`except ValueError:`,
+  `except (A, B) as e:`). Already emitted by the Python adapter.
+- **Java (node kind):** `catch_clause` — individual `catch` arms
+  (`catch (IOException e) { ... }`). Already emitted by the Java adapter.
+- **Java (node kind):** `throw_statement` — throw sites (`throw new RuntimeException(msg)`).
+  Already emitted by the Java adapter.
+
+No parsing-layer change. No new category.
+
+**Double-count semantic.** A Python `try` with 3 `except` arms now yields
+1 `try_statement` + 3 `except_clause` = 4 `error_handling` instances. This is
+intentional — more arms = more error-flow structure = higher entropy signal. It is
+**not** a regression. Rust and TypeScript/JavaScript `error_handling` counts are
+unaffected.
+
+**Count-introduction event.** On the first post-M45.2 snapshot of a Python or Java repo,
+`error_handling` counts rise. Python gains one count per `except` arm (previously only
+the outer `try_statement` counted). Java gains one count per `catch` arm and per `throw`
+site. Prior snapshots had no entries for these node kinds — trend continuity is broken
+for this dimension at the upgrade boundary. Rust repos are unaffected.
+
+**Escape hatch.** Use a per-category threshold override with an `expires` date:
+
+```toml
+[thresholds.overrides.error_handling]
+pattern_entropy_rate = 5.0
+expires = "2026-12-31"
+reason = "Baseline shift from M45.2 adding Python except_clause and Java catch/throw counts"
+```
+
+After the `expires` date, default thresholds resume automatically.
+
 ## M45.1 — `resource_management` enriched: Python/Go/Java node kinds
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. No new categories — additive

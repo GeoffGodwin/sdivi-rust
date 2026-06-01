@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `error_handling` pattern category enriched (M45.2): Python `except_clause` (each
+  `except` arm) and Java `catch_clause` (each `catch` arm) plus `throw_statement` (each
+  `throw` site) are now classified as `error_handling`. All three node kinds were already
+  collected by their respective adapters but previously dropped. Pure node-kind
+  classification — no parsing change, no new category. `list_categories()` count stays 18.
+  `snapshot_version` stays `"1.0"`. **Double-count semantic:** a Python `try` with 3
+  `except` arms yields 1 `try_statement` + 3 `except_clause` = 4 `error_handling`
+  instances (intentional — more arms = higher entropy signal, not a regression). Rust and
+  TypeScript/JavaScript `error_handling` counts are unaffected. See `MIGRATION_NOTES.md`.
+
 - `resource_management` pattern category enriched (M45.1): Python `with_statement`
   (context managers — `with open(p) as f:`), Go `defer_statement` (deferred cleanup —
   `defer f.Close()`), and Java `try_with_resources_statement` are now classified as

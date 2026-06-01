@@ -198,3 +198,5 @@ pub fn classify_hint(hint: &PatternHintInput, language: &str) -> Vec<&'static st
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_m45_2;
