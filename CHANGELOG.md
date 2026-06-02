@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.47] - 2026-06-02
+
 ### Added
 
 - **CI:** Added a TypeScript consumer-contract guard for `@geoffgodwin/sdivi-wasm`
