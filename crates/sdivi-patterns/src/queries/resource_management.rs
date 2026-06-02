@@ -25,6 +25,7 @@ pub const NODE_KINDS: &[&str] = &[
 ];
 
 // Rust: logging macros that should fall through to the `logging` category.
+// Must match logging::RUST_RE exactly — update both together.
 // Same pattern as logging::RUST_RE — if a macro_invocation text matches,
 // it is logging, not resource_management.
 //   ^(tracing|log)::  — tracing::info!, log::debug!, etc.

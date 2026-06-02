@@ -1,4 +1,4 @@
-# Pre-flight Report — 2026-06-01 21:46:22
+# Pre-flight Report — 2026-06-01 23:48:54
 
 ## Summary
 ✓ 4 passed  ⚠ 0 warned  ✗ 0 failed  🔧 0 auto-fixed
@@ -15,5 +15,5 @@ Cargo.lock exists.
 rust-toolchain.toml channel 1.85.0, running 1.85.0. ✓
 
 ### ✓ Claude CLI version
-claude 2.1.159 is within the tested compatibility band (>= 2.1.140).
+claude 2.1.160 is within the tested compatibility band (>= 2.1.140).
 

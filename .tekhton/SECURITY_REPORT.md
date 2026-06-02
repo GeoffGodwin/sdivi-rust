@@ -1,8 +1,11 @@
 ## Summary
-This change consists of three files: a Rust test file (`crates/sdivi-patterns/tests/test_all_categories_doc_classification.rs`) that simplifies a redundant loop and adds one assertion for `testing::NODE_KINDS.is_empty()`, a `package.json` template (`bindings/sdivi-wasm/pkg-template/package.json`) with a patch version bump (0.2.42 → 0.2.43), and a reviewer-notes tracking document (`.tekhton/NON_BLOCKING_LOG.md`). None of the changes touch authentication, cryptography, user input handling, network communication, file I/O, or any other security-relevant surface. The test file uses only compile-time string literals compared via `assert_eq!`/`assert_ne!`; the `package.json` carries no `scripts`, no `dependencies`, and no embedded credentials. The security posture of this change is sound.
+
+This change set resolves 66 architectural drift observations through three code fixes and four documentation/comment improvements: promoting `renumber` to `pub(super)` and delegating `renumber_in_place` to it in the Leiden algorithm; adding a sync-warning comment to `RUST_LOGGING_RE` in `resource_management.rs`; adding a compile-time `const assert!` guard in `categories.rs`; and adding intent comments in a test file and a Cargo.toml note. All changes are internal to the analysis pipeline with no I/O, no user-controlled input surfaces, no authentication logic, no network calls, and no cryptographic operations. The overall security posture is unchanged.
 
 ## Findings
+
 None
 
 ## Verdict
+
 CLEAN

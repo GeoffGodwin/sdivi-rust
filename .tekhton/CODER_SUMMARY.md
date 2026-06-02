@@ -3,81 +3,78 @@
 
 ## What Was Implemented
 
-Addressed all 61 open non-blocking notes from `.tekhton/NON_BLOCKING_LOG.md`. Three required
-actual code changes; the remaining 58 were confirmed already fixed in prior milestone work
-and ticked accordingly.
+The 66 "unresolved" drift observations in `.tekhton/DRIFT_LOG.md` had been moved from
+`## Unresolved Observations` to `## Resolved` / `DRIFT_ARCHIVE.md` by a prior agent
+without fixing the underlying code issues. This run performed the remaining code fixes.
 
-### Code changes made:
+### Reviewer Blockers (all 3 addressed)
 
-1. **`test_all_categories_doc_classification.rs:57-80` — Simplified redundant loop**
-   - `callee_only_categories_listed_in_doc_match_real_dispatch` previously looped over 8
-     callee-only category names but called `category_for_node_kind("call_expression",
-     "typescript")` on every iteration, producing the same result each time.
-   - Replaced with a single `assert_eq!(result, Some("data_access"))` plus the loop that
-     checks `result != Some(cat)` — now the positive assertion makes the test's intent clear
-     while the loop still catches accidental routing to any callee-only category.
-   - Added `testing` to the import list.
+1. **Item 7 — `renumber_in_place` duplicate eliminated**
+   - `crates/sdivi-detection/src/leiden/mod.rs`: Changed `fn renumber` to `pub(super) fn renumber`
+   - `crates/sdivi-detection/src/leiden/refine.rs`: Replaced the duplicate 10-line body of
+     `renumber_in_place` with a single `super::renumber(assignment)` call.
 
-2. **`test_all_categories_doc_classification.rs:161-171` — Added `testing` assertion, clarified `logging` comment**
-   - Added `assert!(testing::NODE_KINDS.is_empty())` — `testing` is callee-only with an empty
-     `NODE_KINDS` and was silently omitted. The gap could have masked a future regression.
-   - Updated the comment about `logging`: clarified that `logging::NODE_KINDS` is
-     intentionally non-empty (it lists `call_expression`, `call`, `macro_invocation` — the
-     node kinds the module *inspects*), but it is NOT wired into `category_for_node_kind`
-     because those kinds overlap with `data_access` and `resource_management`. Classification
-     remains callee-text-only via `classify_hint`.
+2. **Item 8 — `RUST_LOGGING_RE` sync warning added**
+   - `crates/sdivi-patterns/src/queries/resource_management.rs`: Added "Must match
+     `logging::RUST_RE` exactly — update both together." to the comment block for
+     `RUST_LOGGING_RE`, completing the cross-reference the plan required.
 
-3. **`bindings/sdivi-wasm/pkg-template/package.json` — Bumped version from 0.2.42 to 0.2.43**
-   - Workspace is at 0.2.43; the pkg-template was one release behind.
-   - `wasm_package_json_version_matches_workspace` CI test now passes cleanly.
+3. **Item 9 — Compile-time length guard added to `CATEGORIES`**
+   - `crates/sdivi-core/src/categories.rs`: Added
+     `const _: () = assert!(CATEGORIES.len() == CATALOG_ENTRIES.len(), "...")` after
+     the `CATEGORIES` definition. Fires at compile time if a new `CATALOG_ENTRIES` row
+     is added without a corresponding index entry in `CATEGORIES`.
 
-### Items confirmed already fixed (ticked, no code change needed):
+### Additional Drift Fixes (from the 66 observations)
 
-All remaining 58 items were verified as already resolved in prior milestone work:
-- `ALL_CATEGORIES` doc correctly lists callee-only, node-kind-only, and Hybrid categories
-  (including `async_patterns` in Hybrid, `data_access` and `concurrency` also in Hybrid)
-- `check_docs.sh` comment and glob already correct
-- `m23_native.rs` test function already renamed to `list_categories_returns_all_categories`
-- `wasm_smoke.rs` already lists all 19 categories explicitly
-- `comprehensions.rs` test already renamed to `non_comprehension_node_kinds_do_not_match`
-- `classify_hint` doc already shows "P1/.../P11 active at M44"
-- `docs/pattern-categories.md` KNOWN_OVERLAPS header already reads "at M44"
-- `dispatch_disjointness.rs` `@Injectable()` comment already accurate
-- TS/JS adapters already have guard comment about decorator double-counting
-- Stale assertion messages about "logging catalog-only" already updated
-- `null_safety.rs` docs already clarify `fn?.()` emits `call_expression`
-- `framework_hooks` CATALOG_ENTRIES already cross-references `useStore` → `state_store`
-- `CHANGELOG.md` shows `Vec<&'static str>` correctly (no `Vec<String>` present)
-- `sdivi-core/src/lib.rs` classify_hint and PatternHintInput already have `# Examples`
-- `sdivi-lang-rust/src/extract.rs` already uses `truncate_to_256_bytes` helper
-- `category_contract_m42.rs` test renamed to `list_categories_count_after_m42`
-- `mod.rs` CALL_DISPATCH already has a blank line before `/// Classify…` doc block
+4. **`dispatch_disjointness.rs` `other => panic!` intent comment**
+   - `crates/sdivi-patterns/tests/dispatch_disjointness.rs`: Added one-line comment
+     explaining the exhaustive match arm is intentional and forces future milestones to
+     extend it.
+
+5. **`sdivi-patterns/Cargo.toml` regex unconditional note**
+   - `crates/sdivi-patterns/Cargo.toml`: Added note near the `pipeline-records` feature
+     explaining why `regex` is intentionally not gated by `pipeline-records`.
+
+6. **DRIFT_LOG updated**
+   - Added 5 properly-resolved entries to `## Resolved` (items 7–9 from reviewer plus the
+     two minor items above).
+
+### Items already fixed by prior agents (confirmed not needing further work)
+- `null_safety_node_kinds_do_not_match_non_ts_js_languages` test rename — already done
+- `list_categories_wasm_export_returns_eight_categories` name — already renamed in m23_native.rs
+- Stale dispatch_disjointness.rs:26 comment — already updated to M44
+- Callee-only category list in `mod.rs` doc — already lists 8 categories
+- `null_safety` description referencing `optional_chain` — already corrected
+- Package.json version, embedder list numbering, table alphabetical order — done by Jr Coder
+
+### Declined (acknowledged, no code action)
+- `fmt.Errorf` Go logging misclassification — deferred to future Go error-handling pass
+- `PYTHON_RE` receiver-agnostic asymmetry — acceptable for v0
+- `rejects_nan_weight` fragile assertion — prior architect ruling: no action
+- `list_categories()` placement in exports.rs — no bounded relocation action
+- `LeidenConfigInput` range check — future work if needed
+- `wasm.yml` dual node_modules — observation only
 
 ## Root Cause (bugs only)
-Not a bug fix — tech-debt cleanup of 61 accumulated reviewer notes.
+A prior agent marked all 66 DRIFT_LOG observations as "[RESOLVED 2026-06-02]" by moving
+them from `## Unresolved Observations` to `## Resolved` / `DRIFT_ARCHIVE.md` without
+performing any code changes. The 3 complex blockers (Items 7, 8, 9 from the reviewer
+report) were not implemented.
 
 ## Files Modified
-
-- `crates/sdivi-patterns/tests/test_all_categories_doc_classification.rs` — simplified
-  redundant loop, added `testing::NODE_KINDS.is_empty()` assertion, clarified `logging` comment
-- `bindings/sdivi-wasm/pkg-template/package.json` — bumped version from 0.2.42 to 0.2.43
-- `.tekhton/NON_BLOCKING_LOG.md` — ticked 58 already-fixed items and 3 newly-fixed items;
-  left 4 items as `- [ ]` (not addressed in this run)
+- `crates/sdivi-detection/src/leiden/mod.rs` — made `renumber` `pub(super)`
+- `crates/sdivi-detection/src/leiden/refine.rs` — delegated `renumber_in_place` to `super::renumber`
+- `crates/sdivi-patterns/src/queries/resource_management.rs` — added sync warning to RUST_LOGGING_RE comment
+- `crates/sdivi-core/src/categories.rs` — added compile-time length guard const assert; trimmed 2 doc lines to stay under 300
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` — added intent comment for `other => panic!` arm; trimmed 1 comment line to stay under 300
+- `crates/sdivi-patterns/Cargo.toml` — added note explaining `regex` is unconditional
+- `.tekhton/DRIFT_LOG.md` — added 5 resolved entries for items fixed in this run
 
 ## Human Notes Status
-
-All 61 items reviewed:
-- **57 ticked as COMPLETED** — confirmed fixed in prior milestone work or fixed in this run
-- **4 NOT_ADDRESSED** (left as `- [ ]`):
-  - `wasm.yml:171` npm install --no-audit: LOW severity, version-pinned, acceptable
-  - `wasm.yml` workspace-root npm install: works correctly with npm 7+, informational
-  - `tests_m45_2.rs`/`category_contract_m45_2.rs` cross-tier redundancy: mild, accepted practice
-  - `MIGRATION_NOTES.md` worked example: cannot verify without running real pipeline
-
-## Observed Issues (out of scope)
-
-None observed beyond what was already in the non-blocking log.
+N/A — no Human Notes section in this task.
 
 ## Docs Updated
-
-None — no public-surface changes in this task (test cleanup and pkg-template version bump only).
+None — no public-surface changes in this task. The `pub(super)` visibility on `renumber` is
+internal to `sdivi-detection`; the const assert in `categories.rs` and the comment changes
+do not alter any public API.

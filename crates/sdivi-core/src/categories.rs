@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Every entry here is a permanent contract entry for `snapshot_version "1.0"`.
 /// Once a name is in this list it cannot be removed — only deprecated.
-/// [`CATEGORIES`] and [`list_categories`] are both derived from this array,
-/// so the two cannot silently diverge.
+/// [`CATEGORIES`] and [`list_categories`] are derived from this array and cannot silently diverge.
 const CATALOG_ENTRIES: &[(&str, &str)] = &[
     (
         "async_patterns",
@@ -195,7 +194,6 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 
 /// Canonical category names in stable alphabetical order.
 ///
-/// Derived from the private `CATALOG_ENTRIES` table — the two cannot diverge.
 /// Every name here is a permanent contract entry for `snapshot_version "1.0"`.
 /// Once a name is in this list it cannot be removed — only deprecated.
 ///
@@ -228,6 +226,9 @@ pub const CATEGORIES: &[&str] = &[
     CATALOG_ENTRIES[17].0,
     CATALOG_ENTRIES[18].0,
 ];
+
+// Compile-time length guard — add a new index to CATEGORIES when CATALOG_ENTRIES grows.
+const _: () = assert!(CATEGORIES.len() == CATALOG_ENTRIES.len(), "CATEGORIES and CATALOG_ENTRIES out of sync");
 
 /// Metadata for a single canonical pattern category.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -268,8 +269,7 @@ pub struct CategoryCatalog {
 /// - Which category names appear as keys in per-category divergence maps.
 /// - Which category names are accepted by `[thresholds.overrides.<cat>]` in `config.toml`.
 ///
-/// Embedders MUST use these names verbatim — the comparison in
-/// `compute_pattern_metrics` is case-sensitive. Referentially transparent.
+/// Embedders MUST use these names verbatim (case-sensitive). Referentially transparent.
 ///
 /// # Examples
 ///

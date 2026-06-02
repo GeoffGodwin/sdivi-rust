@@ -287,6 +287,7 @@ fn known_overlaps_winner_matches_dispatch_order() {
             "collection_pipelines" => collection_pipelines::matches_callee(text, lang),
             "http_routing" => http_routing::matches_callee(text, lang),
             "concurrency" => concurrency::matches_callee(text, lang),
+            // Exhaustive by design: new CALL_DISPATCH categories must add an arm here.
             other => panic!("KNOWN_OVERLAPS references unknown category {other:?}"),
         };
         assert!(
