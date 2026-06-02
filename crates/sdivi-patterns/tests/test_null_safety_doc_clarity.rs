@@ -80,5 +80,8 @@ fn optional_calls_documentation_distinguishes_from_property_access() {
     assert!(doc.contains("`a?.b`"), "should document property access");
     assert!(doc.contains("`arr?.[0]`"), "should document bracket access");
     assert!(doc.contains("`fn?.()`"), "should mention optional calls");
-    assert!(doc.contains("call_expression"), "should clarify optional calls are call_expression");
+    assert!(
+        doc.contains("call_expression"),
+        "should clarify optional calls are call_expression"
+    );
 }

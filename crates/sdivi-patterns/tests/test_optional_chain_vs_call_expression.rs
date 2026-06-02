@@ -9,7 +9,7 @@
 //! 2. Optional calls like `fn?.()` are routed as `call_expression`, not `optional_chain`
 //! 3. The null_safety module docs correctly clarify this behavior
 
-use sdivi_patterns::queries::{null_safety, category_for_node_kind};
+use sdivi_patterns::queries::{category_for_node_kind, null_safety};
 
 #[test]
 fn optional_chain_is_null_safety() {

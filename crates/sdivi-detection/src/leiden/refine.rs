@@ -178,7 +178,7 @@ pub fn refine_partition(
         refine_community(graph, members, &mut refined, rng, quality, gamma);
     }
 
-    renumber_in_place(&mut refined);
+    super::renumber(&mut refined);
     refined
 }
 
@@ -264,9 +264,4 @@ fn refine_community(
     for (local, &sc) in state.assignment.iter().enumerate() {
         refined[local_to_global[local]] = sc_to_global[&sc];
     }
-}
-
-/// Renumbers community IDs in-place to a dense range `[0, k)`.
-fn renumber_in_place(assignment: &mut [usize]) {
-    super::renumber(assignment);
 }

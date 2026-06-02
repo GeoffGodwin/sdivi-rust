@@ -24,7 +24,7 @@ fn hint(node_kind: &str, text: &str) -> PatternHintInput {
 }
 
 /// Collect every dispatch category that matches this callee text.
-/// At M44, P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 are active; future milestones extend this list.
+/// At M46, P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 are active; future milestones extend this list.
 fn all_matching_categories(text: &str, language: &str) -> Vec<&'static str> {
     let mut matched = Vec::new();
     if async_patterns::matches_callee(text, language) {

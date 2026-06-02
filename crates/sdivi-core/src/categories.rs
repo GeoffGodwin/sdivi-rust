@@ -197,6 +197,13 @@ const CATALOG_ENTRIES: &[(&str, &str)] = &[
 /// Every name here is a permanent contract entry for `snapshot_version "1.0"`.
 /// Once a name is in this list it cannot be removed — only deprecated.
 ///
+/// **Index-order requirement:** Each element here references `CATALOG_ENTRIES[N].0` at
+/// index N. The compile-time length guard below catches length mismatches only —
+/// a positional shift (inserting a new entry at index 5 in `CATALOG_ENTRIES` but
+/// appending `CATALOG_ENTRIES[19].0` here instead) silently corrupts the public const.
+/// When adding a new category: insert `CATALOG_ENTRIES[N].0` at the same index N in
+/// this array to maintain the 1:1 positional mapping.
+///
 /// # Examples
 ///
 /// ```rust
@@ -228,7 +235,10 @@ pub const CATEGORIES: &[&str] = &[
 ];
 
 // Compile-time length guard — add a new index to CATEGORIES when CATALOG_ENTRIES grows.
-const _: () = assert!(CATEGORIES.len() == CATALOG_ENTRIES.len(), "CATEGORIES and CATALOG_ENTRIES out of sync");
+const _: () = assert!(
+    CATEGORIES.len() == CATALOG_ENTRIES.len(),
+    "CATEGORIES and CATALOG_ENTRIES out of sync"
+);
 
 /// Metadata for a single canonical pattern category.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
