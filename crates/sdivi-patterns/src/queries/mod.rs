@@ -164,7 +164,7 @@ const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 active at M44).
+/// Iterates the private `CALL_DISPATCH` registry in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 active at M44).
 ///
 /// ## `macro_invocation`
 ///
