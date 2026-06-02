@@ -16,18 +16,20 @@ npm install @geoffgodwin/sdivi-wasm
 
 ## Bundler consumers (webpack, vite, rollup)
 
-Use the default import path. The bundler target uses `import.meta.url`-style WASM loading
-and requires a bundler to resolve the `.wasm` asset.
+Use the default import path. The bundler target imports the `.wasm` as a direct ES-module
+dependency (`import * as wasm from "./sdivi_wasm_bg.wasm"`), so it requires a bundler with
+WASM support (webpack 5+, vite, rollup) to resolve the `.wasm` asset.
+
+**There is no `init()` to call.** The module initialises itself on import — the bundler
+instantiates the `.wasm` and the `init_wasm` start function (which installs the panic hook)
+runs automatically. Just import the named functions and call them.
 
 ```ts
-import init, {
+import {
   detect_boundaries,
   compute_coupling_topology,
   list_categories,
 } from '@geoffgodwin/sdivi-wasm';
-
-// Must await init() once before calling any other function.
-await init();
 
 const catalog = list_categories();
 console.log(catalog.schema_version); // "1.0"
@@ -39,8 +41,7 @@ console.log(metrics.density);
 Or be explicit with the `/bundler` subpath:
 
 ```ts
-import init, { list_categories } from '@geoffgodwin/sdivi-wasm/bundler';
-await init();
+import { list_categories } from '@geoffgodwin/sdivi-wasm/bundler';
 ```
 
 ## Node.js consumers (CLI, server)
@@ -83,8 +84,14 @@ uses `require('fs')` which bundlers cannot resolve in a browser context. The def
 
 ## Full usage example (bundler)
 
+> **Maps, not objects.** Every field typed `Map<…>` in the `.d.ts` is a real JS `Map`
+> at runtime — both on input (you must pass a `Map`, not a plain object) and on output
+> (read results with `.get()` / `.entries()`, not bracket indexing; note `JSON.stringify`
+> of a `Map` yields `{}`). This applies to `edge_weights`, `cluster_assignments`,
+> `internal_edge_density`, `entropy_per_category`, `overrides`, and friends.
+
 ```ts
-import init, {
+import {
   detect_boundaries,
   compute_coupling_topology,
   compute_pattern_metrics,
@@ -93,8 +100,6 @@ import init, {
   assemble_snapshot,
   list_categories,
 } from '@geoffgodwin/sdivi-wasm';
-
-await init();
 
 const graph = {
   nodes: [
@@ -110,18 +115,22 @@ console.log(metrics.density);
 // Unweighted Leiden.
 const cfg = { seed: 42, gamma: 1.0, iterations: 100, quality: 'Modularity' };
 const boundaries = detect_boundaries(graph, cfg, []);
-console.log(boundaries.cluster_assignments);
+console.log([...boundaries.cluster_assignments.entries()]); // a JS Map
 
 // Weighted Leiden — pass co-change frequencies as edge weights.
-// Keys are "source:target" strings; the first colon splits source from target,
-// so node IDs that contain colons (e.g. "crates/foo:bar.rs") are supported.
-// Weights must be >= 0 and finite; edges absent from the graph are ignored.
+// edge_weights is a JS Map. Keys are "source:target" strings; the first colon
+// splits source from target, so node IDs that contain colons (e.g.
+// "crates/foo:bar.rs") are supported. Weights must be >= 0 and finite; edges
+// absent from the graph are ignored.
 const weightedCfg = {
   ...cfg,
-  edge_weights: { 'src/lib.rs:src/models.rs': 0.8, 'src/lib.rs:src/errors.rs': 0.5 },
+  edge_weights: new Map([
+    ['src/lib.rs:src/models.rs', 0.8],
+    ['src/lib.rs:src/errors.rs', 0.5],
+  ]),
 };
 const weightedBoundaries = detect_boundaries(graph, weightedCfg, []);
-console.log(weightedBoundaries.cluster_assignments);
+console.log([...weightedBoundaries.cluster_assignments.entries()]);
 
 // normalize_and_hash produces the same blake3 digest as the native Rust pipeline.
 const hash = normalize_and_hash('try_expression', []);
@@ -163,13 +172,12 @@ Embedders that supply their own tree-sitter extractors must use the exact catego
 returned by `list_categories()`. The comparison in `compute_pattern_metrics` is case-sensitive.
 
 ```ts
-import init, { list_categories } from '@geoffgodwin/sdivi-wasm';
+import { list_categories } from '@geoffgodwin/sdivi-wasm';
 
-await init();
 const catalog = list_categories();
 console.log(catalog.schema_version); // "1.0"
 for (const cat of catalog.categories) {
-    console.log(cat.name); // "async_patterns", "error_handling", ...
+    console.log(cat.name); // "async_patterns", "error_handling", ... (19 categories)
 }
 ```
 

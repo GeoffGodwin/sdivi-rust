@@ -1,6 +1,7 @@
 //! AST extraction helpers for the Rust language adapter.
 
 use sdivi_parsing::feature_record::PatternHint;
+use sdivi_parsing::text::truncate_to_256_bytes;
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
@@ -99,17 +100,7 @@ pub(crate) fn collect_hints(root: Node<'_>, source: &[u8]) -> Vec<PatternHint> {
     while let Some(node) = stack.pop() {
         if PATTERN_KINDS.contains(&node.kind()) {
             let raw = node.utf8_text(source).unwrap_or("").to_string();
-            let text = if raw.len() > 256 {
-                let end = raw
-                    .char_indices()
-                    .take_while(|(i, c)| *i + c.len_utf8() <= 256)
-                    .last()
-                    .map(|(i, c)| i + c.len_utf8())
-                    .unwrap_or(0);
-                raw[..end].to_string()
-            } else {
-                raw
-            };
+            let text = truncate_to_256_bytes(raw);
             hints.push(PatternHint {
                 node_kind: node.kind().to_string(),
                 start_byte: node.start_byte(),

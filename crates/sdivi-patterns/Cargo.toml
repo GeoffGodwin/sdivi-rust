@@ -15,6 +15,9 @@ categories = ["development-tools", "algorithms"]
 # Default ON for sdivi-pipeline; OFF for sdivi-core's WASM-compatible build.
 pipeline-records = ["dep:sdivi-parsing"]
 default = ["pipeline-records"]
+# Note: `regex` (below) is intentionally NOT gated by `pipeline-records` — the
+# per-category regex tables are needed in both the pipeline path and the WASM/pure-compute
+# path. Do not move `regex` behind the `pipeline-records` feature.
 
 [dependencies]
 sdivi-config  = { workspace = true }

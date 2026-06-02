@@ -12,42 +12,72 @@
 
 pub mod async_patterns;
 pub mod class_hierarchy;
+pub mod collection_pipelines;
+pub mod comprehensions;
+pub mod concurrency;
 pub mod data_access;
+pub mod decorators;
 pub mod error_handling;
+pub mod framework_hooks;
+pub mod http_routing;
 pub mod logging;
+pub mod null_safety;
 pub mod resource_management;
+pub mod schema_validation;
+pub mod serialization;
 pub mod state_management;
+pub mod state_store;
+pub mod testing;
 pub mod type_assertions;
 
 use crate::hint_input::PatternHintInput;
 
 /// All built-in category names in stable alphabetical order.
 ///
-/// Note: `logging` is a catalog-only category for `snapshot_version "1.0"`.
-/// It is present here so embedders can emit `PatternInstanceInput { category: "logging", … }`
-/// and have those instances round-trip through `compute_pattern_metrics` and
-/// `compute_delta`. [`category_for_node_kind`] never returns `Some("logging")` —
-/// the relevant node kinds overlap with `data_access` and `resource_management`.
+/// ## Classification paths
+///
+/// - **Callee-text only** (via [`classify_hint`]; [`category_for_node_kind`] never returns these):
+///   `logging`, `testing`, `serialization`, `schema_validation`, `state_store`,
+///   `framework_hooks`, `http_routing`, and `collection_pipelines`.
+/// - **Node-kind only** (via [`category_for_node_kind`]; no callee-text table):
+///   `class_hierarchy`, `comprehensions`, `decorators`, `error_handling`,
+///   `null_safety`, `resource_management`, `state_management`, and `type_assertions`.
+/// - **Hybrid** (both paths active): `async_patterns` (`await_expression` node kind
+///   plus TypeScript/JavaScript Promise-chain callee regex at CALL_DISPATCH P1),
+///   `data_access` (`call_expression`/`call` node kinds plus per-language callee
+///   regex), and `concurrency` (`go_statement`/`select_statement` node kinds plus
+///   `Promise.all`/`asyncio.gather` callee regex at CALL_DISPATCH P11).
 ///
 /// # Examples
 ///
 /// ```rust
 /// use sdivi_patterns::queries::ALL_CATEGORIES;
 ///
-/// assert!(ALL_CATEGORIES.contains(&"error_handling"));
-/// assert!(ALL_CATEGORIES.contains(&"async_patterns"));
-/// assert!(ALL_CATEGORIES.contains(&"data_access"));
-/// assert!(ALL_CATEGORIES.contains(&"logging"));
-/// assert_eq!(ALL_CATEGORIES.len(), 8);
+/// assert!(ALL_CATEGORIES.contains(&"comprehensions"));
+/// assert!(ALL_CATEGORIES.contains(&"concurrency"));
+/// assert!(ALL_CATEGORIES.contains(&"serialization"));
+/// assert!(ALL_CATEGORIES.contains(&"testing"));
+/// assert_eq!(ALL_CATEGORIES.len(), 19);
 /// ```
 pub const ALL_CATEGORIES: &[&str] = &[
     "async_patterns",
     "class_hierarchy",
+    "collection_pipelines",
+    "comprehensions",
+    "concurrency",
     "data_access",
+    "decorators",
     "error_handling",
+    "framework_hooks",
+    "http_routing",
     "logging",
+    "null_safety",
     "resource_management",
+    "schema_validation",
+    "serialization",
     "state_management",
+    "state_store",
+    "testing",
     "type_assertions",
 ];
 
@@ -63,6 +93,10 @@ pub const ALL_CATEGORIES: &[&str] = &[
 /// node kind but no source text — and for backward compatibility with embedders
 /// that integrated against the M29 API.
 ///
+/// In particular, `call_expression` nodes always return `Some("data_access")` here because
+/// callee text is unavailable; callers that have the source text should use [`classify_hint`] to
+/// get the callee-aware result.
+///
 /// # Examples
 ///
 /// ```rust
@@ -75,18 +109,24 @@ pub const ALL_CATEGORIES: &[&str] = &[
 ///
 /// # See also
 ///
-/// [`classify_hint`] — callee-text-aware classifier that returns `["logging"]` for
-/// matching callees and disambiguates Rust `macro_invocation` into `logging` vs
-/// `resource_management`. This is what the native pipeline calls since M33.
+/// [`classify_hint`] — callee-aware classifier; preferred for most callers (M33+).
 pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'static str> {
     if async_patterns::NODE_KINDS.contains(&node_kind) {
         Some("async_patterns")
     } else if class_hierarchy::NODE_KINDS.contains(&node_kind) {
         Some("class_hierarchy")
+    } else if comprehensions::NODE_KINDS.contains(&node_kind) {
+        Some("comprehensions")
+    } else if concurrency::NODE_KINDS.contains(&node_kind) {
+        Some("concurrency")
     } else if data_access::NODE_KINDS.contains(&node_kind) {
         Some("data_access")
+    } else if decorators::NODE_KINDS.contains(&node_kind) {
+        Some("decorators")
     } else if error_handling::NODE_KINDS.contains(&node_kind) {
         Some("error_handling")
+    } else if null_safety::NODE_KINDS.contains(&node_kind) {
+        Some("null_safety")
     } else if resource_management::NODE_KINDS.contains(&node_kind) {
         Some("resource_management")
     } else if state_management::NODE_KINDS.contains(&node_kind) {
@@ -98,6 +138,22 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
+// Dispatch order: P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines > P11=concurrency; future milestones insert at their slot
+#[allow(clippy::type_complexity)] // fn pointer tuple slice; each entry is one category
+const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
+    ("async_patterns", async_patterns::matches_callee),
+    ("testing", testing::matches_callee),
+    ("serialization", serialization::matches_callee),
+    ("schema_validation", schema_validation::matches_callee),
+    ("state_store", state_store::matches_callee),
+    ("framework_hooks", framework_hooks::matches_callee),
+    ("http_routing", http_routing::matches_callee),
+    ("logging", logging::matches_callee),
+    ("data_access", data_access::matches_callee),
+    ("collection_pipelines", collection_pipelines::matches_callee),
+    ("concurrency", concurrency::matches_callee),
+];
+
 /// Classify a [`PatternHintInput`] using both node kind and callee-text inspection.
 ///
 /// Returns a `Vec` of category name(s) the hint belongs to. In v0 the return is
@@ -108,8 +164,7 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
 ///
 /// ## Dispatch order for `call_expression` / `call`
 ///
-/// Priority: `async_patterns` > `logging` > `data_access`. The first match wins.
-/// The order is load-bearing only if the disjoint-regex invariant is ever relaxed.
+/// Iterates [`CALL_DISPATCH`] in order; first match wins (P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11 active at M44).
 ///
 /// ## `macro_invocation`
 ///
@@ -142,14 +197,10 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
 pub fn classify_hint(hint: &PatternHintInput, language: &str) -> Vec<&'static str> {
     match hint.node_kind.as_str() {
         "call_expression" | "call" => {
-            if async_patterns::matches_callee(&hint.text, language) {
-                return vec!["async_patterns"];
-            }
-            if logging::matches_callee(&hint.text, language) {
-                return vec!["logging"];
-            }
-            if data_access::matches_callee(&hint.text, language) {
-                return vec!["data_access"];
+            for &(category, matches) in CALL_DISPATCH {
+                if matches(&hint.text, language) {
+                    return vec![category];
+                }
             }
             vec![]
         }
@@ -168,132 +219,6 @@ pub fn classify_hint(hint: &PatternHintInput, language: &str) -> Vec<&'static st
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn try_expression_is_error_handling() {
-        assert_eq!(
-            category_for_node_kind("try_expression", "rust"),
-            Some("error_handling")
-        );
-    }
-
-    #[test]
-    fn await_expression_is_async_patterns() {
-        assert_eq!(
-            category_for_node_kind("await_expression", "rust"),
-            Some("async_patterns")
-        );
-    }
-
-    #[test]
-    fn closure_expression_is_state_management() {
-        assert_eq!(
-            category_for_node_kind("closure_expression", "rust"),
-            Some("state_management")
-        );
-    }
-
-    #[test]
-    fn macro_invocation_is_resource_management() {
-        assert_eq!(
-            category_for_node_kind("macro_invocation", "rust"),
-            Some("resource_management")
-        );
-    }
-
-    #[test]
-    fn unknown_node_kind_returns_none() {
-        assert_eq!(category_for_node_kind("unknown_xyz", "rust"), None);
-    }
-
-    #[test]
-    fn all_categories_has_eight_entries() {
-        assert_eq!(ALL_CATEGORIES.len(), 8);
-        assert!(ALL_CATEGORIES.contains(&"data_access"));
-    }
-
-    #[test]
-    fn logging_is_in_all_categories() {
-        assert!(ALL_CATEGORIES.contains(&"logging"));
-    }
-
-    #[test]
-    fn class_hierarchy_is_in_all_categories() {
-        assert!(ALL_CATEGORIES.contains(&"class_hierarchy"));
-    }
-
-    #[test]
-    fn class_declaration_is_class_hierarchy() {
-        assert_eq!(
-            category_for_node_kind("class_declaration", "typescript"),
-            Some("class_hierarchy")
-        );
-    }
-
-    #[test]
-    fn class_definition_is_class_hierarchy() {
-        assert_eq!(
-            category_for_node_kind("class_definition", "python"),
-            Some("class_hierarchy")
-        );
-    }
-
-    #[test]
-    fn impl_item_is_class_hierarchy() {
-        assert_eq!(
-            category_for_node_kind("impl_item", "rust"),
-            Some("class_hierarchy")
-        );
-    }
-
-    #[test]
-    fn interface_declaration_is_class_hierarchy() {
-        assert_eq!(
-            category_for_node_kind("interface_declaration", "java"),
-            Some("class_hierarchy")
-        );
-    }
-
-    #[test]
-    fn abstract_class_declaration_is_class_hierarchy() {
-        assert_eq!(
-            category_for_node_kind("abstract_class_declaration", "typescript"),
-            Some("class_hierarchy")
-        );
-    }
-
-    // M30 sentinel: tests `category_for_node_kind` (node-kind-only, unchanged).
-    // M33 promoted `logging` via `classify_hint`; `category_for_node_kind` is
-    // intentionally unchanged. See `tests/m33_sentinels.rs` for the M33 counterpart.
-    #[test]
-    fn category_for_node_kind_never_returns_logging() {
-        // `category_for_node_kind` never returns logging — that requires callee-text
-        // inspection (see `classify_hint`). This is unchanged through M32 and M33.
-        for kind in ["call_expression", "call", "macro_invocation"] {
-            for lang in ["rust", "python", "typescript", "javascript", "go", "java"] {
-                assert_ne!(
-                    category_for_node_kind(kind, lang),
-                    Some("logging"),
-                    "logging is catalog-only in v0 for category_for_node_kind; \
-                     routing for ({kind}, {lang}) would steal from data_access/resource_management"
-                );
-            }
-        }
-    }
-
-    // M33 positive sentinels live in `tests/m33_sentinels.rs` (file ceiling).
-
-    #[test]
-    fn call_expression_is_data_access() {
-        assert_eq!(
-            category_for_node_kind("call_expression", "typescript"),
-            Some("data_access")
-        );
-        assert_eq!(
-            category_for_node_kind("call", "python"),
-            Some("data_access")
-        );
-    }
-}
+mod tests;
+#[cfg(test)]
+mod tests_m45_2;

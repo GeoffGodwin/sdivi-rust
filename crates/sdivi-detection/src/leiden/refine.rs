@@ -178,7 +178,7 @@ pub fn refine_partition(
         refine_community(graph, members, &mut refined, rng, quality, gamma);
     }
 
-    renumber_in_place(&mut refined);
+    super::renumber(&mut refined);
     refined
 }
 
@@ -263,19 +263,5 @@ fn refine_community(
 
     for (local, &sc) in state.assignment.iter().enumerate() {
         refined[local_to_global[local]] = sc_to_global[&sc];
-    }
-}
-
-/// Renumbers community IDs in-place to a dense range `[0, k)`.
-fn renumber_in_place(assignment: &mut [usize]) {
-    let mut map = BTreeMap::new();
-    let mut next = 0usize;
-    for comm in assignment.iter_mut() {
-        let entry = map.entry(*comm).or_insert_with(|| {
-            let c = next;
-            next += 1;
-            c
-        });
-        *comm = *entry;
     }
 }

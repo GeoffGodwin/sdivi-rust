@@ -12,6 +12,10 @@ env:
   # Pin wasm-bindgen-cli to match the workspace's wasm-bindgen lib version
   # (capped at <0.2.118 in Cargo.toml so the CLI builds on rustc 1.85).
   WASM_BINDGEN_VERSION: "0.2.117"
+  # Pin TypeScript for the consumer-surface typecheck (M47).
+  # Bump with care: re-verify negative.ts @ts-expect-error lines still fire
+  # on each TS major/minor bump (error grouping can change between releases).
+  TYPESCRIPT_VERSION: "5.5.4"
   # 1.75 MB per-target budget; 5 MB combined budget for both targets.
   # The per-target budget was raised from 1.2 MB at the close of M19–M24 to
   # absorb the new WASM surface (weighted Leiden, list_categories,
@@ -155,6 +159,32 @@ jobs:
           # a publish + npm install round-trip.
           mkdir -p node_modules/@geoffgodwin
           ln -s "${GITHUB_WORKSPACE}/bindings/sdivi-wasm/pkg" node_modules/@geoffgodwin/sdivi-wasm
+
+      - name: Install TypeScript (pinned) for consumer-surface typecheck
+        if: matrix.os == 'ubuntu-latest'
+        # --no-save: do not create/update any package.json.
+        # --no-package-lock: do not emit package-lock.json in the repo root.
+        # --no-fund: suppress funding messages (no package.json → npm emits them by default).
+        # --no-audit: suppress audit output (no lockfile to audit).
+        # This installs tsc to node_modules/.bin/tsc in the workspace root so
+        # npx tsc resolves it without a network fetch in the next step.
+        run: npm install --no-save --no-package-lock --no-fund --no-audit typescript@${{ env.TYPESCRIPT_VERSION }}
+
+      - name: Typecheck WASM consumer surface (tsc --noEmit)
+        if: matrix.os == 'ubuntu-latest'
+        # Validates that the corrected examples typecheck under strict consumer
+        # settings against the freshly built pkg/ .d.ts, and that the negative
+        # fixture's @ts-expect-error directives are all consumed (preventing
+        # silent contract drift). See bindings/sdivi-wasm/tests/typecheck/.
+        run: npx tsc --noEmit -p bindings/sdivi-wasm/tests/typecheck/tsconfig.json
+
+      - name: Lint consumer docs for forbidden patterns
+        if: matrix.os == 'ubuntu-latest'
+        # Belt-and-suspenders: grep catches prose snippets in doc fences that
+        # tsc cannot reach as standalone files. Forbidden: import init / await
+        # init( (no init() in bundler+nodejs builds) and edge_weights: { (must
+        # be a JS Map, not a plain object). See tests/check_docs.sh for details.
+        run: sh bindings/sdivi-wasm/tests/check_docs.sh
 
       - name: Run Node.js smoke tests (CJS and ESM)
         if: matrix.os == 'ubuntu-latest'

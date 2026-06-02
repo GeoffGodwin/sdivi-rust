@@ -5,10 +5,15 @@
 // `import`/`require`), so both ESM and CJS Node consumers route to the
 // nodejs wasm-pack target — which uses fs.readFileSync to load the .wasm
 // synchronously, no init() needed. Browser/bundler consumers skip the
-// `node` condition and resolve through `import` to the bundler target;
-// that path's runtime is validated by wasm-bindgen-cli's own pinned test
-// suite and by real consumer integration (e.g., Meridian) — it is not
-// exercised end-to-end in this CI workflow.
+// `node` condition and resolve through `import` to the bundler target.
+//
+// Bundler *type* contract (both targets): validated by M47's tsc --noEmit
+// guard over examples/binding_node.ts and examples/binding_bundler.ts against
+// the freshly generated pkg/*.d.ts, plus a self-verifying negative fixture
+// (tests/typecheck/negative.ts). Bundler *runtime* path (instantiation via
+// wasm-pack bundler target): validated by wasm-bindgen-cli's own pinned test
+// suite and by real consumer integration — a runtime bundler e2e is
+// intentionally deferred (see M47 Non-Goals and Seeds Forward).
 //
 // The nodejs target is CJS, so we default-import then destructure.
 // Node's cjs-module-lexer would also let us use named imports, but

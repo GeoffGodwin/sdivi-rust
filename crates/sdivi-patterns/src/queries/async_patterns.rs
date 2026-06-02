@@ -1,7 +1,18 @@
-//! Node kinds classified as async-concurrency patterns.
+//! Node-kind and callee-text classification for async-concurrency patterns.
 //!
-//! These node kinds correspond to the `async_patterns` category in the
-//! [`PatternCatalog`](crate::catalog::PatternCatalog).
+//! ## Node-kind detection
+//!
+//! - `await_expression` — `.await` on a `Future` (Rust) or `await expr` (TS/JS)
+//!
+//! ## Callee-text detection (TypeScript / JavaScript only)
+//!
+//! Promise-chain call shapes registered at CALL_DISPATCH slot P1:
+//! - `.then(…)`, `.catch(…)`, `.finally(…)`
+//!
+//! Both paths together make `async_patterns` a **hybrid** category: `await_expression`
+//! nodes arrive via [`category_for_node_kind`](super::category_for_node_kind), and
+//! Promise-chain `call_expression` nodes arrive via [`matches_callee`] in
+//! [`super::classify_hint`]'s CALL_DISPATCH.
 
 use std::sync::LazyLock;
 

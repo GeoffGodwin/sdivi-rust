@@ -7,6 +7,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.47] - 2026-06-02
+
+### Added
+
+- **CI:** Added a TypeScript consumer-contract guard for `@geoffgodwin/sdivi-wasm`
+  (M47). The WASM workflow now `tsc --noEmit`-typechecks the published examples
+  (`examples/binding_node.ts`, `examples/binding_bundler.ts`) against the freshly
+  generated `.d.ts` under strict settings (`--strict --noUncheckedIndexedAccess
+  --exactOptionalPropertyTypes`), asserts via a self-verifying negative fixture
+  (`tests/typecheck/negative.ts`) that the previously-broken `await init()` and
+  object-as-`Map` patterns fail to typecheck, and lints the consumer docs for those
+  regressions (`tests/check_docs.sh`). Prevents the binding's documented usage from
+  drifting away from the shipped types.
+
+- `comprehensions` pattern category added (M46): Python `list_comprehension`,
+  `set_comprehension`, `dictionary_comprehension`, and `generator_expression` nodes
+  are now classified as `comprehensions`. All four node kinds were already collected
+  by the Python adapter but previously dropped. Pure node-kind classification — no
+  parsing change. `list_categories()` count increases from 18 to 19.
+  `snapshot_version` stays `"1.0"`. Python repos gain a non-zero `comprehensions`
+  bucket on the first post-upgrade snapshot. Other languages produce zero instances.
+  Nested comprehensions each emit their own node. See `MIGRATION_NOTES.md`.
+
+- `error_handling` pattern category enriched (M45.2): Python `except_clause` (each
+  `except` arm) and Java `catch_clause` (each `catch` arm) plus `throw_statement` (each
+  `throw` site) are now classified as `error_handling`. All three node kinds were already
+  collected by their respective adapters but previously dropped. Pure node-kind
+  classification — no parsing change, no new category. `list_categories()` count stays 18.
+  `snapshot_version` stays `"1.0"`. **Double-count semantic:** a Python `try` with 3
+  `except` arms yields 1 `try_statement` + 3 `except_clause` = 4 `error_handling`
+  instances (intentional — more arms = higher entropy signal, not a regression). Rust and
+  TypeScript/JavaScript `error_handling` counts are unaffected. See `MIGRATION_NOTES.md`.
+
+- `resource_management` pattern category enriched (M45.1): Python `with_statement`
+  (context managers — `with open(p) as f:`), Go `defer_statement` (deferred cleanup —
+  `defer f.Close()`), and Java `try_with_resources_statement` are now classified as
+  `resource_management`. All three node kinds were already collected by their respective
+  adapters but previously dropped. Pure node-kind classification — no parsing change, no
+  new category. `list_categories()` count stays 18. `snapshot_version` stays `"1.0"`.
+  Python, Go, and Java repos gain non-zero `resource_management` buckets on the first
+  post-upgrade snapshot. Rust `macro_invocation` behaviour is unchanged. See
+  `MIGRATION_NOTES.md`.
+
+- `concurrency` pattern category (M44): goroutine launches (`go_statement`) and channel
+  multiplexing (`select_statement`) in Go — already collected by the Go adapter but
+  previously dropped — are now routed to `concurrency`. Multi-future coordination calls are
+  also classified: `Promise.all/allSettled/race/any` (TypeScript/JavaScript) and
+  `asyncio.gather/create_task/wait/as_completed/run` (Python) at CALL_DISPATCH slot P11
+  (lowest). `defer_statement` is not concurrency. `promise.then/catch/finally` chains stay
+  in `async_patterns`. `list_categories()` count grows from 17 → 18. `snapshot_version`
+  stays `"1.0"`. No existing category assignments change. See `MIGRATION_NOTES.md`.
+
+- `serialization` pattern category (M43): (de)serialization boundary calls are now
+  natively classified as `serialization` via receiver-anchored callee-text at CALL_DISPATCH
+  slot P3 (below `testing` P2, above `schema_validation` P4). TypeScript/JavaScript:
+  `JSON.parse(…)`, `JSON.stringify(…)`, `structuredClone(…)`. Python: `json.loads(…)`,
+  `json.dumps(…)`, `json.load(…)`, `json.dump(…)`, `pickle.loads(…)`, `pickle.dumps(…)`.
+  Go: `json.Marshal(…)`, `json.Unmarshal(…)`, `json.MarshalIndent(…)`, `json.NewEncoder(…)`,
+  `json.NewDecoder(…)`. Bare `.parse(` is intentionally excluded (collides with schema
+  validators). `list_categories()` count grows from 16 → 17. `snapshot_version` stays
+  `"1.0"`. No existing category assignments change. See `MIGRATION_NOTES.md`.
+
+- `testing` pattern category (M42): test-suite structure and assertion calls are now
+  natively classified as `testing` via callee-text inspection at CALL_DISPATCH slot P2
+  (just below `async_patterns` P1). TypeScript/JavaScript: BDD globals (`describe`, `it`,
+  `test`, `context`), lifecycle hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`),
+  `expect(…)` assertion roots, and framework-namespaced helpers (`jest.fn`, `jest.mock`,
+  `vi.fn`, `vi.mock`, `vi.spyOn`, etc. — full Jest and Vitest helper set). Go:
+  `testing.T` method calls (`t.Run`, `t.Fatal`, `t.Error`, `t.Errorf`, and the full T
+  method set) via `\bt\.` word-boundary anchor. Python: `unittest.TestCase` assertion
+  methods (`self.assertEqual`, `self.assertTrue`, and the full `self.assert[A-Z]…`
+  family). `list_categories()` count grows from 15 → 16. `snapshot_version` stays
+  `"1.0"`. **`scope_exclude` interaction:** the bucket is non-empty only when test files
+  are in the pattern scope; repos that exclude test paths will see a zero count. See
+  `MIGRATION_NOTES.md` for the count-introduction event and `scope_exclude` guidance.
+
+- `http_routing` pattern category (M41): server-side route/endpoint registration calls are
+  now natively classified as `http_routing` via receiver-allowlist-anchored callee-text at
+  CALL_DISPATCH slot P7. TypeScript/JavaScript: Express/Koa/Fastify/Hono calls on known
+  server handles (`app`, `router`, `fastify`, `server`, `srv`) with HTTP verbs and middleware
+  methods (`get|post|put|delete|patch|head|options|all|use|route`). Go: net/http + Gin/Echo/Gorilla
+  calls on known router handles (`http`, `mux`, `r`, `e`, `router`, `engine`, `g`, `rg`).
+  Python: Flask/FastAPI `app.add_url_rule(...)` imperative registration. **Precedence note:**
+  `app.get(...)` / `router.post(...)` previously resolved to `data_access`; they now resolve to
+  `http_routing` — a count shift. Client calls (`axios.get`, `fetch`) stay `data_access`.
+  NestJS/FastAPI decorator routes stay `decorators`. `list_categories()` count grows from 14 → 15.
+  `snapshot_version` stays `"1.0"`. See `MIGRATION_NOTES.md` for the worked before/after.
+
+- `collection_pipelines` pattern category (M40): `.map`, `.filter`, `.reduce`,
+  `.flatMap`, `.forEach`, `.find`, `.findIndex`, `.some`, `.every`, `.flat` on any
+  receiver are now natively classified as `collection_pipelines` via member-call
+  callee-text inspection at CALL_DISPATCH slot P10 (broadest member-call category —
+  all more specific categories resolve first). TypeScript and JavaScript are the primary
+  targets; the same regex applies to Go and Java where these method names appear.
+  Callee-text cannot distinguish the receiver type — `rxObservable.map(fn)`,
+  `new Map().forEach(cb)`, and `array.map(f)` all match; treated as acceptable entropy
+  noise. `list_categories()` count grows from 13 → 14. `snapshot_version` stays `"1.0"`.
+  See `MIGRATION_NOTES.md` for the count-introduction event and receiver-type noise note.
+
+- `state_store` pattern category (M39): Redux / RTK (`createSlice`, `configureStore`,
+  `createStore`, etc.), React-Redux hooks (`useSelector`, `useDispatch`, `useStore`),
+  Zustand (`create(...)`), Jotai / Recoil (`atom`, `selector`), MobX (`observable`,
+  `makeAutoObservable`, etc.), Signals — Preact/Angular (`signal`, `computed`, `effect`),
+  and Solid (`createSignal`, `createStore`, etc.) are now natively classified as
+  `state_store` via callee-text inspection at CALL_DISPATCH slot P5 (above
+  `framework_hooks` P6). All patterns are `^`-anchored at callee start — member-access
+  calls (`prisma.user.create(data)`, `document.createElement(...)`) are intentionally
+  excluded. **Precedence reassignment:** `useSelector`, `useDispatch`, and `useStore`
+  previously resolved to `framework_hooks`; they now resolve to `state_store` (more
+  specific wins). `list_categories()` count grows from 12 → 13. `snapshot_version`
+  stays `"1.0"`. See `MIGRATION_NOTES.md` for the precedence-reassignment story.
+
+- `schema_validation` pattern category (M38): Zod (`z.object`, `z.string`, `z.enum`), Yup
+  (`yup.object().shape(...)`), Valibot (`v.object`, `v.pipe`), Superstruct (`s.object`), and
+  the Zod-specific `.safeParse(` call in TypeScript and JavaScript are now natively classified
+  as `schema_validation` via callee-text inspection at CALL_DISPATCH slot P4. Python: Pydantic
+  field-constraint calls (`Field(...)`, `constr(...)`, `conint(...)`) are also classified here.
+  Detection is namespace-anchored for TS/JS (`z.`/`yup.`/`v.`/`s.`) — bare method calls on
+  arbitrary receivers are intentionally excluded. `class Foo(BaseModel)` is counted under
+  `class_hierarchy`; class-validator decorators (`@IsString()`) belong to `decorators`.
+  On the first post-upgrade snapshot of a repo using these libraries, `schema_validation`
+  transitions from zero to non-zero — a count-introduction event; see `MIGRATION_NOTES.md`.
+  `list_categories()` count grows from 11 → 12. `snapshot_version` stays `"1.0"`.
+
+- `null_safety` pattern category (M37): TypeScript and JavaScript `optional_chain` nodes
+  (`a?.b`, `arr?.[0]`) and TypeScript `non_null_expression` nodes (`el!`) are now
+  natively classified as `null_safety`. Note: optional calls (`fn?.()`) emit
+  `call_expression` in the grammar, not `optional_chain` — they are not counted here.
+  Node-kind-only — all optional chains and non-null assertions are counted. On the first post-upgrade snapshot of a TS/JS repo
+  using these constructs, `null_safety` transitions from zero to non-zero — a
+  count-introduction event; see `MIGRATION_NOTES.md` for details. Nullish coalescing
+  (`??`) is deferred (requires operator-field inspection beyond the v0 model).
+  `list_categories()` count grows from 10 → 11. `snapshot_version` stays `"1.0"`.
+
+- `decorators` pattern category extended to Python (M36.2): `decorated_definition` nodes
+  (the tree-sitter-python wrapper for `@`-decorated functions and classes) are now classified
+  as `decorators`. Covers `@dataclass`, `@property`, `@staticmethod`, `@app.route(...)`,
+  `@pytest.fixture`, `@cached_property`, `@app.task`, and any other decorator syntax.
+  The Python adapter already emitted `decorated_definition` hints — they now route to the
+  `decorators` bucket. **Count semantics:** Python counts one instance per decorated definition
+  (wrapper-granularity); TypeScript/JavaScript count one per decorator line. See
+  `docs/pattern-categories.md` for the v0 rationale. `list_categories()` count stays at 10;
+  `snapshot_version` stays `"1.0"`.
+
+- `decorators` pattern category (M36.1): TypeScript and JavaScript `decorator` nodes
+  (`@Injectable()`, `@Component({...})`, `@Entity()`, `@Get('/')`, `@IsString()`, etc.)
+  are now natively classified as `decorators`. Node-kind-only — every decorator counts
+  regardless of name; decorator-shape entropy is the signal. The parsing stage now emits
+  `decorator` hints (previously uncollected). On the first post-upgrade snapshot of a
+  TS/JS repo using decorators, `decorators` transitions from zero to non-zero —
+  a count-introduction event; see `MIGRATION_NOTES.md` for details.
+  `list_categories()` count grows from 9 → 10. `snapshot_version` stays `"1.0"`.
+
+- `framework_hooks` pattern category (M35): TypeScript and JavaScript `call_expression`
+  callees matching `^use[A-Z]` are now natively classified as `framework_hooks`. Covers
+  built-in React/Vue/Svelte hooks (`useState`, `useEffect`, `useMemo`, etc.) and the
+  full custom-hook ecosystem (`useAuth`, `useStore`, etc.). On the first post-upgrade
+  snapshot of a TS/JS repo, `framework_hooks` transitions from zero to non-zero —
+  a count-introduction event; see `MIGRATION_NOTES.md` for details.
+  `list_categories()` count grows from 8 → 9. `snapshot_version` stays `"1.0"`.
+
+### Changed
+
+- (Internal) `classify_hint`'s `call_expression`/`call` arm now iterates a `const
+  CALL_DISPATCH` registry instead of a hand-ordered if-chain. Behaviour is
+  identical — P1/P8/P9 (`async_patterns` > `logging` > `data_access`) resolve as
+  before. The registry makes precedence a first-class, tested contract for the
+  M35–M44 category expansion. No snapshot output change; `snapshot_version` stays
+  `"1.0"`. See `docs/pattern-categories.md` ("Canonical precedence table") for the
+  full P1–P11 slot specification.
+
 ## [0.2.23] - 2026-05-29
 
 ### Changed
@@ -34,8 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sdivi_patterns::queries::logging::matches_callee(text, language) -> bool` — per-language logging callee regex tables.
 - `sdivi_patterns::queries::async_patterns::matches_callee(text, language) -> bool` — TypeScript/JavaScript Promise-chain callee regex.
 - `sdivi_patterns::queries::resource_management::excludes_callee(text, language) -> bool` — inverted: returns `true` when a `macro_invocation` is a logging macro and should not be classified as resource management.
-- New pattern category `class_hierarchy` covering class, interface, and impl declarations across TypeScript, JavaScript, Python, Rust, and Java. Go is skipped (no class/interface AST shape). Adds `class_declaration` / `class_definition` / `abstract_class_declaration` / `interface_declaration` / `impl_item` to the relevant language adapters' `PATTERN_KINDS`. `list_categories()` now returns 8 entries. **Migration note:** adopters will see a new `class_hierarchy` bucket appear in snapshots post-upgrade; a `compute_delta` between a pre-upgrade snapshot (no `class_hierarchy` key) and a post-upgrade snapshot is a one-time recalibration event. Use `[thresholds.overrides.class_hierarchy]` with an `expires` date to defer recalibration if needed.
-- New pattern category `logging` (catalog-only for `category_for_node_kind` — `classify_hint` now returns `["logging"]` for matching callees). `list_categories()` now returns 7 entries.
+- New pattern category `class_hierarchy` covering class, interface, and impl declarations across TypeScript, JavaScript, Python, Rust, and Java. Go is skipped (no class/interface AST shape). Adds `class_declaration` / `class_definition` / `abstract_class_declaration` / `interface_declaration` / `impl_item` to the relevant language adapters' `PATTERN_KINDS`. `list_categories()` returns 8 entries (at M31; see current count in the Unreleased block above). **Migration note:** adopters will see a new `class_hierarchy` bucket appear in snapshots post-upgrade; a `compute_delta` between a pre-upgrade snapshot (no `class_hierarchy` key) and a post-upgrade snapshot is a one-time recalibration event. Use `[thresholds.overrides.class_hierarchy]` with an `expires` date to defer recalibration if needed.
+- New pattern category `logging` (catalog-only for `category_for_node_kind` — `classify_hint` now returns `["logging"]` for matching callees). `list_categories()` returns 7 entries (at M30; see current count in the Unreleased block above).
 - New pattern category `data_access` covering call expressions across all supported languages. `call_expression` nodes in TypeScript, JavaScript, and Go are now bucketed under `data_access` in the pattern catalog (these were already collected as `PatternHint`s but previously classified as `None`). Adds `"call"` to the Python adapter's collected node kinds, so all Python function calls now emit a `PatternHint` and are bucketed under `data_access`. **Migration note:** a `compute_delta` between a pre-upgrade snapshot (no `data_access` key) and a post-upgrade snapshot (new `data_access` key) is a one-time recalibration event — the new top-level key should not be read as a sudden drift spike.
 
 ### Fixed

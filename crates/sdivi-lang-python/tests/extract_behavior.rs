@@ -226,3 +226,263 @@ fn both_class_kinds_collected_in_one_file() {
         "both class definitions must appear as class_definition hints, got: {class_hints:?}"
     );
 }
+
+// ── decorator pattern hints (M36.2) ──────────────────────────────────────────
+
+#[test]
+fn decorated_definition_captured_as_decorator_hint() {
+    let record = parse("@dataclass\nclass Point:\n    x: int\n    y: int\n");
+    let has_decorated = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "decorated_definition");
+    assert!(
+        has_decorated,
+        "decorated_definition must appear in pattern_hints for a @dataclass class"
+    );
+}
+
+#[test]
+fn fastapi_and_pytest_fixture_produce_decorated_definition_hints() {
+    // Two decorated functions → two decorated_definition hints (wrapper-granularity:
+    // one hint per decorated function regardless of how many @-lines are stacked).
+    let source = concat!(
+        "@app.get(\"/users\")\n",
+        "def get_users():\n",
+        "    return []\n",
+        "\n",
+        "@pytest.fixture\n",
+        "def db():\n",
+        "    return {}\n",
+    );
+    let record = parse(source);
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 2,
+        "two decorated functions must produce exactly 2 decorated_definition hints, got: {decorated_count}"
+    );
+}
+
+#[test]
+fn stacked_decorators_count_as_one_decorated_definition() {
+    // Three @-lines on one function = one decorated_definition (wrapper-granularity).
+    let source = "@decorator_a\n@decorator_b\n@decorator_c\ndef fn():\n    pass\n";
+    let record = parse(source);
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 1,
+        "three stacked decorators on one function = one decorated_definition, got: {decorated_count}"
+    );
+}
+
+#[test]
+fn file_with_no_decorators_produces_no_decorated_definition_hints() {
+    let record = parse("def plain():\n    pass\n");
+    let decorated_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorated_definition")
+        .count();
+    assert_eq!(
+        decorated_count, 0,
+        "a file with no decorators must produce zero decorated_definition hints"
+    );
+}
+
+// ── M45.2: except_clause pattern hints ───────────────────────────────────────
+
+/// M45.2: `except_clause` is emitted by the Python adapter from real Python source —
+/// confirming the real tree-sitter parse path that the synthetic-FeatureRecord tests
+/// in `error_handling_fixture.rs` do not cover.
+#[test]
+fn except_clause_captured_as_pattern_hint() {
+    let source = "try:\n    pass\nexcept ValueError:\n    pass\n";
+    let record = parse(source);
+    let has_except = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "except_clause");
+    assert!(
+        has_except,
+        "except_clause must appear in pattern_hints when parsing real Python source; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M45.2: Each `except` arm in a multi-arm try/except produces a separate
+/// `except_clause` hint — one hint per arm, not one per try block.
+#[test]
+fn multi_arm_except_emits_one_hint_per_arm() {
+    let source = concat!(
+        "try:\n",
+        "    pass\n",
+        "except ValueError:\n",
+        "    pass\n",
+        "except (TypeError, KeyError) as e:\n",
+        "    pass\n",
+        "except Exception:\n",
+        "    pass\n",
+    );
+    let record = parse(source);
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        except_count, 3,
+        "three except arms must produce exactly 3 except_clause hints; got: {except_count}"
+    );
+}
+
+/// M45.2: A `try` with `except` arms emits both `try_statement` and `except_clause`
+/// hints — the double-count semantic (1 try + N excepts = 1 + N total).
+#[test]
+fn try_with_excepts_emits_both_try_statement_and_except_clause_hints() {
+    let source = concat!(
+        "try:\n",
+        "    risky()\n",
+        "except OSError:\n",
+        "    pass\n",
+        "except RuntimeError:\n",
+        "    pass\n",
+    );
+    let record = parse(source);
+    let try_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "try_statement")
+        .count();
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        try_count, 1,
+        "one try block must produce exactly 1 try_statement hint; got: {try_count}"
+    );
+    assert_eq!(
+        except_count, 2,
+        "two except arms must produce exactly 2 except_clause hints; got: {except_count}"
+    );
+}
+
+/// M45.2: A bare `try/finally` with no `except` arms produces zero `except_clause` hints.
+#[test]
+fn try_finally_without_except_produces_no_except_clause_hints() {
+    let source = "try:\n    pass\nfinally:\n    pass\n";
+    let record = parse(source);
+    let except_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "except_clause")
+        .count();
+    assert_eq!(
+        except_count, 0,
+        "try/finally with no except arms must produce zero except_clause hints; got: {except_count}"
+    );
+}
+
+// ── M46: comprehension pattern hints ─────────────────────────────────────────
+
+/// M46: `list_comprehension` is emitted by the Python adapter from real Python source.
+///
+/// Confirms the tree-sitter-python grammar uses "list_comprehension" as the node kind
+/// and that the adapter's PATTERN_KINDS table includes it.
+#[test]
+fn list_comprehension_captured_as_pattern_hint() {
+    let record = parse("squares = [x * x for x in [1, 2, 3]]\n");
+    let has_list_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "list_comprehension");
+    assert!(
+        has_list_comp,
+        "list_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `set_comprehension` is emitted by the Python adapter from real Python source.
+#[test]
+fn set_comprehension_captured_as_pattern_hint() {
+    let record = parse("unique = {x for x in [1, 2, 3]}\n");
+    let has_set_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "set_comprehension");
+    assert!(
+        has_set_comp,
+        "set_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `dictionary_comprehension` is emitted by the Python adapter from real Python source.
+#[test]
+fn dictionary_comprehension_captured_as_pattern_hint() {
+    let record = parse("mapping = {k: v for k, v in [(\"a\", 1)]}\n");
+    let has_dict_comp = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "dictionary_comprehension");
+    assert!(
+        has_dict_comp,
+        "dictionary_comprehension must appear in pattern_hints; \
+         got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// M46: `generator_expression` is emitted by the Python adapter from real Python source.
+///
+/// Verifies the node-kind string "generator_expression" matches the pinned
+/// tree-sitter-python grammar (Watch For item in the M46 milestone spec).
+#[test]
+fn generator_expression_captured_as_pattern_hint() {
+    // The argument to sum() is a generator_expression node in tree-sitter-python.
+    let record = parse("total = sum(x for x in [1, 2, 3])\n");
+    let has_gen_expr = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "generator_expression");
+    assert!(
+        has_gen_expr,
+        "generator_expression must appear in pattern_hints for `sum(x for x in xs)`; \
+         if absent the tree-sitter-python grammar may use a different node-kind spelling. \
+         Got node kinds: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}

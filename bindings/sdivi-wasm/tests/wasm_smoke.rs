@@ -240,12 +240,26 @@ fn test_normalize_and_hash_differs_by_kind() {
 fn list_categories_returns_schema_version_and_expected_count() {
     let catalog = list_categories().unwrap();
     assert_eq!(catalog.schema_version, "1.0");
-    // 8 categories defined for snapshot_version "1.0"
-    assert_eq!(catalog.categories.len(), 8);
+    // 19 categories defined for snapshot_version "1.0" (M46 adds comprehensions)
+    assert_eq!(catalog.categories.len(), 19);
     let names: Vec<&str> = catalog.categories.iter().map(|c| c.name.as_str()).collect();
-    assert!(names.contains(&"error_handling"));
     assert!(names.contains(&"async_patterns"));
-    assert!(names.contains(&"data_access"));
-    assert!(names.contains(&"logging"));
     assert!(names.contains(&"class_hierarchy"));
+    assert!(names.contains(&"collection_pipelines"));
+    assert!(names.contains(&"comprehensions"));
+    assert!(names.contains(&"concurrency"));
+    assert!(names.contains(&"data_access"));
+    assert!(names.contains(&"decorators"));
+    assert!(names.contains(&"error_handling"));
+    assert!(names.contains(&"framework_hooks"));
+    assert!(names.contains(&"http_routing"));
+    assert!(names.contains(&"logging"));
+    assert!(names.contains(&"null_safety"));
+    assert!(names.contains(&"resource_management"));
+    assert!(names.contains(&"schema_validation"));
+    assert!(names.contains(&"serialization"));
+    assert!(names.contains(&"state_management"));
+    assert!(names.contains(&"state_store"));
+    assert!(names.contains(&"testing"));
+    assert!(names.contains(&"type_assertions"));
 }

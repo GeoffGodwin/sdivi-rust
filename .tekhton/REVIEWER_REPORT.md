@@ -1,26 +1,47 @@
-# Reviewer Report — M33: Native Pipeline Switchover to `classify_hint`
-Review cycle: 1 of 4
-Reviewed by: reviewer agent
+# Reviewer Report
+
+**Reviewer:** code-review agent
+**Date:** 2026-06-02
+**Branch:** feature/MorePatterns
+**Review cycle:** 1 of 2
+
+---
 
 ## Verdict
-APPROVED_WITH_NOTES
+APPROVED
 
 ## Complex Blockers (senior coder)
-- None
+None
 
 ## Simple Blockers (jr coder)
-- None
+None
 
 ## Non-Blocking Notes
-- `queries/mod.rs:24-31` — The `ALL_CATEGORIES` const doc comment still reads "Note: `logging` is a catalog-only category for `snapshot_version "1.0"`" and implies the native pipeline never populates it. M33 makes this framing stale — logging is now natively classified via `classify_hint`. The individual claim that "`category_for_node_kind` never returns `Some("logging")`" remains accurate (the M30 sentinel confirms it), but the "catalog-only" label should be updated to say logging is natively classified since M33.
-- `prop_classify_hint.rs` appears as modified in gitStatus but is absent from CODER_SUMMARY "Files Modified". The file content is correct and valuable — it tests the fall-through consistency invariant for non-special node kinds. The omission is a CODER_SUMMARY accuracy gap only; nothing is wrong with the code.
-- `MIGRATION_NOTES.md` worked example shows pre-M33 `data_access.instance_count: 2`. Milestone spec explicitly requires this be generated from a real fixture run, not estimated. If hand-authored, confirm against an actual pipeline run before tagging the release — the spec warns "an inaccurate example is worse than no example."
+None
 
 ## Coverage Gaps
-- No integration test covers the `simple-go` fixture acceptance criterion: "data_access containing only `db.*`/`sql.*`-shape calls and `logging` containing only `fmt.Print*`-shape calls; non-matching calls dropped from both." This is an explicit M33 acceptance criterion not covered by any modified test file.
-- WASM re-baselining: CODER_SUMMARY does not confirm `bindings/sdivi-wasm` integration tests were checked. If no WASM test asserts pattern_metrics distribution shape the criterion is vacuously satisfied — PR description should note this explicitly so reviewers don't assume a check was done.
+None
 
 ## Drift Observations
-- `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` — The file name and determinism test (`m32_pipeline_output_byte_identical_for_same_params`) are labelled M32 but the file now hosts the M33 positive sentinel (`m33_pipeline_snapshot_has_logging_entry_for_tracing_macros`). The M32 determinism test is still correct and load-bearing. Consider renaming the file to `snapshot_pipeline_regression.rs` in a future cleanup pass to avoid reader confusion.
-- `catalog.rs:110-113` — `crate::hint_input::PatternHintInput` is referenced by its full path inline rather than imported at the top of the file via `use`. The other feature-gated items (`fingerprint_node_kind`, `queries`) are imported normally. Cosmetic inconsistency only.
-- `resource_management::excludes_callee` and `logging::matches_callee` are both tested in the `macro_invocation` arm of `classify_hint` — they use the same regex in v0, so the double check is harmless but redundant. The prior M32 Drift Observation about these two identical `RUST_LOGGING_RE` / `RUST_RE` literals being maintained separately remains open; M33 does not worsen it.
+None
+
+---
+
+## Review Notes
+
+The single file modified — `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` — is
+a test-only change. The implementation:
+
+- Replaces the prior manual 18-entry `assert_ne!` block in `go_statement_not_misclassified`
+  with a loop over `ALL_CATEGORIES` (imported from `sdivi_patterns::queries`).
+- The branch logic is correct: when `*cat == "concurrency"` it asserts the result equals
+  `Some("concurrency")`; for every other category it asserts inequality. This faithfully
+  replicates the semantics of the old hand-enumerated list while being self-maintaining.
+- `ALL_CATEGORIES` is confirmed to contain `"concurrency"` at index 4, so the positive
+  assertion branch will fire exactly once, as intended.
+- The `concurrency` sub-module is a public re-export from `sdivi_patterns::queries`
+  (`pub mod concurrency` at mod.rs:17), so `use sdivi_patterns::queries::concurrency` is
+  a valid import.
+
+No public surface was touched. Doc requirement is satisfied. No architecture rule from
+CLAUDE.md is implicated by a test-file refactor.

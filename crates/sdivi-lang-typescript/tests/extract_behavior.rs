@@ -63,8 +63,6 @@ fn parent_relative_import_yields_specifier() {
     assert_eq!(record.imports, &["../lib/x"]);
 }
 
-// ── count tests ──────────────────────────────────────────────────────────────
-
 #[test]
 fn multiple_imports_are_extracted() {
     let record = parse_ts("import { a } from './a';\nimport { b } from './b';\n");

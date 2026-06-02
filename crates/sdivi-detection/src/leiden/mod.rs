@@ -194,7 +194,7 @@ fn leiden_recursive(
 
 /// Renumbers community IDs to a dense range `[0, k)`, sorted by first-occurrence
 /// node index for deterministic output.
-fn renumber(partition: &mut [usize]) {
+pub(super) fn renumber(partition: &mut [usize]) {
     let mut map = BTreeMap::new();
     let mut next = 0usize;
     for comm in partition.iter_mut() {

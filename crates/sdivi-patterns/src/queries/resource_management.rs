@@ -9,10 +9,23 @@ use regex::Regex;
 
 /// Tree-sitter node kinds for resource-management patterns.
 ///
-/// - `macro_invocation`: macro calls (e.g. `drop!`, `vec!`, `println!`)
-pub const NODE_KINDS: &[&str] = &["macro_invocation"];
+/// - `macro_invocation`: Rust macro calls (e.g. `drop!`, `vec!`, `println!`)
+/// - `with_statement`: Python context managers (`with open(p) as f:`, `with lock:`)
+/// - `defer_statement`: Go deferred cleanup (`defer f.Close()`, `defer mu.Unlock()`)
+/// - `try_with_resources_statement`: Java try-with-resources (`try (var r = open()) { ... }`)
+///
+/// These four forms are the canonical scoped-resource-release idioms in their
+/// respective languages and are structurally distinct even though they serve the
+/// same semantic purpose (acquire → use → release on scope exit).
+pub const NODE_KINDS: &[&str] = &[
+    "macro_invocation",
+    "with_statement",
+    "defer_statement",
+    "try_with_resources_statement",
+];
 
 // Rust: logging macros that should fall through to the `logging` category.
+// Must match logging::RUST_RE exactly — update both together.
 // Same pattern as logging::RUST_RE — if a macro_invocation text matches,
 // it is logging, not resource_management.
 //   ^(tracing|log)::  — tracing::info!, log::debug!, etc.

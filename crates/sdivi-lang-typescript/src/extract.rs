@@ -5,16 +5,25 @@ use sdivi_parsing::text::{js_string_content, truncate_to_256_bytes};
 use tree_sitter::Node;
 
 /// Node kinds collected as pattern hints for the patterns stage.
+///
+/// Note: `decorator` is included and the walk recurses into its children, so the
+/// inner `call_expression` inside a decorator (e.g. `Injectable()` inside `@Injectable()`)
+/// is also emitted as a separate hint. For all current CALL_DISPATCH patterns no
+/// spurious classification occurs in practice, but a decorator whose callee matches a
+/// CALL_DISPATCH regex (e.g. `@fetch()`) would double-count. Acceptable for v0.
 const PATTERN_KINDS: &[&str] = &[
     "try_statement",
     "await_expression",
     "arrow_function",
     "call_expression",
+    "decorator",
     "generator_function",
     "generator_function_declaration",
     "class_declaration",
     "abstract_class_declaration",
     "interface_declaration",
+    "optional_chain",
+    "non_null_expression",
 ];
 
 /// Declaration kinds that may appear as the `declaration` child of an

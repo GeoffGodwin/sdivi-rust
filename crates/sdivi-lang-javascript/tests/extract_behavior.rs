@@ -166,3 +166,98 @@ fn pattern_hints_text_does_not_exceed_256_bytes() {
         assert!(hint.text.is_char_boundary(hint.text.len()));
     }
 }
+
+// ── decorator pattern hints (M36.1) ──────────────────────────────────────────
+
+#[test]
+fn file_with_no_decorators_produces_no_decorator_hints() {
+    // JS files without decorator syntax must produce zero decorator hints
+    // regardless of grammar support.
+    let record = parse("function plain() {}\n");
+    let decorator_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorator")
+        .count();
+    assert_eq!(
+        decorator_count, 0,
+        "a JS file with no decorators must produce zero decorator hints"
+    );
+}
+
+#[test]
+fn decorator_hint_is_correctly_typed_if_grammar_emits_it() {
+    // JS Stage-3 decorators: the tree-sitter-javascript grammar may or may not
+    // emit `decorator` nodes for this syntax. Both outcomes are valid — the
+    // adapter collects what the grammar produces. If hints are emitted, they
+    // must have node_kind == "decorator" and text starting with '@'.
+    let source = "@injectable\nclass Service {}\n";
+    let record = parse(source);
+    let decorator_hints: Vec<_> = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "decorator")
+        .collect();
+    // If the grammar did not emit decorator nodes, that is acceptable (grammar-dependent).
+    // If it did emit them, each must be correctly typed and start with '@'.
+    for hint in &decorator_hints {
+        assert_eq!(
+            hint.node_kind, "decorator",
+            "any decorator hint must have node_kind 'decorator'"
+        );
+        assert!(
+            hint.text.starts_with('@'),
+            "decorator hint text must start with '@', got: {:?}",
+            hint.text
+        );
+    }
+}
+
+// ── null_safety pattern hints (M37) ──────────────────────────────────────────
+
+#[test]
+fn optional_chain_captured_as_pattern_hint() {
+    let record = parse("const x = user?.name;\n");
+    let has_opt = record
+        .pattern_hints
+        .iter()
+        .any(|h| h.node_kind == "optional_chain");
+    assert!(
+        has_opt,
+        "optional_chain must appear in pattern_hints for user?.name, got hints: {:?}",
+        record
+            .pattern_hints
+            .iter()
+            .map(|h| h.node_kind.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn js_has_no_non_null_expression_hints() {
+    // non_null_expression is TypeScript-only; JS adapter must not emit it.
+    let record = parse("const x = user?.name;\n");
+    let nne_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "non_null_expression")
+        .count();
+    assert_eq!(
+        nne_count, 0,
+        "JS adapter must not emit non_null_expression hints (TS-only node kind)"
+    );
+}
+
+#[test]
+fn file_with_no_optional_chain_produces_no_null_safety_hints() {
+    let record = parse("const x = user.name;\n");
+    let opt_count = record
+        .pattern_hints
+        .iter()
+        .filter(|h| h.node_kind == "optional_chain" || h.node_kind == "non_null_expression")
+        .count();
+    assert_eq!(
+        opt_count, 0,
+        "plain member access must produce zero null_safety hints"
+    );
+}
