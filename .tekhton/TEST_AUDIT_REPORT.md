@@ -4,90 +4,64 @@
 Tests audited: 1 file, 7 test functions
 Verdict: PASS
 
----
-
 ### Findings
 
 #### SCOPE: Shell orphan-detection false positive
 - File: `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`
-- Issue: The pre-verified orphan list claims this file "imports deleted module
-  '.tekhton/.commit_decision'". The file was read in full and contains only two valid
-  Rust `use` declarations: `sdivi_patterns::queries::category_for_node_kind` and
-  `sdivi_patterns::queries::concurrency`. `.tekhton/.commit_decision` is not a Rust
-  module path and cannot be imported by any Rust source file. False positive in the
-  orphan-detection script — likely a string-search match on a filename fragment rather
-  than actual Rust `use` analysis.
+- Issue: The pre-verified orphan list claims this file "imports deleted module '.tekhton/.commit_decision'" (listed twice). The file was read in full. Its three `use` declarations are `sdivi_patterns::queries::category_for_node_kind`, `sdivi_patterns::queries::concurrency`, and `sdivi_patterns::queries::ALL_CATEGORIES` — all live symbols in the current codebase. `.tekhton/.commit_decision` is not a Rust module path and cannot appear in a `use` statement. This is a false positive in the orphan-detection script, likely a filename-fragment grep rather than Rust `use` analysis.
 - Severity: LOW
-- Action: Dismiss this orphan flag. No test changes needed.
+- Action: Dismiss the orphan flag. No test changes needed.
 
----
-
-#### INTEGRITY (LOW): Trivially-true `assert_ne!` calls against callee-only categories
-- File: `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:100–118`
-- Issue: `go_statement_not_misclassified` (pre-existing; not modified this run) contains
-  eight `assert_ne!` calls for categories that `category_for_node_kind` structurally
-  cannot return for any input: `collection_pipelines`, `framework_hooks`, `http_routing`,
-  `logging`, `schema_validation`, `serialization`, `state_store`, `testing`. These
-  categories are absent from the dispatch chain in `queries/mod.rs:114–139` — the
-  function only checks `async_patterns`, `class_hierarchy`, `comprehensions`,
-  `concurrency`, `data_access`, `decorators`, `error_handling`, `null_safety`,
-  `resource_management`, `state_management`, and `type_assertions`. All eight
-  assertions always pass regardless of implementation changes. The terminal
-  `assert_eq!(result, Some("concurrency"))` at line 121 is the only load-bearing guard.
+#### SCOPE: Language-parameter tests lock in behavior marked as temporary in implementation
+- File: `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:42–67` (`go_statement_language_parameter_ignored`)
+- Issue: The test asserts that `category_for_node_kind("select_statement", "python")` and `category_for_node_kind("select_statement", "rust")` both return `Some("concurrency")`. The `concurrency.rs` module doc explicitly notes that the `_language` parameter exists for a future per-language override — specifically because SQL grammars also emit `select_statement`. These assertions correctly reflect current behavior but will require deliberate updating when a SQL adapter is added. Pre-existing; not introduced by this cycle.
 - Severity: LOW
-- Action: Either remove the eight trivially-true `assert_ne!` calls or add an inline
-  comment clarifying they document the callee-only/node-kind-only API split rather than
-  acting as behavioral guards. This predates the current task; not a blocker.
+- Action: No immediate action. When a SQL adapter is added, update these assertions. Consider adding an inline comment: `// NOTE: must be revised when a SQL language adapter is introduced (see concurrency.rs SQL adapter seed note)`.
 
----
+### Rubric Evaluation
 
-### Targeted Changes — Rubric Evaluation
+**1. Assertion Honesty — PASS**
 
-#### Lines 58–61: `unknown_go_node_kinds_return_none`
+All assertions derive from real function calls, not hard-coded magic values:
+- `go_statement` and `select_statement` are in `concurrency::NODE_KINDS` (concurrency.rs:56); `category_for_node_kind` returns `Some("concurrency")` via the `concurrency::NODE_KINDS.contains()` branch (mod.rs:120–121). ✓
+- `defer_statement` is in `resource_management::NODE_KINDS` (resource_management.rs:23); returns `Some("resource_management")` via mod.rs:128–129. ✓
+- `go_foo_statement` and `unknown_node` appear in no `NODE_KINDS` constant across any category module; `None` is structurally guaranteed. ✓
+- The `ALL_CATEGORIES` loop derives its expected outcomes from `category_for_node_kind` return values, not from literals. ✓
 
-**Assertion Honesty — PASS.** `"go_foo_statement"` and `"unknown_node"` are absent
-from every `NODE_KINDS` slice across all category modules (confirmed by reading
-concurrency.rs, resource_management.rs, and the full dispatch in mod.rs:114–139).
-Both `None` returns are structurally guaranteed.
+**2. Edge Case Coverage — PASS**
 
-**Intent match — PASS.** After the split, the function name is accurate: all
-assertions test the `None` path.
+- `unknown_go_node_kinds_return_none`: covers the `None`/unrecognized-input path.
+- `defer_statement_maps_to_resource_management`: guards a semantically adjacent node kind against misclassification into `concurrency`.
+- `go_statement_not_misclassified`: comprehensive negative check across all 19 categories.
+- Ratio of boundary/error-path tests to happy-path tests is healthy.
 
-**Test Weakening — PASS.** The prior misleading version mixed a `Some("resource_management")`
-assertion into a function named `*_return_none`. Removing that assertion from this
-function and placing it in `defer_statement_maps_to_resource_management` preserves
-all three assertions and corrects the naming.
+**3. Implementation Exercise — PASS**
 
-#### Lines 68–73: `defer_statement_maps_to_resource_management`
+All seven tests call real functions (`category_for_node_kind`, `concurrency::NODE_KINDS`, `ALL_CATEGORIES`) with zero mocking. The full dispatch chain in mod.rs:114–139 is exercised on every call.
 
-**Assertion Honesty — PASS.** `"defer_statement"` is present in
-`resource_management::NODE_KINDS` at `resource_management.rs:20–25` (confirmed). The
-dispatch in `mod.rs:128` returns `Some("resource_management")` for it. The assertion
-matches the implementation exactly.
+**4. Test Weakening Detection — PASS (strengthening confirmed)**
 
-**Intent match — PASS.** Function name encodes both the input and the expected output.
-Doc comment explains the `resource_management` / `concurrency` boundary correctly.
+The coder's change to `go_statement_not_misclassified` (lines 110–127) replaced a static 18-entry manual `assert_ne!` list with a loop over `ALL_CATEGORIES`. This is strictly stronger:
+- The original covered 18 categories statically at write time.
+- The new loop covers all 19 current categories and any future additions automatically.
+- The loop adds an explicit `assert_eq!` branch for `"concurrency"` rather than silently skipping it, converting an implicit assumption into a behavioral assertion.
+No assertions were removed. No expected values were broadened.
 
-#### Lines 80–90: `all_concurrency_node_kinds_are_classified`
+**5. Test Naming and Intent — PASS**
 
-**Assertion Honesty — PASS.** The iteration source is `concurrency::NODE_KINDS`
-(`&["go_statement", "select_statement"]`, concurrency.rs:56), imported directly rather
-than duplicated. If the constant grows, the test covers new entries automatically —
-this directly resolves Drift Observation #2.
+All seven names precisely encode the scenario and expected outcome:
+- `go_statement_maps_to_concurrency_category` — input, expected output ✓
+- `select_statement_maps_to_concurrency_category` — input, expected output ✓
+- `go_statement_language_parameter_ignored` — behavioral property tested ✓
+- `unknown_go_node_kinds_return_none` — inputs and expected output ✓
+- `defer_statement_maps_to_resource_management` — input, expected output ✓
+- `all_concurrency_node_kinds_are_classified` — scope and expected outcome ✓
+- `go_statement_not_misclassified` — input and invariant tested ✓
 
-**Coverage improvement — PASS.** Prior hard-coded `vec!["go_statement",
-"select_statement"]` required manual maintenance and could silently drift from the
-constant. The current form is self-synchronizing.
+**6. Scope Alignment — PASS**
 
-**Implementation Exercise — PASS.** Calls `category_for_node_kind` with each entry
-from the canonical source of truth and checks the return against `Some("concurrency")`.
-No mocking; real dispatch path exercised.
+All three imports (`category_for_node_kind`, `concurrency`, `ALL_CATEGORIES`) are live symbols. The deleted file `.tekhton/.commit_decision` is not referenced in the test source. The coder's stated change (replacing manual `assert_ne!` list with `ALL_CATEGORIES` loop) matches what is present at lines 110–127. No stale references to deleted or renamed items.
 
----
+**7. Test Isolation — PASS**
 
-### Prior-Report Stale Finding (Resolved)
-
-The previous audit (prior run) logged a MEDIUM COVERAGE finding: "hardcoded
-`vec![\"go_statement\", \"select_statement\"]` in `all_concurrency_node_kinds_are_classified`."
-The coder's changes in this run (lines 80–90) resolve that finding by replacing the
-local vec with `concurrency::NODE_KINDS`. The MEDIUM finding is retired.
+All tests are self-contained function calls with literal string inputs. No filesystem reads, no mutable project-state access (no `.tekhton/` file reads, no snapshot files, no config state), no dependency on prior pipeline runs. Fully isolated; order-independent.

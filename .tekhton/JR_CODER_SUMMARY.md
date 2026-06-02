@@ -1,76 +1,35 @@
-# JR Coder Summary — feature/MorePatterns
+# Junior Coder Summary
 
 **Date:** 2026-06-02  
 **Branch:** feature/MorePatterns  
-**Architect Plan:** `.tekhton/ARCHITECT_PLAN.md`
+**Items addressed from ARCHITECT_PLAN.md:** 2 staleness fixes
 
----
+## What Was Fixed
 
-## Cleanup Tasks — Status: ALL COMPLETE
+### 1. Staleness in dispatch_disjointness.rs comment
+- **File:** `crates/sdivi-patterns/tests/dispatch_disjointness.rs:27`
+- **Change:** Updated milestone marker from "At M44" to "At M46" 
+- **Reason:** M45 and M46 added no CALL_DISPATCH entries (only node-kind-only changes); updating the marker reflects the current cycle so the next reviewer knows when it was last verified
 
-The architect plan identified three cleanup categories for the jr coder. **All are marked as "None" — no new work required this cycle.** The following items from prior drifts/cycles have already been resolved and verified:
+### 2. Documentation comment added to categories.rs
+- **File:** `crates/sdivi-core/src/categories.rs:208`
+- **Change:** Added a detailed doc comment above the `CATEGORIES` const definition
+- **Content:** Explains the critical index-order synchronization requirement between `CATEGORIES` and `CATALOG_ENTRIES`, noting that the compile-time length guard catches length mismatches only, not positional shifts. Provides explicit instructions for adding new entries: "When adding a new category: insert `CATALOG_ENTRIES[N].0` at the same index N in this array to maintain the 1:1 positional mapping."
+- **Reason:** Prevents silent corruption of the public const if a caller inserts a new entry at one index in `CATALOG_ENTRIES` but appends (instead of inserts) in `CATEGORIES`
 
-### Staleness Fixes — RESOLVED ✓
+## Files Modified
 
-**Drift Obs §1-4**: ALL_CATEGORIES classification path doc in `crates/sdivi-patterns/src/queries/mod.rs` was updated to:
-- Move `async_patterns` from "Node-kind only" list to "Hybrid" list (it has a CALL_DISPATCH P1 entry)
-- Correct `data_access` listing from "Node-kind only" to "Hybrid" (it has both node-kind and callee-text paths)
-- Add explicit guidance in `category_for_node_kind` doc: "`call_expression` nodes always return `Some("data_access")` here because callee text is unavailable; callers that have the source text should use `classify_hint` to get the callee-aware result."
+- `crates/sdivi-patterns/tests/dispatch_disjointness.rs` (line 27 comment updated)
+- `crates/sdivi-core/src/categories.rs` (doc comment added above CATEGORIES const)
 
-**Change:** `crates/sdivi-patterns/src/queries/mod.rs`  
-- Lines 42–44: Three hybrid categories listed (async_patterns, data_access, concurrency)
-- Lines ~50–60: Updated doc comment on `category_for_node_kind` clarifying call_expression behavior
+## Verification
 
-**Verification:** Count 8 callee-only + 8 node-kind-only + 3 hybrid = 19 total, consistent with `ALL_CATEGORIES.len() == 19`. ✓
+- ✅ All doc tests pass (`cargo test --doc`)
+- ✅ All dispatch_disjointness tests pass (4/4)
+- ✅ All sdivi-core doc tests pass (38/38)
+- ✅ `cargo fmt` passes (formatting applied)
+- ✅ `cargo clippy -- -D warnings` passes (no new warnings)
 
-### Dead Code Removal — None
+## Items NOT addressed
 
-No unused functions or test files identified. Clean codebase.
-
-### Naming Normalization — RESOLVED ✓
-
-**Drift Obs §5**: Test file renamed for semantic correctness.
-
-**Change:** `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` → `snapshot_pipeline_regression.rs`
-- File deleted: `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs`
-- File created: `crates/sdivi-pipeline/tests/snapshot_pipeline_regression.rs` (via rename)
-- All four tests preserved under new name:
-  - M32 byte-identity guard
-  - M32 seed-variation sanity
-  - M33 logging-entry sentinel
-  - M32 schema-version check
-
-**Verification:** File present at correct location; `git status` shows deletion of old file. ✓
-
----
-
-## Additional Test Additions — Supporting Drift Observations
-
-The following test files were added to support the drift observations (not cleanup per se, but completeness improvements):
-
-### `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` (Drift Obs §2)
-Six unit tests for `category_for_node_kind` applied to Go concurrency node kinds:
-- `go_statement_maps_to_concurrency_category`
-- `select_statement_maps_to_concurrency_category`
-- `go_statement_language_parameter_ignored`
-- `unknown_go_node_kinds_return_none`
-- `all_concurrency_node_kinds_are_classified`
-- `go_statement_not_misclassified`
-
-### `crates/sdivi-detection/tests/renumber_delegation.rs` (Drift Obs §6)
-Four tests confirming `renumber_in_place` now correctly delegates to `super::renumber`:
-- Dense `[0, k)` renumbering output
-- Ring-of-cliques behavior
-- Determinism under same seed
-- Valid-range invariant
-
----
-
-## No Further Action Required
-
-All cleanup items from the architect plan are complete. The branch is ready for:
-- Code review (via senior coder / reviewer)
-- Testing (via test harness)
-- Merge to `main`
-
-**Out of scope:** Design doc observations and deferred drift entries remain in `DRIFT_LOG.md` for future cycles (see ARCHITECT_PLAN.md § "Out of Scope").
+No items remain from the architect plan's "Staleness Fixes" section. The "Dead Code Removal" and "Naming Normalization" sections contained no items for jr coder.

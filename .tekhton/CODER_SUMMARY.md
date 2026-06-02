@@ -1,38 +1,38 @@
 # Coder Summary
+
+**Agent:** coder
+**Date:** 2026-06-02
+**Branch:** feature/MorePatterns
+
+---
+
 ## Status: COMPLETE
 
 ## What Was Implemented
-- Identified the 2 unresolved architectural drift observations from the REVIEWER_REPORT's
-  non-blocking notes and drift observations section (never previously logged in DRIFT_LOG.md):
-  1. `unknown_go_node_kinds_return_none` test name was misleading — its third assertion
-     `assert_eq!(category_for_node_kind("defer_statement", "go"), Some("resource_management"))`
-     returns a known-category `Some`, not `None`. Fixed by splitting into two functions:
-     `unknown_go_node_kinds_return_none` (two None-only assertions) and the new
-     `defer_statement_maps_to_resource_management`.
-  2. `all_concurrency_node_kinds_are_classified` hard-coded `vec!["go_statement", "select_statement"]`
-     instead of using `concurrency::NODE_KINDS`. Fixed by importing the constant and iterating
-     over it directly — automatic sync when the constant grows.
-- Also fixed the cosmetic doc-comment paragraph break in `mod.rs` (reviewer note #3): added
-  a blank `///` line before the "In particular, `call_expression`…" sentence.
-- Added both observations to `DRIFT_LOG.md` under `## Unresolved Observations` then
-  immediately added resolved entries under `## Resolved`.
+
+Resolved the 1 unresolved architectural drift observation from `.tekhton/DRIFT_LOG.md`:
+
+- `go_concurrency_node_kind.rs` — replaced the 18-entry manual `assert_ne!` list in
+  `go_statement_not_misclassified` with a loop over `ALL_CATEGORIES`. Each entry is
+  checked: if `"concurrency"`, assert the result equals `Some("concurrency")`; otherwise,
+  assert the result does not equal that category. New categories added to `ALL_CATEGORIES`
+  are now covered automatically with no manual update required.
+
+The DRIFT_LOG entry (`go_concurrency_node_kind.rs:97–122`) was already moved to
+`## Resolved` by a previous agent with `[RESOLVED 2026-06-02]`, but the code change
+had not been applied. The code is now aligned with the resolution note.
 
 ## Root Cause (bugs only)
-N/A — not a bug-fix task
+Not a bug — a deferred code improvement. The previous agent marked the drift observation
+as resolved in the log without applying the corresponding code change. The `go_statement_not_misclassified`
+test still contained the hand-enumerated category list from before `ALL_CATEGORIES` existed.
 
 ## Files Modified
-- `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` — split misleading test into two;
-  updated `all_concurrency_node_kinds_are_classified` to iterate `concurrency::NODE_KINDS`;
-  added `use sdivi_patterns::queries::concurrency` import
-- `crates/sdivi-patterns/src/queries/mod.rs` — added blank `///` line before
-  "In particular, `call_expression`…" sentence in `category_for_node_kind` doc
-- `.tekhton/DRIFT_LOG.md` — added 2 resolved entries under `## Resolved`
+- `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` — replaced manual `assert_ne!`
+  category list with `ALL_CATEGORIES` loop; added `use sdivi_patterns::queries::ALL_CATEGORIES`
 
 ## Docs Updated
-None — no public-surface changes in this task (test file only; doc comment whitespace only).
+None — no public-surface changes in this task.
 
 ## Human Notes Status
-N/A — no Human Notes section in this task
-
-## Observed Issues (out of scope)
-None.
+No Human Notes section present in this task.

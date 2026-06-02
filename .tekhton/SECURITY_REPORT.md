@@ -1,6 +1,6 @@
 ## Summary
 
-This change touches three files: a test file (`crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`) that splits one misleading test into two focused functions and refactors a hard-coded list to iterate `concurrency::NODE_KINDS` directly; a source file (`crates/sdivi-patterns/src/queries/mod.rs`) with a single blank `///` line added to a doc comment; and a log file (`.tekhton/DRIFT_LOG.md`) recording the resolved observations. None of the changed files involve authentication, cryptography, user input handling, network communication, file I/O, or external process invocation. The security surface of this change is negligible.
+This change modifies a single test file (`crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`) to replace a manually maintained list of `assert_ne!` calls with a loop over the internal `ALL_CATEGORIES` constant. The change is entirely within test code; no production code, no public API surface, no I/O, no user input, no authentication or cryptographic logic is touched. The security posture of this change is clean.
 
 ## Findings
 
