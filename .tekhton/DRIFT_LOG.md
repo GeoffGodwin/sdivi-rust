@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-05-07
-- Runs since audit: 27
+- Runs since audit: 28
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 

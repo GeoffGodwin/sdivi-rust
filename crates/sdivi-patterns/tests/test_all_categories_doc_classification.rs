@@ -9,7 +9,7 @@
 
 use sdivi_patterns::queries::{
     self, async_patterns, collection_pipelines, concurrency, data_access, framework_hooks,
-    http_routing, schema_validation, serialization, state_store, ALL_CATEGORIES,
+    http_routing, schema_validation, serialization, state_store, testing, ALL_CATEGORIES,
 };
 
 #[test]
@@ -55,8 +55,17 @@ fn all_19_categories_are_in_constant() {
 
 #[test]
 fn callee_only_categories_listed_in_doc_match_real_dispatch() {
-    // Doc claims these are callee-text only (never returned by category_for_node_kind):
-    let callee_only = vec![
+    // Doc claims these 8 categories are callee-text only — category_for_node_kind
+    // never returns them. Verify by asserting that a representative node kind
+    // (call_expression in typescript) maps to data_access (a hybrid), not any
+    // of the callee-only names.
+    let result = queries::category_for_node_kind("call_expression", "typescript");
+    assert_eq!(
+        result,
+        Some("data_access"),
+        "call_expression should map to the hybrid 'data_access', not a callee-only category"
+    );
+    let callee_only = [
         "logging",
         "testing",
         "serialization",
@@ -66,15 +75,11 @@ fn callee_only_categories_listed_in_doc_match_real_dispatch() {
         "http_routing",
         "collection_pipelines",
     ];
-
     for cat in callee_only {
-        // Spot-check: category_for_node_kind should never return any of these
-        // We test a few known node kinds to verify none return callee-only categories
         assert_ne!(
-            queries::category_for_node_kind("call_expression", "typescript"),
+            result,
             Some(cat),
-            "callee-only category {} should not be returned by category_for_node_kind",
-            cat
+            "callee-only category '{cat}' must not be returned by category_for_node_kind"
         );
     }
 }
@@ -159,13 +164,19 @@ fn node_kind_only_categories_have_dispatch_entries() {
 
 #[test]
 fn callee_only_categories_have_empty_node_kinds() {
-    // Callee-only categories intentionally have empty NODE_KINDS:
-    // they are purely text-based classification via classify_hint
+    // These 7 callee-only categories have empty NODE_KINDS — they are classified
+    // exclusively via classify_hint callee-text inspection:
     assert!(collection_pipelines::NODE_KINDS.is_empty());
     assert!(framework_hooks::NODE_KINDS.is_empty());
     assert!(http_routing::NODE_KINDS.is_empty());
     assert!(schema_validation::NODE_KINDS.is_empty());
     assert!(serialization::NODE_KINDS.is_empty());
     assert!(state_store::NODE_KINDS.is_empty());
-    // Note: logging module intentionally omitted from category_for_node_kind dispatch
+    assert!(testing::NODE_KINDS.is_empty());
+    // Note: logging::NODE_KINDS is intentionally non-empty — it lists the node
+    // kinds the module *inspects* (call_expression, call, macro_invocation) but
+    // those overlap with data_access and resource_management, so logging is NOT
+    // wired into category_for_node_kind. Classification is still callee-text-only
+    // via classify_hint; callers must apply callee-text filtering before emitting
+    // PatternInstanceInput values with category = "logging".
 }

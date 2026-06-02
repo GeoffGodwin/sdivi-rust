@@ -1,5 +1,5 @@
 ## Verdict
-APPROVED_WITH_NOTES
+APPROVED
 
 ## Complex Blockers (senior coder)
 - None
@@ -8,11 +8,11 @@ APPROVED_WITH_NOTES
 - None
 
 ## Non-Blocking Notes
-- `test_all_categories_doc_classification.rs:57-80` — `callee_only_categories_listed_in_doc_match_real_dispatch` iterates over 8 callee-only category names but always calls `category_for_node_kind("call_expression", "typescript")` in the loop body, producing the same query result on every iteration. The loop adds zero extra coverage; a single assertion outside the loop would be clearer. Pre-existing code — not introduced by this change.
-- `test_all_categories_doc_classification.rs:161-171` — `callee_only_categories_have_empty_node_kinds` checks `NODE_KINDS.is_empty()` for 6 of 8 callee-only categories but silently omits `testing` and `logging` with only a comment as explanation. If those two modules ever gain `NODE_KINDS` entries the assertion gap won't catch it. Pre-existing code.
+- `test_all_categories_doc_classification.rs:166` — the inline comment reads "These 7 callee-only categories have empty NODE_KINDS" but the file-level doc (line 4) lists 8 callee-only categories; the number 7 is technically correct (logging is excluded from the is_empty assertions), yet the mismatch with the doc header could confuse a future reader. A one-line parenthetical "(8 callee-only total; logging is excluded because its NODE_KINDS is non-empty by design)" would remove the apparent contradiction.
+- Four items remain open in NON_BLOCKING_LOG: the two `wasm.yml` informational notes (npm --no-audit, workspace-root install), the cross-tier test redundancy, and the MIGRATION_NOTES.md worked example. All four deferrals are plausibly justified as stated by the coder; no action required in this cycle.
 
 ## Coverage Gaps
 - None
 
 ## Drift Observations
-- `test_all_categories_doc_classification.rs:83-96` — `data_access_is_hybrid_both_node_kind_and_callee` asserts `category_for_node_kind("call_expression", "typescript") == Some("data_access")`. If `data_access::NODE_KINDS` truly contains `"call_expression"`, then `category_for_node_kind` maps every call expression to `data_access` regardless of callee text, while `classify_hint` takes the `CALL_DISPATCH` path and may return a different category for the same node. The two entry points are intentionally distinct but the asymmetry could surprise embedders who call `category_for_node_kind` directly for call-expression nodes. Worth a note in the `category_for_node_kind` doc warning that call-expression nodes should prefer `classify_hint`. Pre-existing, not introduced here.
+- None
