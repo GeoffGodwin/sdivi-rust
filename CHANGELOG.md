@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.48] - 2026-06-02
+
+### Changed
+
+- **WASM artifact ~25% smaller (M48).** The `@geoffgodwin/sdivi-wasm` bundler and
+  node `.wasm` targets now build with the size-optimised `release-wasm` settings
+  (`opt-level="z"`, fat LTO, `codegen-units=1`), driven through wasm-pack via
+  job-scoped `CARGO_PROFILE_RELEASE_*` env overrides. Bundler and node targets
+  drop from ~2,062,372 to ~1,531,484 bytes. Behaviour is byte-for-byte equivalent
+  (same wasm-bindgen surface; only the codegen profile changed). `snapshot_version`
+  stays `"1.0"`.
+
+### Fixed
+
+- **CI: WASM bundle-size gate (M48).** The M34–M47 pattern-category growth pushed
+  the `.wasm` over the 1.75 MB per-target budget; the size-optimised build above
+  brings it back under with ~300 KB headroom.
+- **CI: M47 consumer-surface typecheck made deterministic (M48).** The
+  `tests/typecheck/tsconfig.json` `lib` gained `"DOM"` so `console` resolves on
+  every runner instead of depending on ambient `@types/node` (previously green on
+  macOS, red on ubuntu). A guard comment in `negative.ts` that began with the
+  literal `@ts-expect-error` token — which TypeScript parsed as a real directive —
+  was reworded.
+- **docs: rustdoc on `classify_hint` (M48).** Demoted an intra-doc link to the
+  private `CALL_DISPATCH` const to a code span, fixing `cargo doc` under
+  `RUSTDOCFLAGS="-D warnings"` (the CI Docs job had been red since M34).
+
 ## [0.2.47] - 2026-06-02
 
 ### Added
