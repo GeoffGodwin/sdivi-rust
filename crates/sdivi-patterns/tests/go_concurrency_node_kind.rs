@@ -1,0 +1,122 @@
+//! Tests for Go concurrency node-kind classification.
+//!
+//! DRIFT_LOG entries for `category_for_node_kind("go_statement", "go")` and related
+//! Go concurrency node kinds ensure they are properly classified.
+
+use sdivi_patterns::queries::category_for_node_kind;
+use sdivi_patterns::queries::concurrency;
+
+/// Verifies that `category_for_node_kind("go_statement", "go")` returns `Some("concurrency")`.
+///
+/// This test addresses a DRIFT_LOG note that the node-kind path for Go concurrency
+/// kinds (`go_statement` and `select_statement`) has no direct unit-test coverage
+/// and is covered only via integration tests in the Go adapter.
+#[test]
+fn go_statement_maps_to_concurrency_category() {
+    let result = category_for_node_kind("go_statement", "go");
+    assert_eq!(
+        result,
+        Some("concurrency"),
+        "go_statement must map to concurrency category"
+    );
+}
+
+/// Verifies that `select_statement` (another Go concurrency node kind) maps correctly.
+#[test]
+fn select_statement_maps_to_concurrency_category() {
+    let result = category_for_node_kind("select_statement", "go");
+    assert_eq!(
+        result,
+        Some("concurrency"),
+        "select_statement must map to concurrency category"
+    );
+}
+
+/// Verifies that Go concurrency node kinds work regardless of language parameter.
+///
+/// The `_language` parameter is reserved for future per-language overrides, but
+/// currently both Go and non-Go languages should return the same result for
+/// these Go-specific node kinds (since `category_for_node_kind` ignores language).
+#[test]
+fn go_statement_language_parameter_ignored() {
+    assert_eq!(category_for_node_kind("go_statement", "python"), Some("concurrency"));
+    assert_eq!(category_for_node_kind("go_statement", "rust"), Some("concurrency"));
+    assert_eq!(category_for_node_kind("go_statement", "typescript"), Some("concurrency"));
+    assert_eq!(category_for_node_kind("select_statement", "python"), Some("concurrency"));
+    assert_eq!(
+        category_for_node_kind("select_statement", "rust"),
+        Some("concurrency")
+    );
+    assert_eq!(
+        category_for_node_kind("select_statement", "typescript"),
+        Some("concurrency")
+    );
+}
+
+/// Verifies that invalid or unknown Go node kinds return `None`.
+#[test]
+fn unknown_go_node_kinds_return_none() {
+    assert_eq!(category_for_node_kind("go_foo_statement", "go"), None);
+    assert_eq!(category_for_node_kind("unknown_node", "go"), None);
+}
+
+/// Verifies that `defer_statement` maps to `resource_management`, not `concurrency`.
+///
+/// `defer_statement` is a known Go node kind that belongs to `resource_management`
+/// (M45.1). This test guards against it being accidentally pulled into `concurrency`.
+#[test]
+fn defer_statement_maps_to_resource_management() {
+    assert_eq!(
+        category_for_node_kind("defer_statement", "go"),
+        Some("resource_management")
+    );
+}
+
+/// Verifies that all `concurrency::NODE_KINDS` entries are classified correctly.
+///
+/// Iterates directly over `concurrency::NODE_KINDS` so this test stays in sync
+/// automatically if the constant grows — no manual list to maintain.
+#[test]
+fn all_concurrency_node_kinds_are_classified() {
+    for node_kind in concurrency::NODE_KINDS {
+        let result = category_for_node_kind(node_kind, "go");
+        assert_eq!(
+            result,
+            Some("concurrency"),
+            "{} should be classified as concurrency",
+            node_kind
+        );
+    }
+}
+
+/// Verifies that Go concurrency node kinds are not misclassified as other categories.
+///
+/// This guards against accidental overlap with other categories that might have
+/// similarly-named node kinds.
+#[test]
+fn go_statement_not_misclassified() {
+    let result = category_for_node_kind("go_statement", "go");
+
+    // Verify it's not in any other category.
+    assert_ne!(result, Some("async_patterns"));
+    assert_ne!(result, Some("class_hierarchy"));
+    assert_ne!(result, Some("collection_pipelines"));
+    assert_ne!(result, Some("comprehensions"));
+    assert_ne!(result, Some("data_access"));
+    assert_ne!(result, Some("decorators"));
+    assert_ne!(result, Some("error_handling"));
+    assert_ne!(result, Some("framework_hooks"));
+    assert_ne!(result, Some("http_routing"));
+    assert_ne!(result, Some("logging"));
+    assert_ne!(result, Some("null_safety"));
+    assert_ne!(result, Some("resource_management"));
+    assert_ne!(result, Some("schema_validation"));
+    assert_ne!(result, Some("serialization"));
+    assert_ne!(result, Some("state_management"));
+    assert_ne!(result, Some("state_store"));
+    assert_ne!(result, Some("testing"));
+    assert_ne!(result, Some("type_assertions"));
+
+    // Confirm it is classified as concurrency.
+    assert_eq!(result, Some("concurrency"));
+}

@@ -1,78 +1,76 @@
-# Jr Coder Summary — Architect Remediation
+# JR Coder Summary — feature/MorePatterns
 
 **Date:** 2026-06-02  
 **Branch:** feature/MorePatterns  
-**Status:** Complete
+**Architect Plan:** `.tekhton/ARCHITECT_PLAN.md`
 
-## What Was Fixed
+---
 
-### Staleness Fixes
+## Cleanup Tasks — Status: ALL COMPLETE
 
-1. **`docs/pattern-categories.md` — embedder responsibilities list numbering regression** (items 14–17)
-   - Reordered four misplaced items to sequential numbering
-   - M42 testing (was item 14, now at line 403) → moved to position 14
-   - M43 serialization (was item 15) → remains item 15
-   - M44 concurrency (was item 16) → remains item 16
-   - class_hierarchy note (was item 15) → renumbered to item 17
+The architect plan identified three cleanup categories for the jr coder. **All are marked as "None" — no new work required this cycle.** The following items from prior drifts/cycles have already been resolved and verified:
 
-2. **`docs/pattern-categories.md` — canonical category table alphabetical order** (rows 3–5 after class_hierarchy)
-   - Reordered three rows in the canonical category list table
-   - Before: concurrency, collection_pipelines, comprehensions
-   - After: collection_pipelines, comprehensions, concurrency (alphabetical)
+### Staleness Fixes — RESOLVED ✓
 
-3. **`bindings/sdivi-wasm/pkg-template/package.json` — version sync**
-   - Updated `"version": "0.2.43"` → `"version": "0.2.44"`
-   - Now matches workspace `[workspace.package].version`
-   - Test `wasm_package_json_version_matches_workspace` now passes
+**Drift Obs §1-4**: ALL_CATEGORIES classification path doc in `crates/sdivi-patterns/src/queries/mod.rs` was updated to:
+- Move `async_patterns` from "Node-kind only" list to "Hybrid" list (it has a CALL_DISPATCH P1 entry)
+- Correct `data_access` listing from "Node-kind only" to "Hybrid" (it has both node-kind and callee-text paths)
+- Add explicit guidance in `category_for_node_kind` doc: "`call_expression` nodes always return `Some("data_access")` here because callee text is unavailable; callers that have the source text should use `classify_hint` to get the callee-aware result."
 
-4. **`crates/sdivi-patterns/src/queries/mod.rs:137` — split priority-slot comment**
-   - Moved 11-slot dispatch order comment to a separate line above the `#[allow]` attribute
-   - New format:
-     ```rust
-     // Dispatch order: P1 > P2=testing > P3=serialization > … > P11=concurrency; future milestones insert at their slot
-     #[allow(clippy::type_complexity)] // fn pointer tuple slice; each entry is one category
-     const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
-     ```
+**Change:** `crates/sdivi-patterns/src/queries/mod.rs`  
+- Lines 42–44: Three hybrid categories listed (async_patterns, data_access, concurrency)
+- Lines ~50–60: Updated doc comment on `category_for_node_kind` clarifying call_expression behavior
 
-5. **`crates/sdivi-patterns/src/queries/mod.rs:94** — `category_for_node_kind` doc asymmetry note**
-   - Added two sentences explaining `call_expression` asymmetry
-   - Notes that this node kind always returns `"data_access"` here because callee text is unavailable
-   - Recommends using `classify_hint` for callee-aware results
+**Verification:** Count 8 callee-only + 8 node-kind-only + 3 hybrid = 19 total, consistent with `ALL_CATEGORIES.len() == 19`. ✓
 
-### Dead Code Removal
+### Dead Code Removal — None
 
-6. **`crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` → `snapshot_pipeline_regression.rs`**
-   - Renamed test file to reflect actual contents (M32 + M33 tests)
-   - All test functions and doc comments already encoded milestone context
-   - No CI or doc references to old filename found (only in `.claude/logs/`)
-   - All 4 tests pass with new name
+No unused functions or test files identified. Clean codebase.
 
-## Files Modified
+### Naming Normalization — RESOLVED ✓
 
-1. `/home/geoff/workspace/geoffgodwin/sdivi-rust/docs/pattern-categories.md`
-   - Fixed embedder list numbering (14–17)
-   - Reordered canonical category table (collection_pipelines, comprehensions, concurrency)
+**Drift Obs §5**: Test file renamed for semantic correctness.
 
-2. `/home/geoff/workspace/geoffgodwin/sdivi-rust/bindings/sdivi-wasm/pkg-template/package.json`
-   - Version bump: 0.2.43 → 0.2.44
+**Change:** `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` → `snapshot_pipeline_regression.rs`
+- File deleted: `crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs`
+- File created: `crates/sdivi-pipeline/tests/snapshot_pipeline_regression.rs` (via rename)
+- All four tests preserved under new name:
+  - M32 byte-identity guard
+  - M32 seed-variation sanity
+  - M33 logging-entry sentinel
+  - M32 schema-version check
 
-3. `/home/geoff/workspace/geoffgodwin/sdivi-rust/crates/sdivi-patterns/src/queries/mod.rs`
-   - Dispatch order comment split across two lines
-   - `category_for_node_kind` doc enhanced with asymmetry note
+**Verification:** File present at correct location; `git status` shows deletion of old file. ✓
 
-4. `/home/geoff/workspace/geoffgodwin/sdivi-rust/crates/sdivi-pipeline/tests/snapshot_m32_unchanged.rs` → `snapshot_pipeline_regression.rs`
-   - File renamed (no content changes)
+---
 
-## Verification
+## Additional Test Additions — Supporting Drift Observations
 
-- ✅ `cargo test --workspace --lib` — all library tests pass
-- ✅ `cargo test --test snapshot_pipeline_regression` — renamed test runs, all 4 tests pass
-- ✅ `cargo test wasm_package_json_version_matches_workspace` — version test passes
-- ✅ `cargo test dispatch_disjointness` — dispatch order tests pass
-- ✅ `cargo test test_all_categories_doc_classification` — category doc tests pass
+The following test files were added to support the drift observations (not cleanup per se, but completeness improvements):
 
-## Notes
+### `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` (Drift Obs §2)
+Six unit tests for `category_for_node_kind` applied to Go concurrency node kinds:
+- `go_statement_maps_to_concurrency_category`
+- `select_statement_maps_to_concurrency_category`
+- `go_statement_language_parameter_ignored`
+- `unknown_go_node_kinds_return_none`
+- `all_concurrency_node_kinds_are_classified`
+- `go_statement_not_misclassified`
 
-- No items from "Simplification" (route to sr coder) or "Design Doc Observations" (route to human) were touched
-- All changes are mechanical and bounded per instructions
-- No refactoring, judgment calls, or multi-file dependencies introduced
+### `crates/sdivi-detection/tests/renumber_delegation.rs` (Drift Obs §6)
+Four tests confirming `renumber_in_place` now correctly delegates to `super::renumber`:
+- Dense `[0, k)` renumbering output
+- Ring-of-cliques behavior
+- Determinism under same seed
+- Valid-range invariant
+
+---
+
+## No Further Action Required
+
+All cleanup items from the architect plan are complete. The branch is ready for:
+- Code review (via senior coder / reviewer)
+- Testing (via test harness)
+- Merge to `main`
+
+**Out of scope:** Design doc observations and deferred drift entries remain in `DRIFT_LOG.md` for future cycles (see ARCHITECT_PLAN.md § "Out of Scope").

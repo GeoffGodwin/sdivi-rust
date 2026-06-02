@@ -93,6 +93,10 @@ pub const ALL_CATEGORIES: &[&str] = &[
 /// node kind but no source text — and for backward compatibility with embedders
 /// that integrated against the M29 API.
 ///
+/// In particular, `call_expression` nodes always return `Some("data_access")` here because
+/// callee text is unavailable; callers that have the source text should use [`classify_hint`] to
+/// get the callee-aware result.
+///
 /// # Examples
 ///
 /// ```rust
@@ -134,7 +138,8 @@ pub fn category_for_node_kind(node_kind: &str, _language: &str) -> Option<&'stat
     }
 }
 
-#[allow(clippy::type_complexity)] // P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines > P11=concurrency; future milestones insert at their slot
+// Dispatch order: P1 > P2=testing > P3=serialization > P4=schema_validation > P5=state_store > P6=framework_hooks > P7=http_routing > P8=logging > P9=data_access > P10=collection_pipelines > P11=concurrency; future milestones insert at their slot
+#[allow(clippy::type_complexity)] // fn pointer tuple slice; each entry is one category
 const CALL_DISPATCH: &[(&str, fn(&str, &str) -> bool)] = &[
     ("async_patterns", async_patterns::matches_callee),
     ("testing", testing::matches_callee),

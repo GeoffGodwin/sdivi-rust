@@ -1,6 +1,6 @@
 ## Summary
 
-This change set resolves 66 architectural drift observations through three code fixes and four documentation/comment improvements: promoting `renumber` to `pub(super)` and delegating `renumber_in_place` to it in the Leiden algorithm; adding a sync-warning comment to `RUST_LOGGING_RE` in `resource_management.rs`; adding a compile-time `const assert!` guard in `categories.rs`; and adding intent comments in a test file and a Cargo.toml note. All changes are internal to the analysis pipeline with no I/O, no user-controlled input surfaces, no authentication logic, no network calls, and no cryptographic operations. The overall security posture is unchanged.
+This change touches three files: a test file (`crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`) that splits one misleading test into two focused functions and refactors a hard-coded list to iterate `concurrency::NODE_KINDS` directly; a source file (`crates/sdivi-patterns/src/queries/mod.rs`) with a single blank `///` line added to a doc comment; and a log file (`.tekhton/DRIFT_LOG.md`) recording the resolved observations. None of the changed files involve authentication, cryptography, user input handling, network communication, file I/O, or external process invocation. The security surface of this change is negligible.
 
 ## Findings
 

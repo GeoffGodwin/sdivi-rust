@@ -1,40 +1,32 @@
-# Reviewer Report — Cycle 2
+# Reviewer Report — feature/MorePatterns
 
 **Date:** 2026-06-02
-**Branch:** feature/MorePatterns
-**Reviewer:** code-review agent
-**Review cycle:** 2 of 2
+**Review type:** Drift resolution (cycle 1 of 2)
+**Task:** Resolve 2 unresolved architectural drift observations in `.tekhton/DRIFT_LOG.md`
 
 ---
 
 ## Verdict
+
 APPROVED_WITH_NOTES
 
----
-
 ## Complex Blockers (senior coder)
-None
 
----
+None
 
 ## Simple Blockers (jr coder)
+
 None
 
----
-
 ## Non-Blocking Notes
-- `DRIFT_LOG.md`: `## Decisions (Declined / Will Not Implement)` section (line 61) remains empty despite six items being explicitly declined (`fmt.Errorf` Go logging, `PYTHON_RE` receiver asymmetry, `rejects_nan_weight`, `list_categories()` placement, `LeidenConfigInput` range check, `wasm.yml` dual node_modules). All declined items are merged into `## Resolved` alongside code-fixed items. Future reviewers cannot distinguish "fixed" from "acknowledged/deferred" without reading every entry body. Consider moving declined items to the Declined section for structural clarity.
-- `leiden/mod.rs:197`: `pub(super) fn renumber` is more permissive than strictly necessary — a child module (refine) already has access to private items in its parent under Rust's visibility rules. The change is not a bug, but it extends visibility of `renumber` to `leiden`'s sibling modules within `sdivi_detection`, which is a slightly wider surface than needed for the delegation goal alone.
-- `categories.rs:231`: Compile-time assert line is long (>100 chars). Minor style point; the assert is correct and will fire at compile time on any CATALOG_ENTRIES / CATEGORIES length mismatch.
 
----
+- `go_concurrency_node_kind.rs:97–122` — `go_statement_not_misclassified` enumerates 18 `assert_ne` categories then re-asserts `Some("concurrency")`. This is already covered by `go_statement_maps_to_concurrency_category` and `all_concurrency_node_kinds_are_classified`. Redundant but harmless; the negative list will silently drift if new categories are added — consider driving from `ALL_CATEGORIES.iter().filter(|&&c| c != "concurrency")` on a future pass.
+- `go_concurrency_node_kind.rs:36–53` — `go_statement_language_parameter_ignored` names and tests a behavior that the doc calls "reserved for future per-language overrides." The test will need updating when that override lands. A one-line comment "asserts current no-op behavior; revisit when per-language dispatch is implemented" would make the intent explicit without blocking.
 
 ## Coverage Gaps
-- `leiden/refine.rs`: The delegation `renumber_in_place → super::renumber` is not directly covered by a unit test that verifies `refine_partition` produces densely renumbered IDs starting from 0. Covered indirectly by integration tests; a targeted unit test would pin the contract.
-- DRIFT_LOG entries for `category_for_node_kind("go_statement", "go")` and `call_expression` → `data_access` doc asymmetry are marked "worth a unit test sentinel on the next pass" with no corresponding test or tracking ticket. Risk of silent skip in future cycles.
 
----
+None
 
 ## Drift Observations
-- `leiden/refine.rs:270–272`: `renumber_in_place` is now a one-line private wrapper that only preserves a name. The single call site at line 181 (`renumber_in_place(&mut refined)`) could call `super::renumber(&mut refined)` directly, eliminating the wrapper entirely without any loss of clarity.
-- `DRIFT_LOG.md:63–88`: All resolved items (code-fixed and acknowledged/declined) share the `## Resolved` section. The structural separation between the `## Resolved` and `## Decisions (Declined / Will Not Implement)` sections is not being used, which will degrade the log's usefulness as a historical audit trail as the entry count grows.
+
+- `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:97–122` — The negative-category enumeration in `go_statement_not_misclassified` is a manual list parallel to `queries::ALL_CATEGORIES`. The same pattern was just fixed in `all_concurrency_node_kinds_are_classified` (drift observation 2 of this cycle). Both lists will drift independently when new categories are added; worth a single follow-up pass to drive both from `ALL_CATEGORIES`.
