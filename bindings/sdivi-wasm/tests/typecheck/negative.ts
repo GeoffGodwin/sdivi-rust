@@ -67,7 +67,9 @@ const _badBracket = _boundaries.cluster_assignments['x'];
 //
 // The variables below are declared so tsc cannot tree-shake the negative cases.
 // If any path typo in tsconfig.json caused zero files to be included, the
-// @ts-expect-error directives above would become unused and tsc would fail.
+// suppression directives above would become unused and tsc would fail.
+// (Avoid writing the literal directive token in prose here — a line comment
+// beginning with it is itself parsed as a directive and would trip TS2578.)
 void _badEdgeWeights;
 void _badOverrides;
 void _badBracket;

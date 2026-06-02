@@ -17,12 +17,12 @@ env:
   # on each TS major/minor bump (error grouping can change between releases).
   TYPESCRIPT_VERSION: "5.5.4"
   # 1.75 MB per-target budget; 5 MB combined budget for both targets.
-  # The per-target budget was raised from 1.2 MB at the close of M19–M24 to
-  # absorb the new WASM surface (weighted Leiden, list_categories,
-  # assemble_snapshot, threshold-comparison epsilon, change-coupling) plus
-  # the bundler+node dual build. It can be tightened again if/when wasm-pack
-  # 0.13.x's `--release` + `--profile <name>` conflict is fixed and we can
-  # drive the size-optimised `release-wasm` profile through wasm-pack.
+  # The build now drives the size-optimised `release-wasm` settings
+  # (opt-level=z, fat LTO, codegen-units=1) via the per-job CARGO_PROFILE_RELEASE_*
+  # env overrides below, which brought the bundler target from ~2.06 MB
+  # (plain --release, M34–M47 category growth) back to ~1.53 MB — ~300 KB of
+  # headroom under this budget. Tighten the budget toward ~1.6 MB only if you
+  # want tighter pressure; the current value absorbs minor per-platform variance.
   WASM_BUDGET_BYTES: "1835008"
   WASM_COMBINED_BUDGET_BYTES: "5242880"
 
@@ -31,6 +31,15 @@ jobs:
     name: Build WASM (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    # Drive the size-optimised `release-wasm` profile (opt-level=z, fat LTO,
+    # codegen-units=1) through wasm-pack's `--release` by overriding the
+    # `release` profile via env, sidestepping the wasm-pack 0.13.x
+    # `--release`/`--profile` conflict. Scoped to this WASM-only job, so the
+    # native release binaries built elsewhere keep their opt-level.
+    env:
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+      CARGO_PROFILE_RELEASE_LTO: fat
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -70,12 +79,11 @@ jobs:
           fi
           echo "OK: no forbidden deps"
 
-      - name: Build WASM bundler target (release profile)
+      - name: Build WASM bundler target (size-optimised release profile)
         working-directory: bindings/sdivi-wasm
-        # wasm-pack 0.13.x passes both `--release` and `--profile <name>` to
-        # cargo, which cargo 1.85+ rejects as conflicting (rustwasm/wasm-pack
-        # has an open issue for this). For now we use the default `--release`
-        # profile and accept slightly larger wasm output.
+        # `--release` here picks up the CARGO_PROFILE_RELEASE_* env overrides set
+        # at the job level (opt-level=z, fat LTO, codegen-units=1) — equivalent to
+        # the `release-wasm` profile without the wasm-pack 0.13.x --profile conflict.
         run: wasm-pack build --target bundler --release --out-dir pkg/bundler
 
       - name: Build WASM nodejs target (release profile)
