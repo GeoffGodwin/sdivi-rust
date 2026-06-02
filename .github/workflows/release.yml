@@ -270,6 +270,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm-publish
+    # Ship the size-optimised wasm (opt-level=z, fat LTO, codegen-units=1 — the
+    # `release-wasm` settings) by overriding the `release` profile via env, so
+    # `wasm-pack --release` produces the ~1.53 MB artifact instead of ~2.06 MB.
+    # Scoped to this job only; the native-binary build job keeps its profile.
+    env:
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+      CARGO_PROFILE_RELEASE_LTO: fat
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
     permissions:
       id-token: write
       contents: read
@@ -287,9 +295,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build WASM bundler target (release profile)
+      - name: Build WASM bundler target (size-optimised release profile)
         working-directory: bindings/sdivi-wasm
-        # wasm-pack 0.13.x conflicts between --release and --profile; use --release only.
+        # `--release` picks up the job-level CARGO_PROFILE_RELEASE_* env overrides
+        # (opt-level=z, fat LTO, codegen-units=1) — the `release-wasm` settings
+        # without the wasm-pack 0.13.x --profile conflict.
         run: wasm-pack build --target bundler --release --out-dir pkg/bundler
 
       - name: Build WASM nodejs target (release profile)
