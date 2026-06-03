@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Leiden non-termination on pathological small graphs (M49.2).** `leiden_recursive`
+  previously descended into the aggregated graph on *every* outer-loop iteration where
+  local moves fired, producing O(max_iter^depth) work.  For inputs such as a K_{1,5}
+  star (n=6, seed=0) this caused `run_leiden` to run for minutes on an 8-node graph.
+  The loop is now restructured to match Traag et al. 2019 Algorithm 1: local moves run
+  to convergence at each level, and the aggregate is descended into **at most once per
+  invocation**, bounding total work to O(max_iter × n × max_recursion_depth).
+  `snapshot_version` stays `"1.0"`.  Because the restructuring changes the order of
+  RNG draws, some inputs will see different (but deterministic and quality-preserving)
+  cluster assignments compared to pre-M49.2. See `MIGRATION_NOTES.md`.
+
 ## [0.2.48] - 2026-06-02
 
 ### Changed

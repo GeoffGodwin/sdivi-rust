@@ -1,7 +1,7 @@
 # Coder Summary
 
 **Agent:** coder
-**Date:** 2026-06-02
+**Date:** 2026-06-03
 **Branch:** main
 
 ---
@@ -10,37 +10,72 @@
 
 ## What Was Implemented
 
-**M49.1: Leiden Hang — Capture the Minimal Repro and Contain it in CI**
+**M49.2: Leiden — Fix the `O(max_iterations^depth)` Recursion Blowup**
 
-1. **Enabled proptest `fork` + `timeout` features** for `sdivi-detection`'s dev-dependency by adding `features = ["fork", "timeout"]` to `crates/sdivi-detection/Cargo.toml`. Without these features, `PROPTEST_TIMEOUT` and `ProptestConfig { fork: true, timeout: … }` are silently ignored — the existing bug that caused CI hangs.
+1. **Restructured `leiden_recursive` in `crates/sdivi-detection/src/leiden/mod.rs`.**
+   The old loop body called `leiden_recursive` recursively on every iteration where
+   `moved == true`, producing O(max_iter^depth) total calls.  The new structure
+   separates the function into two phases:
+   - **Phase 1:** Run local moves to convergence (`for _iter in 0..max_iter` with break
+     on `!moved`). If no moves fire, return immediately — already locally optimal.
+   - **Phase 2:** After convergence, refine + aggregate + recurse **once**. Flatten and
+     renumber; return.
+   
+   Total recursive calls per invocation: at most 1 (plus the depth-cap guard at
+   `depth >= max_recursion_depth`). Total work: O(max_iter × n × max_recursion_depth)
+   — polynomial.
 
-2. **Split the `proptest!` block in `refinement.rs`** into two separate blocks:
-   - Block 1 (no change): `prop_refine_does_not_increase_coarse_communities` — uses `ProptestConfig::with_cases(256)`, no fork overhead needed.
-   - Block 2 (new): `prop_refine_modularity_does_not_decrease` — uses `ProptestConfig { timeout: 10_000, fork: true, ..ProptestConfig::with_cases(256) }`. Each case now runs in a forked subprocess; a non-converging `run_leiden` call is killed after 10 seconds and reported as a test failure with its minimized input, rather than hanging the test binary.
+2. **Un-ignored the M49.1 regression test** in `leiden_termination.rs`:
+   removed `#[ignore = "fails until M49.2 fixes leiden blowup; see milestone"]` from
+   `leiden_termination_regression_star_n6_seed0`. Updated the doc comment to note that
+   M49.2's restructure eliminates the blowup.
 
-3. **Captured the minimal hanging case** by running `PROPTEST_CASES=4096` with the new fork+timeout config. Proptest found and minimized to:
-   - **n=6, K_{1,5} star graph** (node 3 connected to all of 0,1,2,4,5), **seed=0**
-   - Stored as `cc 7bcb943d7e48407056966a9ca32d5f7f276d3d9e694db514ac5de978d843f27e` in `refinement.proptest-regressions`
-   - Replay: `PROPTEST_CASES=1 cargo test … prop_refine_modularity_does_not_decrease` fails in ~40s (never hangs)
+3. **Added brute-force termination sweep test** `termination_sweep_known_graphs_all_seeds`
+   in `leiden_termination.rs`. Sweeps 5 graphs (K_{1,5} star, K4, path-n6, two-K3-bridge,
+   K5) × all seeds 0..=255 (1280 `run_leiden` calls total). Asserts every call returns a
+   valid partition covering all nodes. Completes in ~1.7s in debug builds.
 
-4. **Created `leiden_termination.rs`** (new test file) with:
-   - `leiden_with_corrected_refine_gives_positive_modularity` — full-Leiden integration test (moved from `refinement.rs` to make room under the 300-line ceiling)
-   - `leiden_termination_regression_star_n6_seed0` — `#[ignore = "fails until M49.2 fixes leiden blowup; see milestone"]` deterministic regression test. Constructs the minimal case on a thread with a 30-second join timeout; asserts `run_leiden` returns before the deadline. M49.2 un-ignores this once the non-termination bug is fixed.
+4. **Fixed pre-existing version mismatch** in `bindings/sdivi-wasm/pkg-template/package.json`:
+   bumped from `"0.2.48"` to `"0.2.49"` to match the workspace Cargo.toml (the M49.1
+   run bumped Cargo.toml but not package.json, causing `wasm_package_json_version_matches_workspace`
+   to fail in `cargo test --workspace`).
+
+5. **Updated CHANGELOG.md** (Unreleased section) documenting the non-termination fix and
+   the partition-value change.
+
+6. **Updated MIGRATION_NOTES.md** with an M49.2 entry explaining the RNG sequence change
+   and its impact on community assignments, with an escape-hatch `[thresholds.overrides]`
+   snippet.
 
 ## Root Cause (bugs only)
 
-`prop_refine_modularity_does_not_decrease` calls `run_leiden` on random `(n, edges, seed)` inputs with `n ≤ 8`. For specific inputs (e.g. K_{1,5} star with seed=0), the Leiden algorithm takes far longer than typical cases: the outer loop in `leiden_recursive` can run many iterations each spawning a recursive descent on the aggregated graph, producing exponential work for pathological partition sequences. Without `fork: true` + `timeout: 10_000`, proptest could not time-out the hanging subprocess — `PROPTEST_TIMEOUT` is silently ignored without the Cargo features. The test binary hung until the 30-minute CI job timeout killed the runner.
+`leiden_recursive` called the recursive descent (`leiden_recursive(&agg_graph, ..., depth+1)`)
+**inside** the `for _iter in 0..max_iter` loop, on every iteration where
+`local_move_phase` returned `true`.  For inputs where local moves fire on consecutive
+iterations (e.g. K_{1,5} star, n=6, seed=0), this caused up to `max_iter` recursive
+descents per level, each of which could do `max_iter` more, compounding to
+O(max_iter^depth) total work.  For max_iter=100 even at depth 2, this is 10,000
+recursive calls; at depth 8, ~10^16.  The M28 recursion-depth cap bounded depth but
+not the number of descents per level.
+
+Fix: separate Phase 1 (local-move convergence loop) from Phase 2 (single refine +
+aggregate + recurse).  The recursive call now happens at most once per invocation.
 
 ## Files Modified
 
-- `crates/sdivi-detection/Cargo.toml` — added `features = ["fork", "timeout"]` to proptest dev-dep
-- `crates/sdivi-detection/tests/refinement.rs` — split `proptest!` block; added fork+timeout ProptestConfig to the modularity test; moved `leiden_with_corrected_refine_gives_positive_modularity` to `leiden_termination.rs` (line count compliance)
-- `crates/sdivi-detection/tests/leiden_termination.rs` (NEW) — full-Leiden integration test + ignored M49.1 regression guard
-- `crates/sdivi-detection/tests/refinement.proptest-regressions` (NEW) — committed minimal hanging case for immediate regression replay on CI
+- `crates/sdivi-detection/src/leiden/mod.rs` — restructured `leiden_recursive` to
+  eliminate the O(max_iter^depth) recursion blowup; added doc comment explaining the fix
+- `crates/sdivi-detection/tests/leiden_termination.rs` — un-ignored the M49.1 regression
+  guard; updated its doc comment; added `termination_sweep_known_graphs_all_seeds`
+- `bindings/sdivi-wasm/pkg-template/package.json` — bumped version 0.2.48 → 0.2.49
+  (pre-existing mismatch from M49.1)
+- `CHANGELOG.md` — added Unreleased entry for the non-termination fix
+- `MIGRATION_NOTES.md` — added M49.2 section for partition-assignment migration guidance
 
 ## Docs Updated
 
-None — no public-surface changes in this task (test-only and dev-dependency-only changes).
+- `CHANGELOG.md` — Unreleased section: describes the blowup fix and partition-value change
+- `MIGRATION_NOTES.md` — new M49.2 entry with migration action and escape-hatch snippet
 
 ## Human Notes Status
 
@@ -48,4 +83,6 @@ No Human Notes section present in this task.
 
 ## Observed Issues (out of scope)
 
-- `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` — two pre-existing `clippy::iter_cloned_collect` warnings (`iter().copied().collect()` should be `.to_vec()`). Not caused by this task's changes; unmodified file.
+- `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` — two pre-existing
+  `clippy::iter_cloned_collect` warnings (pre-existing from M49.1, noted by the reviewer;
+  unrelated to M49.2).

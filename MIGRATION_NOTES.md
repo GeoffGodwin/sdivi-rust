@@ -8,6 +8,37 @@ For the broader migration story from the Python POC
 ([`structural-divergence-indexer`](https://github.com/GeoffGodwin/structural-divergence-indexer)),
 see [`docs/migrating-from-the-python-poc.md`](docs/migrating-from-the-python-poc.md).
 
+## M49.2 — Leiden partition assignments may differ for some inputs
+
+**Schema:** unchanged. `snapshot_version` remains `"1.0"`.
+
+**Config:** unchanged. No new keys.
+
+**What changed.** `leiden_recursive` was restructured to match Traag et al. 2019
+Algorithm 1: local moves now run to convergence at each level before a single
+recursive descent into the aggregated graph.  The previous implementation descended
+once per local-move sweep, compounding to O(max_iter^depth) work for pathological
+inputs (e.g. K_{1,5} star graphs with certain seeds).
+
+**Partition-value impact.** The restructuring changes the RNG draw sequence — local
+moves now run to convergence before refine/aggregate/recurse, rather than interleaving
+recursion after each sweep.  Inputs that previously converged in a single sweep are
+unaffected.  Inputs that required multiple sweeps may produce different (but
+deterministic for a fixed seed) cluster assignments.  Quality is preserved within
+the `verify-leiden` tolerance (modularity within 1%, community count within ±10%).
+
+**Migration action.** Re-baseline any stored snapshots if you compare them
+snapshot-to-snapshot (e.g. via `sdivi diff`); the structural metrics are unaffected
+but community IDs may shift.  Use a threshold override to suppress transient
+divergence during the re-baseline window:
+
+```toml
+[thresholds.overrides.boundary_violations]
+boundary_violation_rate = 999.0
+expires = "2027-01-01"
+reason = "M49.2 Leiden restructure; re-baselining community assignments."
+```
+
 ## M46 — New `comprehensions` pattern category (Python-only)
 
 **Schema:** unchanged. `snapshot_version` remains `"1.0"`. `list_categories()` count

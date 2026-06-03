@@ -1,28 +1,26 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 2 files, 14 test functions (12 runnable + 1 ignored regression guard + 2 proptest property tests in separate blocks)
+Tests audited: 1 file, 3 test functions (`crates/sdivi-detection/tests/leiden_termination.rs`, modified by the coder — the tester made no changes this run)
 Verdict: PASS
+
+**Process note.** The tester's report declares "Files Modified: (none)" and "no new test files required," yet the coder directly modified `crates/sdivi-detection/tests/leiden_termination.rs` (un-ignored one existing test, added one new test). The tester ran the suite and confirmed green but performed no independent test authorship. This audit evaluates the coder's test changes under the seven-point rubric since the tester produced nothing to audit.
+
+---
 
 ### Findings
 
-#### SCOPE: Shell orphan detector reports false positives for both files
-- File: `crates/sdivi-detection/tests/refinement.rs`, `crates/sdivi-detection/tests/leiden_termination.rs`
-- Issue: The pre-verified orphan list claims both test files "import deleted module '.tekhton/.commit_decision'". Both files were read in full. `refinement.rs` imports `proptest::prelude::*`, `rand::rngs::StdRng`, `rand::SeedableRng`, and four symbols from `sdivi_detection::internal` and `sdivi_graph`. `leiden_termination.rs` imports `sdivi_detection::leiden::run_leiden`, `sdivi_detection::partition::LeidenConfig`, and `sdivi_graph::dependency_graph::build_dependency_graph_from_edges`. A grep for "commit_decision" across both files returns zero matches. `.tekhton/.commit_decision` is not a Rust module path and cannot appear in a `use` statement. These are false positives from the orphan-detection script.
+#### EXERCISE: Sweep test assertion is structurally guaranteed, not algorithmic
+- File: `crates/sdivi-detection/tests/leiden_termination.rs:158`
+- Issue: `termination_sweep_known_graphs_all_seeds` asserts `p.assignments.len() == n`. This is guaranteed true by construction: `leiden_recursive` always returns a `Vec<usize>` of length `n` (derived from `leiden_graph.n`), and `build_partition` converts it to a `BTreeMap` of the same size. No bug in the phase-separation refactor could reduce the map's length below `n`. The real regression this test guards against is a hang — the test process blocks rather than failing the assertion. The check as written has documentation value but will not catch a misbehaving partition that assigns wrong or out-of-range community IDs.
 - Severity: LOW
-- Action: Dismiss both orphan flags. No test changes needed. Investigate the orphan-detection script's path-matching logic; it is emitting spurious alerts that auditors must manually refute.
+- Action: Consider adding `assert!(p.assignments.values().copied().max().map_or(true, |max_c| max_c < n), "community IDs out of range for graph={name} seed={seed}")` after the existing assertion. This verifies the dense renumbering invariant (community IDs in `[0, k)` where `k ≤ n`) — a property that is non-trivially guaranteed by `renumber()` and that a regression in that function would break.
 
-#### WEAKENING: Shell weakening detector reports false positive
-- File: `crates/sdivi-detection/tests/refinement.rs`
-- Issue: The pre-verified weakening report states "net loss of 2 assertion(s) (removed 2, added 0)" in `refinement.rs`. These two assertions (`p.modularity > 0.1` and `p.community_count() >= 2`) were not removed — they were moved verbatim to `leiden_termination.rs:43-52` as part of a line-count compliance refactor documented in CODER_SUMMARY.md. Both assertions are present and exercised in the new file. Net assertion count across both files is unchanged.
+#### COVERAGE: Termination sweep has no per-call timeout or hang diagnostics
+- File: `crates/sdivi-detection/tests/leiden_termination.rs:115`
+- Issue: The sweep runs 1 280 `run_leiden` calls (5 graphs × 256 seeds) in a bare `for` loop with no timeout mechanism. If any single call hangs — e.g., a future change reintroduces a recursion blowup — the test process blocks indefinitely. `cargo test` applies no per-test timeout; CI eventually kills the job with a generic runner timeout, with no message identifying which `(graph, seed)` pair caused the hang. By contrast, `leiden_termination_regression_star_n6_seed0` (line 79) correctly uses `thread::spawn` + `recv_timeout(Duration::from_secs(30))` for exactly this reason.
 - Severity: LOW
-- Action: No test change needed. The weakening detector counts deletions from individual files without checking whether deleted content reappears in another file in the same commit. This is a known limitation of single-file diff analysis and should be documented as a known false-positive class for cross-file moves.
-
-#### COVERAGE: Ignored regression guard is intentional and correctly structured
-- File: `crates/sdivi-detection/tests/leiden_termination.rs:71-101`
-- Issue: `leiden_termination_regression_star_n6_seed0` is marked `#[ignore = "fails until M49.2 fixes leiden blowup; see milestone"]`. This is not a coverage gap — M49.1's stated scope is to capture and contain the hang, not fix it. The ignore annotation documents the responsible milestone (M49.2) and encodes the minimal reproducer minimized by proptest (`n=6, K_{1,5} star, seed=0`). The 30-second thread-join timeout (`rx.recv_timeout(Duration::from_secs(30))`) correctly distinguishes "terminates but wrong" from "does not terminate" once M49.2 un-ignores it.
-- Severity: LOW
-- Action: None. Confirm M49.2 uses un-ignoring this test as its acceptance criterion.
+- Action: At minimum, add `eprintln!("sweep: graph={name} seed={seed}")` immediately before the `run_leiden` call so CI logs show the last line printed before a hang and the culprit tuple is identifiable without re-running locally. Alternatively, adopt the `recv_timeout` pattern from the regression test, but that carries thread-spawn overhead per call (acceptable for 1 280 iterations); the `eprintln!` approach is zero-overhead and sufficient for diagnostic purposes.
 
 ---
 
@@ -30,56 +28,38 @@ Verdict: PASS
 
 **1. Assertion Honesty — PASS**
 
-All assertions derive their expected values from implementation logic or analytically provable invariants:
-- `sigma_tot` comparisons use `g.degree[i]` directly, not literals. (`refinement.rs:30-32`)
-- The `6.0` in `from_partition_non_singleton_inner_edges` is provable: 3 nodes each with degree 2 in a triangle = 6.0. (`refinement.rs:47`)
-- `apply_move_updates_sigma_tot_and_size` checks `sigma_tot[1]` against `g.degree[0] + g.degree[1]` — derived from the actual degree values. (`refinement.rs:67`)
-- `well_connected_strong_connection_passes` computes the threshold the same way the implementation does (`gamma * (sc - sc*sc/ss)`) and uses a `1e-9` margin to avoid binary-IEEE-754 representation issues — correctly mirrors `refine.rs:138`. (`refinement.rs:87-88`)
-- `prop_refine_modularity_does_not_decrease` computes `q_baseline` via the real `compute_modularity` on the all-singletons assignment — a provably ≤ 0 value — then asserts Leiden improves on it with `1e-9` floating-point tolerance. (`refinement.rs:262-267`)
-- The `> 0.1` threshold in `leiden_with_corrected_refine_gives_positive_modularity` is a meaningful lower bound for a ring-of-3-cliques with two dense internal clusters and one bridge edge. (`leiden_termination.rs:43-47`)
+- `leiden_termination_regression_star_n6_seed0` (line 79): no value assertion — termination is the contract. The 30-second `recv_timeout` is the meaningful check; it is generous for microsecond-class work and deliberate.
+- `termination_sweep_known_graphs_all_seeds` (line 158): `p.assignments.len() == n` is derived from `n`, the actual graph size passed to `build_dependency_graph_from_edges`. Not hard-coded to an arbitrary literal.
+- `leiden_with_corrected_refine_gives_positive_modularity` (line 15, pre-existing, not changed this run): `> 0.1` and `>= 2` are meaningful bounds for a ring-of-3-cliques input.
 
-**2. Edge Case Coverage — PASS**
+**2. Edge Case Coverage — PASS (with note)**
 
-- Gamma=0 short-circuit path in `well_connected` is exercised. (`refinement.rs:75-78`)
-- Size_s=0 short-circuit path in `well_connected` is exercised. (`refinement.rs:92-97`)
-- Singleton and non-singleton `RefinementState` initialization are both tested. (`refinement.rs:21-50`)
-- Disconnected subgraphs within one coarse community are tested (should never merge). (`refinement.rs:114-137`)
-- Path and clique graphs are both tested for boundary preservation. (`refinement.rs:142-184`)
-- Empty edges and zero-total-weight guards in the property test prevent degenerate inputs from producing false failures. (`refinement.rs:253-260`)
+Five graph topologies are exercised: K_{1,5} star (pathological hub), K4 complete, path-n6 (linear), two K3 triangles with a bridge (clear community structure), K5 complete. Seed range 0–255 exercises all RNG initialization values. The empty-graph case (`n=0`) is covered by the doc test in `leiden/mod.rs:37–44`, not this file — acceptable given the file's focus on termination and non-trivial topology.
 
 **3. Implementation Exercise — PASS**
 
-All tests call real implementation code with no mocking:
-- `refine_partition`, `compute_modularity`, `well_connected`, `RefinementState::from_partition`, `RefinementState::apply_move` — called directly via `sdivi_detection::internal` (`lib.rs:34-38`).
-- `run_leiden` — called directly via `sdivi_detection::leiden` (`lib.rs:23`).
-- `LeidenGraph::from_edges` — real constructor.
-- `build_dependency_graph_from_edges` — real function; exercises the full `DependencyGraph` → `LeidenGraph` path that `run_leiden` itself uses (`leiden/mod.rs:50`).
+Both new tests call `run_leiden` with real `DependencyGraph` inputs constructed via `build_dependency_graph_from_edges`. `run_leiden` delegates directly to `leiden_recursive`, which is the function restructured by M49.2. No mocking; no stubs.
 
-**4. Test Weakening Detection — PASS (false positive resolved; hardening confirmed)**
+**4. Test Weakening Detection — PASS (strengthening confirmed)**
 
-The proptest split adds `fork: true` + `timeout: 10_000` to `prop_refine_modularity_does_not_decrease` and enables the Cargo features that make those settings non-silent (`Cargo.toml:31`). This is a hardening: cases that previously hung the test binary indefinitely are now killed after 10 seconds and reported as minimized failures. The coarse-community invariant property (`prop_refine_does_not_increase_coarse_communities`) is unchanged. No assertions were removed; no expected values were broadened.
+Removing `#[ignore = "fails until M49.2 fixes leiden blowup; see milestone"]` from `leiden_termination_regression_star_n6_seed0` means the test now runs in every `cargo test` invocation. The timeout, assertion, and input triple are unchanged. This is an unambiguous strengthening — a known-hanging case is now a required-passing guard.
 
 **5. Test Naming and Intent — PASS**
 
-All 14 test names encode both scenario and expected outcome:
-- `from_partition_singleton_init_sigma_tot` — input kind, field, condition ✓
-- `well_connected_size_s_zero_always_true` — boundary condition named explicitly ✓
-- `leiden_termination_regression_star_n6_seed0` — algorithm, bug class, and minimal repro inputs all encoded ✓
-- `prop_refine_modularity_does_not_decrease` — property and direction ✓
+- `leiden_termination_regression_star_n6_seed0`: encodes the bug class (termination regression), the graph topology (K_{1,5} star), and the exact parameters (`n=6`, `seed=0`).
+- `termination_sweep_known_graphs_all_seeds`: encodes the method (brute-force sweep), the input class (known graphs), and the variable (all seeds).
+
+Both names state scenario and expected outcome without ambiguity.
 
 **6. Scope Alignment — PASS**
 
-All referenced symbols are live in the current codebase:
-- `sdivi_detection::internal::{compute_modularity, refine_partition, well_connected, LeidenGraph, RefinementState}` — all re-exported via `lib.rs:34-38`.
-- `sdivi_detection::leiden::run_leiden` — public function at `leiden/mod.rs:45`.
-- `sdivi_graph::dependency_graph::build_dependency_graph_from_edges` — available via dev-dep at `Cargo.toml:38`.
-- `sdivi_parsing::feature_record::FeatureRecord` — available via `sdivi-parsing` dev-dep at `Cargo.toml:39`.
-- No references to deleted files, renamed functions, or removed features.
+All imports in the modified file resolve to current live symbols:
+- `sdivi_detection::leiden::run_leiden` — public at `leiden/mod.rs:45`
+- `sdivi_detection::partition::LeidenConfig` — unchanged
+- `sdivi_graph::dependency_graph::build_dependency_graph_from_edges` — unchanged
+
+No references to deleted files (`.tekhton/.commit_decision`, `stage_tester_r1_b0.json`) or renamed symbols.
 
 **7. Test Isolation — PASS**
 
-Both test files are fully self-contained:
-- All test data is constructed in-memory (`LeidenGraph::from_edges`, `build_dependency_graph_from_edges`, `FeatureRecord` struct literals).
-- No test reads from `.tekhton/`, `.sdivi/`, snapshots, build reports, or any other mutable project file.
-- No test depends on prior pipeline run state.
-- The regression test in `leiden_termination.rs` uses a dedicated thread and `mpsc::channel` — no shared global state, no filesystem I/O.
+Both tests construct all input data in-memory from literal edge lists. No test reads `.tekhton/` files, `.sdivi/` snapshots, build reports, CI artifacts, or any other mutable project state. The regression test uses a dedicated thread and `mpsc::channel` — no shared global state, no filesystem I/O. The fixture files listed in the audit context's freshness sample (`tests/fixtures/simple-rust/.sdivi/snapshots/*.json`, `tests/fixtures/simple-rust/Cargo.toml`) are static committed files; no test in `leiden_termination.rs` references them.

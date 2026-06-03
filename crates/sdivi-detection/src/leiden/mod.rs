@@ -115,6 +115,11 @@ pub fn run_leiden_with_weights(
 }
 
 /// Recursive Leiden step operating on a graph at one aggregation level.
+///
+/// Structured to match Traag et al. 2019 Algorithm 1: local moves run to
+/// convergence at the current level, then the aggregate is descended into
+/// **at most once** per invocation.  The previous structure descended on every
+/// local-move sweep, producing O(max_iter^depth) work for pathological inputs.
 #[allow(clippy::too_many_arguments)] // all args are genuinely distinct algorithm parameters
 fn leiden_recursive(
     graph: &LeidenGraph,
@@ -141,54 +146,58 @@ fn leiden_recursive(
     let mut partition: Vec<usize> = initial;
     renumber(&mut partition);
 
+    // Phase 1: run local moves to convergence (bounded by max_iter sweeps).
+    let mut any_moved = false;
     for _iter in 0..max_iter {
         let moved = local_move::local_move_phase(graph, &mut partition, rng, quality, gamma);
-
         if !moved {
             break;
         }
-
-        let refined = refine_partition(graph, &partition, rng, quality, gamma);
-
-        let AggregateResult {
-            graph: agg_graph,
-            membership,
-        } = aggregate_network(graph, &refined);
-
-        if agg_graph.n >= graph.n {
-            break; // identity compression — refinement merged zero nodes
-        }
-        // Secondary convergence: stop if compression is below the minimum ratio.
-        // The float comparison is deterministic given a fixed min_compression_ratio.
-        let threshold = graph.n as f64 * (1.0 - min_compression_ratio);
-        if agg_graph.n as f64 > threshold {
-            tracing::debug!(
-                target: "sdivi_detection::leiden",
-                depth,
-                n_before = graph.n,
-                n_after = agg_graph.n,
-                "compression cutoff triggered"
-            );
-            break;
-        }
-
-        let agg_init = map_to_aggregate_init(&partition, &refined, agg_graph.n);
-        let agg_result = leiden_recursive(
-            &agg_graph,
-            agg_init,
-            rng,
-            max_iter,
-            quality,
-            gamma,
-            min_compression_ratio,
-            max_recursion_depth,
-            depth + 1,
-        );
-
-        partition = flatten_partition(&agg_result, &membership, graph.n);
-        renumber(&mut partition);
+        any_moved = true;
     }
 
+    if !any_moved {
+        return partition; // already locally optimal — no aggregation needed
+    }
+
+    // Phase 2: refine, aggregate, and recurse ONCE per level transition.
+    let refined = refine_partition(graph, &partition, rng, quality, gamma);
+    let AggregateResult {
+        graph: agg_graph,
+        membership,
+    } = aggregate_network(graph, &refined);
+
+    if agg_graph.n >= graph.n {
+        return partition; // identity compression — refinement merged zero nodes
+    }
+    // Stop if compression is below the minimum ratio.
+    let threshold = graph.n as f64 * (1.0 - min_compression_ratio);
+    if agg_graph.n as f64 > threshold {
+        tracing::debug!(
+            target: "sdivi_detection::leiden",
+            depth,
+            n_before = graph.n,
+            n_after = agg_graph.n,
+            "compression cutoff triggered"
+        );
+        return partition;
+    }
+
+    let agg_init = map_to_aggregate_init(&partition, &refined, agg_graph.n);
+    let agg_result = leiden_recursive(
+        &agg_graph,
+        agg_init,
+        rng,
+        max_iter,
+        quality,
+        gamma,
+        min_compression_ratio,
+        max_recursion_depth,
+        depth + 1,
+    );
+
+    partition = flatten_partition(&agg_result, &membership, graph.n);
+    renumber(&mut partition);
     partition
 }
 
