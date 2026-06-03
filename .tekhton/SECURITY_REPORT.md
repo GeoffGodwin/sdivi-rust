@@ -1,11 +1,8 @@
 ## Summary
-
-This change modifies a single test file (`crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`) to replace a manually maintained list of `assert_ne!` calls with a loop over the internal `ALL_CATEGORIES` constant. The change is entirely within test code; no production code, no public API surface, no I/O, no user input, no authentication or cryptographic logic is touched. The security posture of this change is clean.
+M49.1 changes are entirely confined to test infrastructure: one dev-dependency feature flag addition (`proptest = { features = ["fork", "timeout"] }`) and three test-only files (`refinement.rs`, `leiden_termination.rs`, `refinement.proptest-regressions`). No production crate code is touched. There are no authentication, cryptography, user-input handling, or network communication changes. The change surface is narrow and low-risk.
 
 ## Findings
-
 None
 
 ## Verdict
-
 CLEAN

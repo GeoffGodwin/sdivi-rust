@@ -1,67 +1,85 @@
 ## Test Audit Report
 
 ### Audit Summary
-Tests audited: 1 file, 7 test functions
+Tests audited: 2 files, 14 test functions (12 runnable + 1 ignored regression guard + 2 proptest property tests in separate blocks)
 Verdict: PASS
 
 ### Findings
 
-#### SCOPE: Shell orphan-detection false positive
-- File: `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`
-- Issue: The pre-verified orphan list claims this file "imports deleted module '.tekhton/.commit_decision'" (listed twice). The file was read in full. Its three `use` declarations are `sdivi_patterns::queries::category_for_node_kind`, `sdivi_patterns::queries::concurrency`, and `sdivi_patterns::queries::ALL_CATEGORIES` — all live symbols in the current codebase. `.tekhton/.commit_decision` is not a Rust module path and cannot appear in a `use` statement. This is a false positive in the orphan-detection script, likely a filename-fragment grep rather than Rust `use` analysis.
+#### SCOPE: Shell orphan detector reports false positives for both files
+- File: `crates/sdivi-detection/tests/refinement.rs`, `crates/sdivi-detection/tests/leiden_termination.rs`
+- Issue: The pre-verified orphan list claims both test files "import deleted module '.tekhton/.commit_decision'". Both files were read in full. `refinement.rs` imports `proptest::prelude::*`, `rand::rngs::StdRng`, `rand::SeedableRng`, and four symbols from `sdivi_detection::internal` and `sdivi_graph`. `leiden_termination.rs` imports `sdivi_detection::leiden::run_leiden`, `sdivi_detection::partition::LeidenConfig`, and `sdivi_graph::dependency_graph::build_dependency_graph_from_edges`. A grep for "commit_decision" across both files returns zero matches. `.tekhton/.commit_decision` is not a Rust module path and cannot appear in a `use` statement. These are false positives from the orphan-detection script.
 - Severity: LOW
-- Action: Dismiss the orphan flag. No test changes needed.
+- Action: Dismiss both orphan flags. No test changes needed. Investigate the orphan-detection script's path-matching logic; it is emitting spurious alerts that auditors must manually refute.
 
-#### SCOPE: Language-parameter tests lock in behavior marked as temporary in implementation
-- File: `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:42–67` (`go_statement_language_parameter_ignored`)
-- Issue: The test asserts that `category_for_node_kind("select_statement", "python")` and `category_for_node_kind("select_statement", "rust")` both return `Some("concurrency")`. The `concurrency.rs` module doc explicitly notes that the `_language` parameter exists for a future per-language override — specifically because SQL grammars also emit `select_statement`. These assertions correctly reflect current behavior but will require deliberate updating when a SQL adapter is added. Pre-existing; not introduced by this cycle.
+#### WEAKENING: Shell weakening detector reports false positive
+- File: `crates/sdivi-detection/tests/refinement.rs`
+- Issue: The pre-verified weakening report states "net loss of 2 assertion(s) (removed 2, added 0)" in `refinement.rs`. These two assertions (`p.modularity > 0.1` and `p.community_count() >= 2`) were not removed — they were moved verbatim to `leiden_termination.rs:43-52` as part of a line-count compliance refactor documented in CODER_SUMMARY.md. Both assertions are present and exercised in the new file. Net assertion count across both files is unchanged.
 - Severity: LOW
-- Action: No immediate action. When a SQL adapter is added, update these assertions. Consider adding an inline comment: `// NOTE: must be revised when a SQL language adapter is introduced (see concurrency.rs SQL adapter seed note)`.
+- Action: No test change needed. The weakening detector counts deletions from individual files without checking whether deleted content reappears in another file in the same commit. This is a known limitation of single-file diff analysis and should be documented as a known false-positive class for cross-file moves.
+
+#### COVERAGE: Ignored regression guard is intentional and correctly structured
+- File: `crates/sdivi-detection/tests/leiden_termination.rs:71-101`
+- Issue: `leiden_termination_regression_star_n6_seed0` is marked `#[ignore = "fails until M49.2 fixes leiden blowup; see milestone"]`. This is not a coverage gap — M49.1's stated scope is to capture and contain the hang, not fix it. The ignore annotation documents the responsible milestone (M49.2) and encodes the minimal reproducer minimized by proptest (`n=6, K_{1,5} star, seed=0`). The 30-second thread-join timeout (`rx.recv_timeout(Duration::from_secs(30))`) correctly distinguishes "terminates but wrong" from "does not terminate" once M49.2 un-ignores it.
+- Severity: LOW
+- Action: None. Confirm M49.2 uses un-ignoring this test as its acceptance criterion.
+
+---
 
 ### Rubric Evaluation
 
 **1. Assertion Honesty — PASS**
 
-All assertions derive from real function calls, not hard-coded magic values:
-- `go_statement` and `select_statement` are in `concurrency::NODE_KINDS` (concurrency.rs:56); `category_for_node_kind` returns `Some("concurrency")` via the `concurrency::NODE_KINDS.contains()` branch (mod.rs:120–121). ✓
-- `defer_statement` is in `resource_management::NODE_KINDS` (resource_management.rs:23); returns `Some("resource_management")` via mod.rs:128–129. ✓
-- `go_foo_statement` and `unknown_node` appear in no `NODE_KINDS` constant across any category module; `None` is structurally guaranteed. ✓
-- The `ALL_CATEGORIES` loop derives its expected outcomes from `category_for_node_kind` return values, not from literals. ✓
+All assertions derive their expected values from implementation logic or analytically provable invariants:
+- `sigma_tot` comparisons use `g.degree[i]` directly, not literals. (`refinement.rs:30-32`)
+- The `6.0` in `from_partition_non_singleton_inner_edges` is provable: 3 nodes each with degree 2 in a triangle = 6.0. (`refinement.rs:47`)
+- `apply_move_updates_sigma_tot_and_size` checks `sigma_tot[1]` against `g.degree[0] + g.degree[1]` — derived from the actual degree values. (`refinement.rs:67`)
+- `well_connected_strong_connection_passes` computes the threshold the same way the implementation does (`gamma * (sc - sc*sc/ss)`) and uses a `1e-9` margin to avoid binary-IEEE-754 representation issues — correctly mirrors `refine.rs:138`. (`refinement.rs:87-88`)
+- `prop_refine_modularity_does_not_decrease` computes `q_baseline` via the real `compute_modularity` on the all-singletons assignment — a provably ≤ 0 value — then asserts Leiden improves on it with `1e-9` floating-point tolerance. (`refinement.rs:262-267`)
+- The `> 0.1` threshold in `leiden_with_corrected_refine_gives_positive_modularity` is a meaningful lower bound for a ring-of-3-cliques with two dense internal clusters and one bridge edge. (`leiden_termination.rs:43-47`)
 
 **2. Edge Case Coverage — PASS**
 
-- `unknown_go_node_kinds_return_none`: covers the `None`/unrecognized-input path.
-- `defer_statement_maps_to_resource_management`: guards a semantically adjacent node kind against misclassification into `concurrency`.
-- `go_statement_not_misclassified`: comprehensive negative check across all 19 categories.
-- Ratio of boundary/error-path tests to happy-path tests is healthy.
+- Gamma=0 short-circuit path in `well_connected` is exercised. (`refinement.rs:75-78`)
+- Size_s=0 short-circuit path in `well_connected` is exercised. (`refinement.rs:92-97`)
+- Singleton and non-singleton `RefinementState` initialization are both tested. (`refinement.rs:21-50`)
+- Disconnected subgraphs within one coarse community are tested (should never merge). (`refinement.rs:114-137`)
+- Path and clique graphs are both tested for boundary preservation. (`refinement.rs:142-184`)
+- Empty edges and zero-total-weight guards in the property test prevent degenerate inputs from producing false failures. (`refinement.rs:253-260`)
 
 **3. Implementation Exercise — PASS**
 
-All seven tests call real functions (`category_for_node_kind`, `concurrency::NODE_KINDS`, `ALL_CATEGORIES`) with zero mocking. The full dispatch chain in mod.rs:114–139 is exercised on every call.
+All tests call real implementation code with no mocking:
+- `refine_partition`, `compute_modularity`, `well_connected`, `RefinementState::from_partition`, `RefinementState::apply_move` — called directly via `sdivi_detection::internal` (`lib.rs:34-38`).
+- `run_leiden` — called directly via `sdivi_detection::leiden` (`lib.rs:23`).
+- `LeidenGraph::from_edges` — real constructor.
+- `build_dependency_graph_from_edges` — real function; exercises the full `DependencyGraph` → `LeidenGraph` path that `run_leiden` itself uses (`leiden/mod.rs:50`).
 
-**4. Test Weakening Detection — PASS (strengthening confirmed)**
+**4. Test Weakening Detection — PASS (false positive resolved; hardening confirmed)**
 
-The coder's change to `go_statement_not_misclassified` (lines 110–127) replaced a static 18-entry manual `assert_ne!` list with a loop over `ALL_CATEGORIES`. This is strictly stronger:
-- The original covered 18 categories statically at write time.
-- The new loop covers all 19 current categories and any future additions automatically.
-- The loop adds an explicit `assert_eq!` branch for `"concurrency"` rather than silently skipping it, converting an implicit assumption into a behavioral assertion.
-No assertions were removed. No expected values were broadened.
+The proptest split adds `fork: true` + `timeout: 10_000` to `prop_refine_modularity_does_not_decrease` and enables the Cargo features that make those settings non-silent (`Cargo.toml:31`). This is a hardening: cases that previously hung the test binary indefinitely are now killed after 10 seconds and reported as minimized failures. The coarse-community invariant property (`prop_refine_does_not_increase_coarse_communities`) is unchanged. No assertions were removed; no expected values were broadened.
 
 **5. Test Naming and Intent — PASS**
 
-All seven names precisely encode the scenario and expected outcome:
-- `go_statement_maps_to_concurrency_category` — input, expected output ✓
-- `select_statement_maps_to_concurrency_category` — input, expected output ✓
-- `go_statement_language_parameter_ignored` — behavioral property tested ✓
-- `unknown_go_node_kinds_return_none` — inputs and expected output ✓
-- `defer_statement_maps_to_resource_management` — input, expected output ✓
-- `all_concurrency_node_kinds_are_classified` — scope and expected outcome ✓
-- `go_statement_not_misclassified` — input and invariant tested ✓
+All 14 test names encode both scenario and expected outcome:
+- `from_partition_singleton_init_sigma_tot` — input kind, field, condition ✓
+- `well_connected_size_s_zero_always_true` — boundary condition named explicitly ✓
+- `leiden_termination_regression_star_n6_seed0` — algorithm, bug class, and minimal repro inputs all encoded ✓
+- `prop_refine_modularity_does_not_decrease` — property and direction ✓
 
 **6. Scope Alignment — PASS**
 
-All three imports (`category_for_node_kind`, `concurrency`, `ALL_CATEGORIES`) are live symbols. The deleted file `.tekhton/.commit_decision` is not referenced in the test source. The coder's stated change (replacing manual `assert_ne!` list with `ALL_CATEGORIES` loop) matches what is present at lines 110–127. No stale references to deleted or renamed items.
+All referenced symbols are live in the current codebase:
+- `sdivi_detection::internal::{compute_modularity, refine_partition, well_connected, LeidenGraph, RefinementState}` — all re-exported via `lib.rs:34-38`.
+- `sdivi_detection::leiden::run_leiden` — public function at `leiden/mod.rs:45`.
+- `sdivi_graph::dependency_graph::build_dependency_graph_from_edges` — available via dev-dep at `Cargo.toml:38`.
+- `sdivi_parsing::feature_record::FeatureRecord` — available via `sdivi-parsing` dev-dep at `Cargo.toml:39`.
+- No references to deleted files, renamed functions, or removed features.
 
 **7. Test Isolation — PASS**
 
-All tests are self-contained function calls with literal string inputs. No filesystem reads, no mutable project-state access (no `.tekhton/` file reads, no snapshot files, no config state), no dependency on prior pipeline runs. Fully isolated; order-independent.
+Both test files are fully self-contained:
+- All test data is constructed in-memory (`LeidenGraph::from_edges`, `build_dependency_graph_from_edges`, `FeatureRecord` struct literals).
+- No test reads from `.tekhton/`, `.sdivi/`, snapshots, build reports, or any other mutable project file.
+- No test depends on prior pipeline run state.
+- The regression test in `leiden_termination.rs` uses a dedicated thread and `mpsc::channel` — no shared global state, no filesystem I/O.

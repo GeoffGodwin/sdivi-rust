@@ -28,7 +28,7 @@ rand        = { workspace = true }
 tracing     = { workspace = true }
 
 [dev-dependencies]
-proptest     = { workspace = true }
+proptest     = { workspace = true, features = ["fork", "timeout"] }
 tempfile     = { workspace = true }
 # Internal sdivi-* dev-deps must use direct path (no workspace inheritance):
 # workspace.dependencies has version constraints used during cargo publish, but

@@ -183,61 +183,6 @@ fn refine_path_graph_boundary() {
     }
 }
 
-// ── Integration: full Leiden quality ─────────────────────────────────────────
-
-/// Full Leiden on a ring-of-3-cliques must produce positive modularity,
-/// confirming that the corrected refinement no longer collapses all nodes into
-/// one community.
-#[test]
-fn leiden_with_corrected_refine_gives_positive_modularity() {
-    use sdivi_graph::dependency_graph::build_dependency_graph;
-    use sdivi_parsing::feature_record::FeatureRecord;
-    use std::path::PathBuf;
-
-    let make = |p: &str, imports: &[&str]| FeatureRecord {
-        path: PathBuf::from(p),
-        language: "rust".into(),
-        imports: imports.iter().map(|s| s.to_string()).collect(),
-        exports: vec![],
-        signatures: vec![],
-        pattern_hints: vec![],
-    };
-
-    let records = vec![
-        make("src/a0.rs", &["crate::a1", "crate::a2", "crate::a3"]),
-        make("src/a1.rs", &["crate::a0", "crate::a2", "crate::a3"]),
-        make("src/a2.rs", &["crate::a0", "crate::a1", "crate::a3"]),
-        make(
-            "src/a3.rs",
-            &["crate::a0", "crate::a1", "crate::a2", "crate::b0"],
-        ),
-        make(
-            "src/b0.rs",
-            &["crate::b1", "crate::b2", "crate::b3", "crate::a3"],
-        ),
-        make("src/b1.rs", &["crate::b0", "crate::b2", "crate::b3"]),
-        make("src/b2.rs", &["crate::b0", "crate::b1", "crate::b3"]),
-        make("src/b3.rs", &["crate::b0", "crate::b1", "crate::b2"]),
-    ];
-    let dg = build_dependency_graph(&records);
-    let cfg = LeidenConfig {
-        seed: 42,
-        ..LeidenConfig::default()
-    };
-    let p = run_leiden(&dg, &cfg, None);
-
-    assert!(
-        p.modularity > 0.1,
-        "Leiden with corrected refinement must produce positive modularity (got {})",
-        p.modularity
-    );
-    assert!(
-        p.community_count() >= 2,
-        "Two-clique graph must produce ≥ 2 communities (got {})",
-        p.community_count()
-    );
-}
-
 // ── Property: coarse-community subset invariant ───────────────────────────────
 fn check_coarse_invariant(n: usize, raw_edges: &[(usize, usize)], coarse_raw: &[usize]) {
     let coarse: Vec<usize> = coarse_raw[..n].iter().map(|&c| c % 3).collect();
@@ -278,6 +223,19 @@ proptest! {
             .collect();
         check_coarse_invariant(n, &edges, &coarse_raw);
     }
+}
+
+proptest! {
+    // fork: true isolates each case in a subprocess so a non-converging run_leiden
+    // call is killed and reported as a failure (with minimized input) rather than
+    // hanging the test binary until the 30-minute CI timeout kills the runner.
+    // timeout: 10_000 ms per case.  Both require features = ["fork", "timeout"] in
+    // the dev-dependency (they are silently ignored without the Cargo features).
+    #![proptest_config(ProptestConfig {
+        timeout: 10_000,
+        fork: true,
+        ..ProptestConfig::with_cases(256)
+    })]
 
     /// Leiden must produce modularity >= the all-singletons baseline (≤ 0).
     /// (Leiden monotone-improvement guarantee: only positive-gain moves are made.)

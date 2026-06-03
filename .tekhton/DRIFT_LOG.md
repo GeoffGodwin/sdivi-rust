@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-06-02
-- Runs since audit: 1
+- Runs since audit: 2
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,6 +57,7 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [ ] [2026-06-02 | "unknown"] `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` â Pre-existing `clippy::iter_cloned_collect` warnings (`.iter().copied().collect()` should be `.to_vec()`); unrelated to M49.1 and noted by the coder. Should be cleaned up in a follow-on pass so `cargo clippy -- -D warnings` remains clean per CLAUDE.md Rule 20.
 
 ## Decisions (Declined / Will Not Implement)
 

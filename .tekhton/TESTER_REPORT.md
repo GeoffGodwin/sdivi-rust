@@ -1,11 +1,13 @@
 ## Planned Tests
-- [x] `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` — comprehensive test suite for Go concurrency node-kind classification
+- [x] `crates/sdivi-detection/tests/refinement.rs` — verify fork+timeout proptest config compiles and non-hanging cases pass
+- [x] `crates/sdivi-detection/tests/leiden_termination.rs` — verify integration test passes and ignored regression is properly skipped
 
 ## Test Run Results
-Passed: 7  Failed: 0
+Passed: 12  Failed: 0
 
 ## Bugs Found
 None
 
 ## Files Modified
-- [x] `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs`
+- [x] `crates/sdivi-detection/tests/refinement.rs`
+- [x] `crates/sdivi-detection/tests/leiden_termination.rs`

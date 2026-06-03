@@ -1,47 +1,18 @@
-# Reviewer Report
-
-**Reviewer:** code-review agent
-**Date:** 2026-06-02
-**Branch:** feature/MorePatterns
-**Review cycle:** 1 of 2
-
----
-
 ## Verdict
-APPROVED
+APPROVED_WITH_NOTES
 
 ## Complex Blockers (senior coder)
-None
+- None
 
 ## Simple Blockers (jr coder)
-None
+- None
 
 ## Non-Blocking Notes
-None
+- `leiden_termination.rs:94-96` — The thread spawned in `leiden_termination_regression_star_n6_seed0` is intentionally leaked when `run_leiden` hangs (the `tx.send` never completes, the thread is never joined). Safe here because the test process exits shortly after, but worth noting for M49.2 when the `#[ignore]` is removed and the test is expected to actually return — at that point the thread will complete normally and there is no issue.
+- `refinement.rs:229-233` comment says "forks test processes on Unix"; proptest actually uses `rusty-fork` which spawns a subprocess via `std::process::Command` and is cross-platform. On Windows the feature is active (just slower), so the comment slightly understates coverage. Consider s/forks test processes on Unix/spawns a subprocess per case/ to avoid misleading future readers.
 
 ## Coverage Gaps
-None
+- None
 
 ## Drift Observations
-None
-
----
-
-## Review Notes
-
-The single file modified — `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs` — is
-a test-only change. The implementation:
-
-- Replaces the prior manual 18-entry `assert_ne!` block in `go_statement_not_misclassified`
-  with a loop over `ALL_CATEGORIES` (imported from `sdivi_patterns::queries`).
-- The branch logic is correct: when `*cat == "concurrency"` it asserts the result equals
-  `Some("concurrency")`; for every other category it asserts inequality. This faithfully
-  replicates the semantics of the old hand-enumerated list while being self-maintaining.
-- `ALL_CATEGORIES` is confirmed to contain `"concurrency"` at index 4, so the positive
-  assertion branch will fire exactly once, as intended.
-- The `concurrency` sub-module is a public re-export from `sdivi_patterns::queries`
-  (`pub mod concurrency` at mod.rs:17), so `use sdivi_patterns::queries::concurrency` is
-  a valid import.
-
-No public surface was touched. Doc requirement is satisfied. No architecture rule from
-CLAUDE.md is implicated by a test-file refactor.
+- `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` — Pre-existing `clippy::iter_cloned_collect` warnings (`.iter().copied().collect()` should be `.to_vec()`); unrelated to M49.1 and noted by the coder. Should be cleaned up in a follow-on pass so `cargo clippy -- -D warnings` remains clean per CLAUDE.md Rule 20.
