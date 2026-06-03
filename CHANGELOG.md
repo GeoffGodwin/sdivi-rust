@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.51] - 2026-06-03
+
+### Changed
+
+- **Disabled `wasm-opt` post-processing in the wasm-pack release profile.**
+  Binaryen (`wasm-opt`) is often unavailable in network-restricted build
+  environments; the `release-wasm` Cargo profile (`opt-level = "z"`, fat LTO)
+  already provides the primary size reduction. The bundler/node `.wasm` grows
+  ~10% (≈1.53 MB → ≈1.68 MB) but stays within the 1.75 MB per-target budget.
+  `snapshot_version` stays `"1.0"`.
+
 ## [0.2.50] - 2026-06-03
 
 ### Fixed

@@ -3,7 +3,7 @@
   "stage": "tester",
   "verdict": "pass",
   "exit_reason": "exit=0",
-  "agent_calls": 2,
-  "duration_sec": 294,
+  "agent_calls": 3,
+  "duration_sec": 703,
   "human_action_required": false
 }

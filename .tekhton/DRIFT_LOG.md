@@ -2,7 +2,7 @@
 
 ## Metadata
 - Last audit: 2026-06-02
-- Runs since audit: 3
+- Runs since audit: 4
 
 ## M28 Leiden Perf Bugs — Discovered and Fixed (2026-05-07)
 
@@ -57,12 +57,14 @@ Both bugs were correctness-irrelevant for the `verify-leiden` fixtures (small/me
   disabled or skipped.
 
 ## Unresolved Observations
+- [ ] [2026-06-03 | "unknown"] `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` â Pre-existing `clippy::iter_cloned_collect` warnings carried forward from M49.2. Should be cleaned up so `cargo clippy -- -D warnings` stays green per CLAUDE.md Rule 20.
 - [ ] [2026-06-03 | "unknown"] `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` â Pre-existing `clippy::iter_cloned_collect` warnings noted by the coder (unrelated to M49.2). Should be cleaned up in a follow-on pass so `cargo clippy -- -D warnings` remains green per CLAUDE.md Rule 20.
 - [ ] [2026-06-02 | "unknown"] `crates/sdivi-detection/tests/renumber_delegation.rs:83,85` â Pre-existing `clippy::iter_cloned_collect` warnings (`.iter().copied().collect()` should be `.to_vec()`); unrelated to M49.1 and noted by the coder. Should be cleaned up in a follow-on pass so `cargo clippy -- -D warnings` remains clean per CLAUDE.md Rule 20.
 
 ## Decisions (Declined / Will Not Implement)
 
 ## Resolved
+- [x] [2026-06-03 | "unknown"] `Cargo.toml:51-70` â Internal crate workspace dependencies (`sdivi-core`, `sdivi-pipeline`, etc.) are pinned at `version = "0.2.13"` while `[workspace.package].version` is `0.2.51`. Pre-existing state not introduced by M50, but the ~38-patch divergence between the workspace version and the dependency-constraint declarations will mislead future contributors. Appropriate for a future cleanup pass.
 - [RESOLVED 2026-06-02] `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:97â122` â The negative-category enumeration in `go_statement_not_misclassified` is a manual list parallel to `queries::ALL_CATEGORIES`. The same pattern was just fixed in `all_concurrency_node_kinds_are_classified` (drift observation 2 of this cycle). Both lists will drift independently when new categories are added; worth a single follow-up pass to drive both from `ALL_CATEGORIES`.
 - [RESOLVED 2026-06-02] `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:57` — `unknown_go_node_kinds_return_none` had a misleading name: its third assertion returned `Some("resource_management")`, not `None`. Fixed: split into `unknown_go_node_kinds_return_none` (two None assertions) and new `defer_statement_maps_to_resource_management` (the resource_management assertion). Logic unchanged; name now accurately describes each function.
 - [RESOLVED 2026-06-02] `crates/sdivi-patterns/tests/go_concurrency_node_kind.rs:70` — `all_concurrency_node_kinds_are_classified` hard-coded `vec!["go_statement", "select_statement"]` instead of importing `concurrency::NODE_KINDS`. Fixed: test now iterates `concurrency::NODE_KINDS` directly, ensuring automatic sync when the constant grows.
