@@ -446,6 +446,33 @@ Under `tests/fixtures/`:
 - Benchmarks: `cargo bench --features bench`
 - Coverage (CI nightly): `cargo llvm-cov --workspace --html`
 
+### Pre-release gate set (run the FULL CI matrix before tagging — not a subset)
+
+A green `cargo build` + `cargo test` + `cargo clippy` + `cargo fmt --check` does
+**not** imply CI is green. `v0.2.47` was tagged and published to crates.io and
+npm while `main` was red on three gates that the standard four don't cover.
+Before cutting any release, reproduce **every** CI gate locally, with the exact
+flags CI uses:
+
+- **Docs:** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude sdivi-wasm --exclude sdivi-rust --no-deps`
+  (a public item linking to a `pub(crate)`/private item fails only here, not in `cargo build`).
+- **WASM bundle size:** `wasm-pack build --target bundler --release` (with the
+  size-opt env `CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat
+  CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1`) and check `pkg/bundler/*_bg.wasm` against
+  `WASM_BUDGET_BYTES` in `wasm.yml`.
+- **WASM consumer typecheck:** `npx tsc --noEmit -p bindings/sdivi-wasm/tests/typecheck/tsconfig.json`
+  with pinned TypeScript — environment-dependent type resolution (e.g. ambient
+  `@types/node`) can make this pass locally but fail on a clean runner; pin `lib`.
+- **WASM forbidden-dep tree:** the exact `cargo tree … -e normal,build` from `wasm.yml`
+  (dev-deps like `tempfile` via `proptest` are excluded by `-e normal,build`; don't
+  flag them).
+
+Also: a green local `cargo test` does not catch a **flaky or hanging** test — CI
+matrix legs can hang to the job timeout and show as `cancelled` (see the Leiden
+`prop_refine_modularity_does_not_decrease` blowup). After any push to `main`, watch
+the actual CI run to completion (`gh run watch`) before tagging; don't infer green
+from a local subset.
+
 ## Development Environment
 
 ### Prerequisites
