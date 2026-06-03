@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.50] - 2026-06-03
+
 ### Fixed
 
 - **Leiden non-termination on pathological small graphs (M49.2).** `leiden_recursive`
@@ -19,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `snapshot_version` stays `"1.0"`.  Because the restructuring changes the order of
   RNG draws, some inputs will see different (but deterministic and quality-preserving)
   cluster assignments compared to pre-M49.2. See `MIGRATION_NOTES.md`.
+
+- **CI: Leiden hang is now caught fast (M49.1).** Enabled `proptest`'s `fork` +
+  `timeout` features and a per-case timeout for the `sdivi-detection` refinement
+  proptests, so a non-terminating case fails in seconds with its minimized input
+  instead of hanging the CI runner to its 30-minute timeout. The captured minimal
+  case is committed as a regression and guarded by a deterministic termination test.
 
 ## [0.2.48] - 2026-06-02
 
